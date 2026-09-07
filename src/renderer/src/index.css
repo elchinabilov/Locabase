@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #0b0f14;
+  --color-panel: #111820;
+  --color-panel-2: #161f29;
+  --color-line: #1e2a36;
+  --color-line-soft: #182430;
+  --color-text: #dbe4ee;
+  --color-muted: #7d8fa3;
+  --color-accent: #3ecf8e;
+  --color-accent-dim: #1c6b4c;
+  --color-warn: #f0b429;
+  --color-danger: #ef5f5f;
+  --color-info: #5aa9e6;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #22303d;
+  border-radius: 6px;
+  border: 2px solid var(--color-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2c3d4d;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* fokus halqası — klaviatura ilə naviqasiya üçün */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

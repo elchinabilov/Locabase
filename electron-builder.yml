@@ -1,0 +1,27 @@
+appId: app.supabase-gui
+productName: Supabase GUI
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+asarUnpack:
+  - resources/**
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch: [arm64]
+  # İmzalama və notarization sonrakı mərhələdə — hələlik lokal build.
+  identity: null
+  darkModeSupport: true
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+linux:
+  target: [AppImage]
+  category: Development
+npmRebuild: false
