@@ -1,28 +1,10 @@
 import { useCallback, useState, type ReactNode } from 'react'
-import type { Project, StackStatus } from '@shared/types'
+import type { FieldValue, Project, ServiceStatus, StackStatus } from '@shared/types'
+import { formatBytes, SERVICE_GROUPS } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
 import { cx, timeAgo } from '../lib/format'
-import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Row } from '../components/ui'
+import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Row, Toggle } from '../components/ui'
 import type { RouteId } from '../app'
-
-/** Konteyner adından oxunaqlı servis adı. */
-const SERVICE_LABEL: Record<string, string> = {
-  db: 'Postgres',
-  kong: 'Kong (API gateway)',
-  auth: 'GoTrue (auth)',
-  rest: 'PostgREST',
-  realtime: 'Realtime',
-  storage: 'Storage',
-  imgproxy: 'Imgproxy',
-  studio: 'Studio',
-  studio_next: 'Studio',
-  pg_meta: 'pg-meta',
-  edge_runtime: 'Edge runtime',
-  inbucket: 'Mailpit',
-  analytics: 'Logflare',
-  vector: 'Vector',
-  pooler: 'Supavisor'
-}
 
 export function Dashboard({
   project,
@@ -65,10 +47,14 @@ function ProjectView({
   onChanged: () => void
   onRoute: (r: RouteId) => void
 }): ReactNode {
-  const status = useQuery('stack:status', { id: project.id }, [project.id], { pollMs: 6000 })
+  const status = useQuery('stack:status', { id: project.id, withStats: true }, [project.id], {
+    pollMs: 8000
+  })
+  const config = useQuery('config:read', { id: project.id }, [project.id])
   const conflicts = useQuery('ports:conflicts', undefined, [], { pollMs: 30000 })
   const [busy, setBusy] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [needsRestart, setNeedsRestart] = useState(false)
 
   const act = useCallback(
     async (kind: 'start' | 'stop' | 'restart') => {
@@ -78,6 +64,7 @@ function ProjectView({
           { start: 'stack:start', stop: 'stack:stop', restart: 'stack:restart' } as const
         )[kind]
         await call(channel, { id: project.id })
+        setNeedsRestart(false)
       } finally {
         setBusy(null)
         status.refresh()
@@ -135,8 +122,28 @@ function ProjectView({
         </div>
       )}
 
+      {needsRestart && (
+        <div className="flex items-center gap-3 rounded-md border border-[#4a3c17] bg-[#211c10] px-3.5 py-2 text-[12px] text-warn">
+          Servis keçidi `config.toml`-a yazıldı. Konteynerlər yalnız restartdan sonra dəyişəcək.
+          <Button onClick={() => void act('restart')} loading={busy === 'restart'}>
+            İndi restart et
+          </Button>
+          <button onClick={() => setNeedsRestart(false)} className="text-muted hover:text-text">
+            sonra
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
-        <Services status={s} projectId={project.id} />
+        <Services
+          status={s}
+          projectId={project.id}
+          configValues={config.data?.values}
+          onToggled={() => {
+            setNeedsRestart(true)
+            config.refresh()
+          }}
+        />
         <div className="flex flex-col gap-3">
           <QuickLinks vars={s?.vars ?? {}} running={running} />
           <Environments project={project} onRoute={onRoute} onChanged={onChanged} />
@@ -154,15 +161,28 @@ function ProjectView({
   )
 }
 
+/**
+ * Servis siyahısı: hər sətir bir `config.toml` açarına bağlıdır. Söndürmək
+ * konteyneri dayandırmır — CLI-yə onu ümumiyyətlə qaldırmamağı deyir, ona görə
+ * dəyişiklik restartdan sonra qüvvəyə minir.
+ */
 function Services({
   status,
-  projectId
+  projectId,
+  configValues,
+  onToggled
 }: {
   status: StackStatus | null
   projectId: string
+  configValues: Record<string, FieldValue> | undefined
+  onToggled: () => void
 }): ReactNode {
   const [tailing, setTailing] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const services = status?.services ?? []
+  const byKey = new Map(services.map((s) => [s.key, s]))
 
   const toggleTail = useCallback(
     async (container: string) => {
@@ -174,50 +194,152 @@ function Services({
     [projectId, tailing]
   )
 
+  const setGroup = useCallback(
+    async (configPath: string, on: boolean) => {
+      setSaving(configPath)
+      setError(null)
+      try {
+        await call('stack:setService', { id: projectId, configPath, on })
+        onToggled()
+      } catch (err) {
+        setError((err as Error).message)
+      } finally {
+        setSaving(null)
+      }
+    },
+    [projectId, onToggled]
+  )
+
+  const total = services.reduce((sum, s) => sum + (s.memory ?? 0), 0)
+  const running = services.filter((s) => s.state === 'running').length
+
   return (
     <Card
       title="Servislər"
-      subtitle={`${services.filter((x) => x.state === 'running').length} / ${services.length} işləyir`}
+      subtitle={`${running} / ${services.length} işləyir${total > 0 ? ` · ${formatBytes(total)} RAM` : ''}`}
     >
-      {services.length === 0 ? (
-        <p className="px-3.5 py-6 text-center text-[12px] text-muted">
-          Konteyner tapılmadı — stack dayanıb.
-        </p>
-      ) : (
-        <ul className="divide-y divide-line-soft">
-          {services.map((svc) => {
-            const tone =
-              svc.state !== 'running'
-                ? 'muted'
-                : svc.health === 'unhealthy'
-                  ? 'danger'
-                  : svc.health === 'starting'
-                    ? 'warn'
-                    : 'ok'
-            return (
-              <li key={svc.container} className="flex items-center gap-2.5 px-3.5 py-2">
+      {error && (
+        <div className="px-3.5 pt-2.5">
+          <ErrorNote>{error}</ErrorNote>
+        </div>
+      )}
+      <ul className="divide-y divide-line-soft">
+        {SERVICE_GROUPS.map((group) => {
+          const members = group.keys.map((k) => byKey.get(k)).filter(Boolean) as ServiceStatus[]
+          const live = members.filter((m) => m.state === 'running')
+          // Həqiqət mənbəyi `config.toml`-dur; açar faylda yoxdursa konteynerin
+          // işləyib-işləməməsinə baxırıq (CLI default-u onda qüvvədədir).
+          const fv = group.configPath ? configValues?.[group.configPath] : undefined
+          const enabled =
+            group.configPath === null ? true : fv?.present ? fv.value === true : live.length > 0
+          const mem = members.reduce((sum, m) => sum + (m.memory ?? 0), 0)
+          const isRunning = live.length > 0
+          // Konfiqurasiya «açıq» deyir, amma konteyner qalxmayıb: stack köhnə
+          // konfiqurasiya ilə işləyir — keçid yaşıl yox, sarı görünməlidir.
+          const pending = enabled && !isRunning && (status?.running ?? false)
+          const tone: 'ok' | 'warn' | 'danger' | 'muted' =
+            !isRunning
+              ? pending
+                ? 'warn'
+                : 'muted'
+              : members.some((m) => m.health === 'unhealthy')
+                ? 'danger'
+                : members.some((m) => m.health === 'starting')
+                  ? 'warn'
+                  : 'ok'
+          const statusText = !enabled
+            ? 'söndürülüb'
+            : isRunning
+              ? (members[0]?.health ?? 'running')
+              : pending
+                ? 'restart lazım'
+                : 'dayanıb'
+          const open = expanded === group.label
+
+          return (
+            <li key={group.label}>
+              <div className="flex items-center gap-2.5 px-3.5 py-2">
+                <Toggle
+                  checked={enabled}
+                  tone={pending ? 'pending' : 'accent'}
+                  disabled={group.required || saving !== null}
+                  onChange={(v) => group.configPath && void setGroup(group.configPath, v)}
+                />
                 <Dot tone={tone} />
-                <span className="flex-1 truncate text-[12.5px]">
-                  {SERVICE_LABEL[svc.key] ?? svc.key}
-                </span>
-                <span className="text-[11px] text-muted">{svc.health ?? svc.state}</span>
                 <button
-                  onClick={() => void toggleTail(svc.container)}
+                  onClick={() => setExpanded(open ? null : group.label)}
+                  disabled={members.length < 2}
+                  className="min-w-0 flex-1 truncate text-left text-[12.5px] disabled:cursor-default"
+                  title={group.note}
+                >
+                  {group.label}
+                  {members.length > 1 && (
+                    <span className="ml-1.5 text-[10px] text-muted">{open ? '▾' : '▸'}</span>
+                  )}
+                </button>
+                <span className="w-[68px] shrink-0 text-right font-mono text-[11px] text-muted">
+                  {mem > 0 ? formatBytes(mem) : ''}
+                </span>
+                <span
                   className={cx(
-                    'rounded px-1.5 py-0.5 text-[10.5px]',
-                    tailing === svc.container
-                      ? 'bg-accent-dim text-accent'
-                      : 'text-muted hover:bg-panel-2 hover:text-text'
+                    'w-[74px] shrink-0 text-right text-[10.5px]',
+                    pending ? 'text-warn' : 'text-muted'
                   )}
                 >
-                  log
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+                  {statusText}
+                </span>
+                {members.length === 1 && members[0] && (
+                  <LogButton
+                    active={tailing === members[0].container}
+                    onClick={() => void toggleTail(members[0]!.container)}
+                  />
+                )}
+                {members.length !== 1 && <span className="w-[26px] shrink-0" />}
+              </div>
+
+              {open &&
+                members.map((m) => (
+                  <div
+                    key={m.container}
+                    className="flex items-center gap-2.5 border-t border-line-soft bg-[#0d141b] py-1.5 pr-3.5 pl-[52px]"
+                  >
+                    <Dot tone={m.state === 'running' ? 'ok' : 'muted'} />
+                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted">
+                      {m.container}
+                    </span>
+                    <span className="w-[68px] shrink-0 text-right font-mono text-[11px] text-muted">
+                      {m.memory ? formatBytes(m.memory) : ''}
+                    </span>
+                    <LogButton
+                      active={tailing === m.container}
+                      onClick={() => void toggleTail(m.container)}
+                    />
+                  </div>
+                ))}
+            </li>
+          )
+        })}
+      </ul>
+      {services.length === 0 && (
+        <p className="px-3.5 py-3 text-center text-[11.5px] text-muted">
+          Konteyner yoxdur — keçidlər `config.toml`-u göstərir, stack qalxanda vəziyyət də gələcək.
+        </p>
       )}
     </Card>
+  )
+}
+
+function LogButton({ active, onClick }: { active: boolean; onClick: () => void }): ReactNode {
+  return (
+    <button
+      onClick={onClick}
+      className={cx(
+        'w-[26px] shrink-0 rounded px-1 py-0.5 text-[10.5px]',
+        active ? 'bg-accent-dim text-accent' : 'text-muted hover:bg-panel-2 hover:text-text'
+      )}
+    >
+      log
+    </button>
   )
 }
 

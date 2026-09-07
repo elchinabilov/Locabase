@@ -16,6 +16,7 @@ import type {
   PortConflict,
   Project,
   RemoteEnv,
+  RemoteService,
   StackStatus,
   SyncReport,
   TaskResult,
@@ -37,7 +38,12 @@ export interface IpcContract {
   }
 
   /* --- stack --- */
-  'stack:status': { req: { id: string }; res: StackStatus }
+  'stack:status': { req: { id: string; withStats?: boolean }; res: StackStatus }
+  /** `config.toml`-dakı `<servis>.enabled` açarını yaz; restart tələb edir */
+  'stack:setService': {
+    req: { id: string; configPath: string; on: boolean }
+    res: { restartRequired: true }
+  }
   'stack:start': { req: { id: string }; res: TaskResult }
   'stack:stop': { req: { id: string; noBackup?: boolean }; res: TaskResult }
   'stack:restart': { req: { id: string }; res: TaskResult }
@@ -88,6 +94,13 @@ export interface IpcContract {
   'sync:deploy': { req: { id: string; plan: DeployPlan; confirm: string }; res: TaskResult }
   'remote:backup': { req: { id: string; envId: string }; res: BackupInfo }
   'remote:verify': { req: { id: string; envId: string }; res: VerifyReport }
+  /** Uzaq serverdəki konteynerlər — vəziyyət və RAM */
+  'remote:services': { req: { id: string; envId: string }; res: RemoteService[] }
+  /** Uzaq konteyneri dayandır / başlat */
+  'remote:setService': {
+    req: { id: string; envId: string; container: string; on: boolean }
+    res: TaskResult
+  }
 
   /* --- sistem --- */
   'system:doctor': {
@@ -117,6 +130,7 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'projects:pickFolder',
   'projects:inspect',
   'stack:status',
+  'stack:setService',
   'stack:start',
   'stack:stop',
   'stack:restart',
@@ -148,6 +162,8 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'sync:deploy',
   'remote:backup',
   'remote:verify',
+  'remote:services',
+  'remote:setService',
   'system:doctor'
 ]
 

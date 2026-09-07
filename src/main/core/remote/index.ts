@@ -8,6 +8,7 @@ import type {
   Project,
   RemoteEnv,
   RemoteFunctionInfo,
+  RemoteService,
   VerifyReport
 } from '@shared/types.js'
 import type { MigrationFile } from '../migrations.js'
@@ -33,6 +34,10 @@ export interface RemoteAdapter {
   deployFunctions(names: string[], log: LogFn): Promise<void>
   /** Ledger sətrini əlavə et / sil — fayllarla ledger uyğunsuzluğunu düzəltmək üçün. */
   repairLedger(version: string, status: 'applied' | 'reverted', log: LogFn): Promise<void>
+  /** Uzaq konteynerlər: vəziyyət və RAM. Managed-də idarə oluna bilmir. */
+  listServices(): Promise<RemoteService[]>
+  /** Konteyneri dayandır / başlat. */
+  setServiceState(container: string, on: boolean, log: LogFn): Promise<void>
   verify(): Promise<VerifyReport>
 }
 

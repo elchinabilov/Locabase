@@ -64,6 +64,21 @@ export interface ServiceStatus {
   state: string
   /** healthcheck varsa: healthy / unhealthy / starting */
   health: string | null
+  /** bayt; ölçülməyibsə null */
+  memory: number | null
+  /** host-un ümumi yaddaşı — faiz hesablamaq üçün */
+  memoryLimit: number | null
+}
+
+/** Uzaq serverdəki bir konteyner. */
+export interface RemoteService {
+  container: string
+  /** `supabase-db-xxxx` → `db`; tanınmasa konteyner adı */
+  key: string
+  state: string
+  health: string | null
+  memory: number | null
+  memoryLimit: number | null
 }
 
 export interface StackStatus {

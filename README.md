@@ -1,4 +1,6 @@
-# Supabase GUI
+<img src="resources/logo-128.png" width="64" alt="Localbase">
+
+# Localbase
 
 Lokal Supabase stack-ini idarə etmək, `config.toml`-u forma üzərindən redaktə
 etmək və lokal ilə remote (managed **və** self-hosted) arasındakı fərqi görüb
@@ -12,13 +14,32 @@ boşluğu doldurur: **hər şey UI-dan, faylı əl ilə açmadan.**
 
 | Ekran | Nə verir |
 | --- | --- |
-| **Ümumi** | Konteyner sağlamlığı, start/stop/restart/`db reset`, Studio·Mailpit·API·DB linkləri, port toqquşması xəbərdarlığı |
+| **Ümumi** | Servis keçidləri (on/off) + **konteyner başına RAM**, start/stop/restart/`db reset`, Studio·Mailpit·API·DB linkləri, port toqquşması xəbərdarlığı |
 | **Konfiqurasiya** | `config.toml`-un 108 sahəsi forma kimi, 14 qrupda; diff önizləməsi, restart banneri |
 | **Auth** | 19 OAuth provider, callback URL-in avtomatik hesablanması, `env()` bağlantısı |
 | **Secrets** | Kök `.env` redaktoru, maskalama, `config.toml`-un gözlədiyi boş referenslərin siyahısı |
 | **Miqrasiyalar** | Fayllar · lokal ledger · remote ledger yan-yana; new/up/diff/repair |
 | **Funksiyalar** | Siyahı, şablondan yaratma, lokal serve, `verify_jwt`, tək-tək və ya toplu deploy |
-| **Sync / Deploy** | Beş ox üzrə fərq (miqrasiya, sxem, funksiya, secret, auth), seçmə deploy, quru rejim |
+| **Sync / Deploy** | Beş ox üzrə fərq (miqrasiya, sxem, funksiya, secret, auth), seçmə deploy, quru rejim, **remote konteynerlərin on/off və RAM-ı** |
+
+## Servis keçidləri və RAM
+
+Lokal stack 9 konteynerlə ~1 GiB yeyir. Ən ağır hissələr çox vaxt lazım
+olmur — `Logflare + Vector`, `Studio + pg-meta`, `Realtime`, `Imgproxy`.
+
+**Ümumi** ekranındakı hər keçid `config.toml`-dakı bir `enabled` açarına
+bağlıdır (eyni açarı bölüşən konteynerlər bir sətirdə birləşir: `api.enabled`
+→ Kong + PostgREST). Söndürmək konteyneri dayandırmır — CLI-yə onu
+ümumiyyətlə qaldırmamağı deyir, ona görə dəyişiklik **restartdan sonra**
+qüvvəyə minir və ekran bunu banner kimi göstərir.
+
+Yanında hər servisin RAM istifadəsi var (docker `MEM USAGE` ilə eyni
+hesablama: xam `usage`-dan səhifə keşi çıxılır), başlıqda isə cəmi.
+
+Self-hosted mühitdə **Sync / Deploy** ekranı serverin konteynerlərini eyni
+şəkildə göstərir; oradakı keçid isə birbaşa `docker stop` / `docker start`-dır.
+Managed layihədə belə idarəetmə yoxdur — platforma servisləri özü idarə edir və
+kart bunu açıq deyir.
 
 ## Qurulma
 
@@ -31,6 +52,12 @@ macOS `.dmg` üçün:
 
 ```bash
 npm run dist:mac
+```
+
+İkonlar `resources/*.svg`-dən doğulur; SVG dəyişəndə yenidən çək:
+
+```bash
+npm run icons
 ```
 
 ## Tələblər
@@ -84,7 +111,20 @@ yamaqsız keçid bayt-bayt eyni nəticə verməli, `auth.jwt_expiry` dəyişikli
 npm test
 ```
 
-37 test: TOML yamaqlayıcısı (19), `.env` redaktoru (12), log redaksiyası (6).
+45 test: TOML yamaqlayıcısı (19), `.env` redaktoru (12), servis kataloqu və
+RAM formatı (8), log redaksiyası (6).
+
+## Ad və ikon
+
+Tətbiq əvvəl «Supabase GUI» adlanırdı. Electron istifadəçi qovluğunu ad
+üzərindən qurduğuna görə ilk açılışda köhnə registry avtomatik köçürülür
+(`src/main/core/userdata.ts`) — köhnə qovluq silinmir.
+
+İşarə iki yumru primitivdən qurulan «L»-dir: şaquli sap (*local*) və onun
+oturduğu geniş plita (*base*). İkisi ayrı tonda olduğuna görə birləşmə
+nöqtəsində tikiş görünür — forma bütöv oxunsa da, konstruksiya seçilir.
+Rasterləşdirməni `scripts/make-icons.mjs` Electron-un Chromium-u ilə edir,
+sistemdə əlavə alət tələb olunmur.
 
 ## Bilinən məhdudiyyətlər
 

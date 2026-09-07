@@ -130,31 +130,46 @@ export function Input({
   )
 }
 
+/**
+ * `tone` keçidin **reallığını** ayırır: `accent` = açıq və işləyir,
+ * `pending` = konfiqurasiyada açıqdır, amma konteyner qalxmayıb (restart
+ * gözləyir). Belədə dayanmış servis yaşıl görünmür.
+ */
 export function Toggle({
   checked,
   onChange,
-  disabled
+  disabled,
+  tone = 'accent'
 }: {
   checked: boolean
   onChange: (v: boolean) => void
   disabled?: boolean
+  tone?: 'accent' | 'pending'
 }): ReactNode {
+  const on = checked && tone === 'accent'
+  const pending = checked && tone === 'pending'
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      data-tone={tone}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cx(
         'relative h-[18px] w-[32px] shrink-0 rounded-full border transition-colors disabled:opacity-40',
-        checked ? 'border-accent-dim bg-accent-dim' : 'border-line bg-[#0d141b]'
+        on && 'border-accent-dim bg-accent-dim',
+        pending && 'border-[#4a3c17] bg-[#2b2312]',
+        !checked && 'border-line bg-[#0d141b]'
       )}
     >
       <span
         className={cx(
           'absolute top-[2px] size-3 rounded-full transition-all',
-          checked ? 'left-[16px] bg-accent' : 'left-[2px] bg-[#4a5b6c]'
+          checked ? 'left-[16px]' : 'left-[2px]',
+          on && 'bg-accent',
+          pending && 'bg-warn',
+          !checked && 'bg-[#4a5b6c]'
         )}
       />
     </button>

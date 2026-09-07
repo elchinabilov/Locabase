@@ -4,6 +4,7 @@ import { call, useQuery } from './lib/ipc'
 import { cx, shortPath } from './lib/format'
 import { Badge, Button, Dot, Empty, ErrorNote, Spinner } from './components/ui'
 import { LogDrawer } from './components/log-drawer'
+import { Mark, Wordmark } from './components/brand'
 import { Dashboard } from './routes/dashboard'
 import { ConfigRoute } from './routes/config'
 import { AuthRoute } from './routes/auth'
@@ -151,6 +152,11 @@ function Sidebar({
 }): ReactNode {
   return (
     <aside className="flex w-[228px] shrink-0 flex-col border-r border-line bg-panel">
+      <div className="flex items-center gap-2 border-b border-line-soft px-3 py-2.5">
+        <Mark size={18} />
+        <Wordmark />
+      </div>
+
       <div className="flex items-center justify-between px-3 pt-3 pb-1.5">
         <span className="text-[10.5px] font-semibold tracking-[0.09em] text-muted uppercase">
           Layihələr

@@ -1,0 +1,39 @@
+<!--
+  Localbase — brend işarəsi.
+
+  İki yumru primitiv bir «L» qurur: şaquli sap (local) və onun oturduğu geniş
+  plita (base). Primitivlər e-tehsil-in işarəsindəki kimi ayrı tonlardadır —
+  birləşən nöqtədə tikiş görünür, amma forma bütöv «L» kimi oxunur.
+
+  Rənglər açıq lazuriddir: nə yaşıl, nə də tünd.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Localbase">
+  <defs>
+    <linearGradient id="lb-stem" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#74C2E9"/>
+      <stop offset="1" stop-color="#3F92C9"/>
+    </linearGradient>
+    <linearGradient id="lb-base" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#3B8CC4"/>
+      <stop offset="1" stop-color="#215B8E"/>
+    </linearGradient>
+    <linearGradient id="lb-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="lb-soft" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#1B4E77" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#lb-soft)">
+    <!-- sap: yuxarıdan plitanın dibinə qədər -->
+    <rect x="242" y="215" width="170" height="595" rx="85" fill="url(#lb-stem)"/>
+    <!-- plita: sapın üstündən çəkilir, tikiş beləcə görünür -->
+    <rect x="242" y="640" width="540" height="170" rx="85" fill="url(#lb-base)"/>
+  </g>
+
+  <!-- gloss: yuxarı kənarlarda incə işıq -->
+  <rect x="242" y="215" width="170" height="595" rx="85" fill="none" stroke="url(#lb-gloss)" stroke-width="6"/>
+  <rect x="242" y="640" width="540" height="170" rx="85" fill="none" stroke="url(#lb-gloss)" stroke-width="6"/>
+</svg>

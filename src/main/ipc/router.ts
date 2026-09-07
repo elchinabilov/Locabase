@@ -54,7 +54,8 @@ const handlers: Handlers = {
   },
 
   /* --- stack --- */
-  'stack:status': async ({ id }) => stack.status(id),
+  'stack:status': async ({ id, withStats }) => stack.status(id, withStats ?? false),
+  'stack:setService': async ({ id, configPath, on }) => stack.setService(id, configPath, on),
   'stack:start': async ({ id }) => stack.start(id),
   'stack:stop': async ({ id, noBackup }) => stack.stop(id, noBackup ?? true),
   'stack:restart': async ({ id }) => stack.restart(id),
@@ -144,6 +145,20 @@ const handlers: Handlers = {
   },
   'remote:verify': async ({ id, envId }) =>
     adapterFor(projects.get(id), projects.getEnv(id, envId)).verify(),
+  'remote:services': async ({ id, envId }) =>
+    adapterFor(projects.get(id), projects.getEnv(id, envId)).listServices(),
+  'remote:setService': async ({ id, envId, container, on }) => {
+    const env = projects.getEnv(id, envId)
+    const adapter = adapterFor(projects.get(id), env)
+    try {
+      await adapter.setServiceState(container, on, (t) =>
+        bus.push(`remote:${env.name}`, 'info', t)
+      )
+      return { ok: true, code: 0, output: `${container} → ${on ? 'start' : 'stop'}`, error: null }
+    } catch (err) {
+      return { ok: false, code: null, output: '', error: (err as Error).message }
+    }
+  },
 
   /* --- sistem --- */
   'system:doctor': async () => stack.doctor()

@@ -1,7 +1,7 @@
 {
-  "name": "supabase-gui",
+  "name": "localbase",
   "version": "0.1.0",
-  "description": "Supabase GUI — local stack control, config.toml UI, and local↔remote sync for managed and self-hosted Supabase",
+  "description": "Localbase — Supabase control room: local stack, config, auth, functions and local↔remote sync for managed and self-hosted projects",
   "main": "./out/main/index.js",
   "author": "Elchin Abilov",
   "license": "UNLICENSED",
@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
+    "icons": "electron scripts/make-icons.mjs",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",

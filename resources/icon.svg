@@ -1,0 +1,43 @@
+<!--
+  Localbase — tətbiq ikonu (1024×1024).
+
+  Fon açıq və soyuqdur: dock-da tünd ləkə yaratmır. Künc radiusu macOS
+  squircle-ına yaxındır (ölçünün ~22.4%-i).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DFE9F3"/>
+    </linearGradient>
+    <linearGradient id="stem" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#74C2E9"/>
+      <stop offset="1" stop-color="#3F92C9"/>
+    </linearGradient>
+    <linearGradient id="base" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#3B8CC4"/>
+      <stop offset="1" stop-color="#215B8E"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#1B4E77" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="229" fill="url(#bg)"/>
+  <rect x="1" y="1" width="1022" height="1022" rx="228" fill="none" stroke="#C6D6E5" stroke-width="2"/>
+
+  <g filter="url(#soft)">
+    <!-- sap: yuxarıdan plitanın dibinə qədər -->
+    <rect x="242" y="215" width="170" height="595" rx="85" fill="url(#stem)"/>
+    <!-- plita: sapın üstündən çəkilir, tikiş beləcə görünür -->
+    <rect x="242" y="640" width="540" height="170" rx="85" fill="url(#base)"/>
+  </g>
+
+  <!-- gloss: yuxarı kənarlarda incə işıq -->
+  <rect x="242" y="215" width="170" height="595" rx="85" fill="none" stroke="url(#gloss)" stroke-width="6"/>
+  <rect x="242" y="640" width="540" height="170" rx="85" fill="none" stroke="url(#gloss)" stroke-width="6"/>
+</svg>

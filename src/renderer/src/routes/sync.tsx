@@ -4,6 +4,7 @@ import { call, useQuery } from '../lib/ipc'
 import { cx, timeAgo } from '../lib/format'
 import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Spinner } from '../components/ui'
 import { EnvForm } from '../components/env-form'
+import { RemoteServices } from '../components/remote-services'
 
 export function SyncRoute({
   project,
@@ -146,6 +147,8 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
     <div className="min-h-0 flex-1 overflow-auto p-4">
       <div className="mx-auto flex max-w-5xl flex-col gap-3">
         <Health report={health.data ?? null} loading={health.loading} error={health.error} env={env} />
+
+        <RemoteServices project={project} env={env} />
 
         <div className="flex items-center gap-2">
           <Button variant="primary" onClick={() => void load()} loading={loading}>

@@ -11,7 +11,12 @@ interface Shape {
   items: Record<string, string>
 }
 
-const store = new Store<Shape>({ name: 'credentials', defaults: { items: {} } })
+/** Tənbəl — bax `projects.ts`-dəki eyni səbəb. */
+let _store: Store<Shape> | null = null
+function store(): Store<Shape> {
+  _store ??= new Store<Shape>({ name: 'credentials', defaults: { items: {} } })
+  return _store
+}
 
 export class SecretStoreError extends Error {}
 
@@ -29,13 +34,13 @@ export function set(key: string, value: string): void {
       'Sistem açar anbarı əlçatmazdır — token saxlanıla bilməz (macOS-də Keychain girişini yoxla).'
     )
   }
-  const items = { ...store.get('items') }
+  const items = { ...store().get('items') }
   items[key] = safeStorage.encryptString(value).toString('base64')
-  store.set('items', items)
+  store().set('items', items)
 }
 
 export function get(key: string): string | null {
-  const raw = store.get('items')[key]
+  const raw = store().get('items')[key]
   if (!raw) return null
   try {
     return safeStorage.decryptString(Buffer.from(raw, 'base64'))
@@ -45,13 +50,13 @@ export function get(key: string): string | null {
 }
 
 export function has(key: string): boolean {
-  return Boolean(store.get('items')[key])
+  return Boolean(store().get('items')[key])
 }
 
 export function remove(key: string): void {
-  const items = { ...store.get('items') }
+  const items = { ...store().get('items') }
   delete items[key]
-  store.set('items', items)
+  store().set('items', items)
 }
 
 export const keys = {

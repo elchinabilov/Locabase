@@ -177,6 +177,15 @@ export const CONFIG_FIELDS: ConfigField[] = [
   { path: 'storage.enabled', type: 'boolean', group: 'Storage', label: 'Storage aktiv', default: true, restartRequired: R },
   { path: 'storage.file_size_limit', type: 'string', group: 'Storage', label: 'Fayl həcmi limiti', default: '50MiB', restartRequired: R },
   { path: 'storage.s3_protocol.enabled', type: 'boolean', group: 'Storage', label: 'S3 protokolu', default: true, restartRequired: R },
+  {
+    path: 'storage.image_transformation.enabled',
+    type: 'boolean',
+    group: 'Storage',
+    label: 'Şəkil çevirmə (imgproxy)',
+    help: 'Ayrıca konteyner qaldırır. Şəkil resize/format çevirməsi lazım deyilsə bağlı saxla.',
+    default: false,
+    restartRequired: R
+  },
   { path: 'storage.analytics.enabled', type: 'boolean', group: 'Storage', label: 'Analytics bucket-ləri (Iceberg)', default: false, restartRequired: R },
   { path: 'storage.analytics.max_catalogs', type: 'number', group: 'Storage', label: 'Maks. katalog', default: 2, restartRequired: R },
   { path: 'storage.analytics.max_namespaces', type: 'number', group: 'Storage', label: 'Maks. namespace', default: 5, restartRequired: R },

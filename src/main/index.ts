@@ -4,6 +4,12 @@ import { app, BrowserWindow, shell } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { registerIpc, pipeEvents } from './ipc/router.js'
 import { stopAllTails } from './core/docker.js'
+import { migrateUserData } from './core/userdata.js'
+import { logBus } from './core/log.js'
+
+// Dev-də paket adı, produksiyada `productName` işlənir — ikisi eyni qovluğa
+// baxsın deyə adı burada, hər şeydən əvvəl sabitləyirik.
+app.setName('Localbase')
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -57,7 +63,10 @@ function createWindow(): BrowserWindow {
 }
 
 void app.whenReady().then(() => {
-  electronApp.setAppUserModelId('app.supabase-gui')
+  electronApp.setAppUserModelId('app.localbase')
+
+  const migrated = migrateUserData()
+  if (migrated) logBus.push('app', 'info', `Köhnə ayarlar köçürüldü: ${migrated}`)
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
 
   registerIpc()

@@ -30,7 +30,35 @@ function parseHealth(status: string): string | null {
   return m[1]!.toLowerCase().replace('health: ', '')
 }
 
-export async function servicesFor(projectId: string): Promise<ServiceStatus[]> {
+/**
+ * Bir konteynerin yaddaş istifadəsi. Docker CLI-nin `MEM USAGE` sütunu ilə eyni
+ * hesablama: xam `usage`-dan səhifə keşi (`inactive_file`) çıxılır — əks halda
+ * rəqəm real istifadədən qat-qat böyük görünür.
+ */
+async function memoryOf(
+  name: string
+): Promise<{ memory: number | null; memoryLimit: number | null }> {
+  try {
+    const raw = (await client().getContainer(name).stats({ stream: false })) as {
+      memory_stats?: {
+        usage?: number
+        limit?: number
+        stats?: { inactive_file?: number; total_inactive_file?: number }
+      }
+    }
+    const ms = raw.memory_stats
+    if (!ms?.usage) return { memory: null, memoryLimit: ms?.limit ?? null }
+    const inactive = ms.stats?.inactive_file ?? ms.stats?.total_inactive_file ?? 0
+    return { memory: Math.max(0, ms.usage - inactive), memoryLimit: ms.limit ?? null }
+  } catch {
+    return { memory: null, memoryLimit: null }
+  }
+}
+
+export async function servicesFor(
+  projectId: string,
+  withStats = false
+): Promise<ServiceStatus[]> {
   const suffix = `_${projectId}`
   const containers = await client().listContainers({ all: true })
   const out: ServiceStatus[] = []
@@ -42,9 +70,22 @@ export async function servicesFor(projectId: string): Promise<ServiceStatus[]> {
       key,
       container: name,
       state: c.State,
-      health: parseHealth(c.Status ?? '')
+      health: parseHealth(c.Status ?? ''),
+      memory: null,
+      memoryLimit: null
     })
   }
+
+  if (withStats) {
+    // Yalnız işləyən konteynerlər — dayanmış konteynerin stats-ı sonsuz gözləyir.
+    const running = out.filter((s) => s.state === 'running')
+    const stats = await Promise.all(running.map((s) => memoryOf(s.container)))
+    running.forEach((svc, i) => {
+      svc.memory = stats[i]!.memory
+      svc.memoryLimit = stats[i]!.memoryLimit
+    })
+  }
+
   return out.sort((a, b) => a.key.localeCompare(b.key))
 }
 

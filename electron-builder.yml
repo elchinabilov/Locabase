@@ -1,5 +1,6 @@
-appId: app.supabase-gui
-productName: Supabase GUI
+appId: app.localbase
+productName: Localbase
+icon: resources/icon.png
 directories:
   buildResources: resources
   output: dist

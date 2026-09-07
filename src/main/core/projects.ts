@@ -14,10 +14,15 @@ interface RegistryShape {
   projects: Project[]
 }
 
-const store = new Store<RegistryShape>({
-  name: 'projects',
-  defaults: { projects: [] }
-})
+/**
+ * Store tənbəl yaradılır: `app.getPath('userData')` yalnız ilk müraciətdə
+ * oxunur, beləcə `app.setName()` və userData miqrasiyası ondan əvvəl işləyə bilir.
+ */
+let _store: Store<RegistryShape> | null = null
+function store(): Store<RegistryShape> {
+  _store ??= new Store<RegistryShape>({ name: 'projects', defaults: { projects: [] } })
+  return _store
+}
 
 export class ProjectError extends Error {}
 
@@ -51,7 +56,7 @@ export function inspect(dir: string): InspectResult {
 /* ------------------------------------------------------------- CRUD */
 
 export function list(): Project[] {
-  return store.get('projects')
+  return store().get('projects')
 }
 
 export function get(id: string): Project {
@@ -78,7 +83,7 @@ export function add(dir: string): Project {
     environments: [],
     addedAt: new Date().toISOString()
   }
-  store.set('projects', [...list(), project])
+  store().set('projects', [...list(), project])
   return project
 }
 
@@ -90,12 +95,12 @@ export function update(id: string, patch: Partial<Project>): Project {
   // id və path dəyişməz — onlar registry-nin açarıdır
   const next: Project = { ...current, ...patch, id: current.id, path: current.path }
   projects[idx] = next
-  store.set('projects', projects)
+  store().set('projects', projects)
   return next
 }
 
 export function remove(id: string): void {
-  store.set(
+  store().set(
     'projects',
     list().filter((p) => p.id !== id)
   )

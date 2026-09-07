@@ -6,6 +6,13 @@ import { servicesFor } from './docker.js'
 import { run, supabase, supabaseJson } from './cli.js'
 import { get as getProject } from './projects.js'
 import { logBus } from './log.js'
+import { write as writeConfig } from './config.js'
+import { SERVICE_GROUPS } from '@shared/services.js'
+
+/** Yalnız kataloqdakı açarlara icazə var — ixtiyari config yolu yazılmasın. */
+const SERVICE_PATHS = new Set(
+  SERVICE_GROUPS.map((g) => g.configPath).filter((p): p is string => p !== null)
+)
 import type { StackStatus, TaskResult } from '@shared/types.js'
 
 const START_TIMEOUT = 10 * 60 * 1000
@@ -13,14 +20,14 @@ const STOP_TIMEOUT = 3 * 60 * 1000
 
 export const streamFor = (projectId: string): string => `stack:${projectId}`
 
-export async function status(id: string): Promise<StackStatus> {
+export async function status(id: string, withStats = false): Promise<StackStatus> {
   const project = getProject(id)
   const stream = streamFor(project.projectId)
   let services: StackStatus['services'] = []
   let error: string | null = null
 
   try {
-    services = await servicesFor(project.projectId)
+    services = await servicesFor(project.projectId, withStats)
   } catch (err) {
     error = `Docker əlçatmazdır: ${(err as Error).message}`
   }
@@ -100,6 +107,19 @@ export async function reset(id: string, confirm: string): Promise<TaskResult> {
     stream: streamFor(project.projectId),
     timeoutMs: START_TIMEOUT
   })
+}
+
+/**
+ * Servisi aç/bağla. Lokal stack-də bu, konteyneri dayandırmaq deyil — CLI onu
+ * ümumiyyətlə qaldırmasın deyə `config.toml`-dakı `enabled` açarı yazılır.
+ * Dəyişiklik yalnız restartdan sonra qüvvəyə minir.
+ */
+export function setService(id: string, configPath: string, on: boolean): { restartRequired: true } {
+  if (!SERVICE_PATHS.has(configPath)) {
+    throw new Error(`Bu açar servis keçidi deyil: ${configPath}`)
+  }
+  writeConfig(id, [{ path: configPath, value: on }])
+  return { restartRequired: true }
 }
 
 /** `supabase`, `docker` və `git` mövcuddurmu. */

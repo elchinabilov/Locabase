@@ -9,11 +9,13 @@
 import { basename } from 'node:path'
 import { run } from '../cli.js'
 import { paths } from '../projects.js'
+import { parseBytes } from '@shared/services.js'
 import type {
   BackupInfo,
   HealthReport,
   Project,
   RemoteFunctionInfo,
+  RemoteService,
   SelfHostedEnv,
   VerifyReport
 } from '@shared/types.js'
@@ -24,6 +26,19 @@ import type { LedgerRow, LogFn, RemoteAdapter } from './index.js'
 /** Uzaq shell üçün təhlükəsiz sətir. */
 function sq(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+/** `supabase-edge-functions-abc123` + `abc123` → `edge-functions` */
+function serviceKeyOf(container: string, suffix: string): string {
+  let key = container
+  if (key.endsWith(`-${suffix}`)) key = key.slice(0, -(suffix.length + 1))
+  return key.replace(/^supabase[-_]/, '') || container
+}
+
+/** `Up 2 hours (healthy)` → `healthy` */
+function parseHealth(status: string): string | null {
+  const m = /\((healthy|unhealthy|health: starting|starting)\)/i.exec(status)
+  return m ? m[1]!.toLowerCase().replace('health: ', '') : null
 }
 
 const LEDGER_QUERY =
@@ -283,6 +298,75 @@ export class SelfHostedAdapter implements RemoteAdapter {
         : `delete from supabase_migrations.schema_migrations where version = '${v}';`
     log(`ledger təmiri: ${version} → ${status}`)
     await this.psql(sql)
+  }
+
+  /**
+   * Stack-in konteynerləri. Coolify adları `supabase-<servis>-<id>` şəklində
+   * verir, ona görə Postgres konteynerinin şəkilçisi bütün stack-i tapmaq üçün
+   * açardır — `prod.sh`-dəki `DB_CONTAINER` ilə eyni məntiq.
+   */
+  async listServices(): Promise<RemoteService[]> {
+    const suffix = this.env.dbContainer.slice(this.env.dbContainer.lastIndexOf('-') + 1)
+    if (suffix.length < 4) {
+      throw new Error(
+        `Postgres konteynerinin adından stack şəkilçisi çıxarılmadı: ${this.env.dbContainer}`
+      )
+    }
+
+    const [psOut, statsOut] = await Promise.all([
+      this.ssh(
+        `docker ps -a --format '{{.Names}}\t{{.State}}\t{{.Status}}' | grep -- ${sq(`-${suffix}`)} || true`,
+        { quiet: true }
+      ),
+      this.ssh(
+        `docker stats --no-stream --format '{{.Name}}\t{{.MemUsage}}' | grep -- ${sq(`-${suffix}`)} || true`,
+        { quiet: true, timeoutMs: 60_000 }
+      ).catch(() => '')
+    ])
+
+    const mem = new Map<string, { memory: number | null; memoryLimit: number | null }>()
+    for (const line of statsOut.split('\n')) {
+      const [name, usage] = line.split('\t')
+      if (!name || !usage) continue
+      const [used, limit] = usage.split('/')
+      mem.set(name.trim(), {
+        memory: parseBytes(used ?? ''),
+        memoryLimit: parseBytes(limit ?? '')
+      })
+    }
+
+    const out: RemoteService[] = []
+    for (const line of psOut.split('\n')) {
+      const [name, state, status] = line.split('\t')
+      if (!name?.trim()) continue
+      const container = name.trim()
+      const m = mem.get(container) ?? { memory: null, memoryLimit: null }
+      out.push({
+        container,
+        key: serviceKeyOf(container, suffix),
+        state: (state ?? '').trim(),
+        health: parseHealth(status ?? ''),
+        memory: m.memory,
+        memoryLimit: m.memoryLimit
+      })
+    }
+    return out.sort((a, b) => a.key.localeCompare(b.key))
+  }
+
+  /**
+   * Konteyneri dayandır / başlat. Diqqət: Coolify növbəti deploy-da onu yenidən
+   * qaldıra bilər — davamlı söndürmək üçün compose faylından çıxarmaq lazımdır.
+   */
+  async setServiceState(container: string, on: boolean, log: LogFn): Promise<void> {
+    const suffix = this.env.dbContainer.slice(this.env.dbContainer.lastIndexOf('-') + 1)
+    if (!container.endsWith(`-${suffix}`)) {
+      throw new Error(`Konteyner bu stack-ə aid deyil: ${container}`)
+    }
+    if (!on && container === this.env.dbContainer) {
+      throw new Error('Postgres konteyneri dayandırıla bilməz.')
+    }
+    log(`docker ${on ? 'start' : 'stop'} ${container}`)
+    await this.ssh(`docker ${on ? 'start' : 'stop'} ${sq(container)}`, { timeoutMs: 180_000 })
   }
 
   async verify(): Promise<VerifyReport> {

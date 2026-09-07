@@ -16,6 +16,7 @@ import type {
   ManagedEnv,
   Project,
   RemoteFunctionInfo,
+  RemoteService,
   VerifyReport
 } from '@shared/types.js'
 import type { MigrationFile } from '../migrations.js'
@@ -199,6 +200,20 @@ export class ManagedAdapter implements RemoteAdapter {
       )
       if (!res.ok) throw new Error(`${name}: ${res.error ?? res.output}`)
     }
+  }
+
+  /**
+   * Managed layihədə ayrı-ayrı servisləri söndürmək mümkün deyil — platforma
+   * onları özü idarə edir və belə bir API yoxdur.
+   */
+  async listServices(): Promise<RemoteService[]> {
+    return []
+  }
+
+  async setServiceState(): Promise<void> {
+    throw new Error(
+      'Managed layihədə servisləri ayrıca söndürmək mümkün deyil — supabase.com onları özü idarə edir.'
+    )
   }
 
   async repairLedger(version: string, status: 'applied' | 'reverted', log: LogFn): Promise<void> {
