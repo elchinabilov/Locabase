@@ -8,6 +8,7 @@
  */
 import { spawn, type SpawnOptions } from 'node:child_process'
 import { logBus } from './log.js'
+import { resolvedPath, whichBin } from './env-path.js'
 import type { TaskResult } from '@shared/types.js'
 
 export interface RunOptions {
@@ -38,14 +39,18 @@ export class CommandError extends Error {
 export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise<TaskResult> {
   const stream = opts.stream ?? cmd
   return new Promise((resolve) => {
+    const path = resolvedPath()
     const spawnOpts: SpawnOptions = {
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env, NO_COLOR: '1' },
+      env: { ...process.env, PATH: path, ...opts.env, NO_COLOR: '1' },
       stdio: ['pipe', 'pipe', 'pipe']
     }
     if (!opts.quiet) logBus.push(stream, 'info', `$ ${cmd} ${args.join(' ')}`)
 
-    const child = spawn(cmd, args, spawnOpts)
+    // GUI-dən açılan tətbiqdə PATH kasıb olur; binarı özümüz tapıb tam yolla
+    // çağırırıq ki, spawn ENOENT verməsin.
+    const bin = whichBin(cmd) ?? cmd
+    const child = spawn(bin, args, spawnOpts)
     const chunks: string[] = []
     let settled = false
 
@@ -96,7 +101,7 @@ export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise
     child.on('error', (err) => {
       const msg =
         (err as NodeJS.ErrnoException).code === 'ENOENT'
-          ? `\`${cmd}\` tapılmadı — PATH-də quraşdırılıbmı?`
+          ? `\`${cmd}\` tapılmadı — PATH-də quraşdırılıbmı? (axtarılan PATH: ${path})`
           : err.message
       if (!opts.quiet) logBus.push(stream, 'error', msg)
       finish(null, msg)

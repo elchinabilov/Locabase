@@ -327,3 +327,138 @@ export interface TaskResult {
   output: string
   error: string | null
 }
+
+/* ---------------------------------------------------------------- sql */
+
+/** Bir sətir — bütün xanalar mətndir (bax: `sql/build.ts` TEXT_TYPES). */
+export type DbRow = Array<string | null>
+/** Sütun adı → dəyər. `null` = SQL NULL; açar yoxdursa = «default». */
+export type DbCells = Record<string, string | null>
+
+export interface SqlColumn {
+  name: string
+  typeOid: number
+  /** `pg_type.typname`; tanınmasa `oid:<n>` */
+  typeName: string
+}
+
+export interface SqlResult {
+  /** `SELECT`, `INSERT`, `CREATE TABLE`, … */
+  command: string | null
+  columns: SqlColumn[]
+  rows: DbRow[]
+  rowCount: number | null
+  /** `maxRows` limitinə görə kəsilib */
+  truncated: boolean
+}
+
+export interface SqlErrorInfo {
+  message: string
+  code: string | null
+  severity: string | null
+  detail: string | null
+  hint: string | null
+  /** 0-əsaslı simvol ofseti — redaktorda səhv tokeni işarələmək üçün */
+  position: number | null
+  where: string | null
+  table: string | null
+  column: string | null
+  constraint: string | null
+}
+
+export interface SqlRun {
+  ok: boolean
+  /** Çoxifadəli skript üçün hər ifadəyə bir nəticə */
+  results: SqlResult[]
+  durationMs: number
+  readOnly: boolean
+  error: SqlErrorInfo | null
+}
+
+export interface SavedQuery {
+  name: string
+  path: string
+  bytes: number
+  updatedAt: string
+}
+
+/* ---------------------------------------------------------------- introspeksiya */
+
+export interface DbSchema {
+  name: string
+  owner: string
+  comment: string | null
+  /** `pg_*`, `information_schema` və Supabase-in daxili sxemləri */
+  system: boolean
+}
+
+/** r=cədvəl p=partisiyalı v=görünüş m=materializə f=xarici */
+export type DbRelKind = 'r' | 'p' | 'v' | 'm' | 'f'
+
+export interface DbTable {
+  schema: string
+  name: string
+  kind: DbRelKind
+  /** `reltuples` təxmini; PG14+ analiz olunmayıbsa -1 */
+  estimate: number
+  bytes: number
+  rls: boolean
+  comment: string | null
+  editable: boolean
+  /** `editable: false` olduqda səbəb, məs. «PK yoxdur» */
+  editableReason: string | null
+}
+
+export interface DbColumn {
+  position: number
+  name: string
+  dataType: string
+  typeOid: number
+  nullable: boolean
+  defaultExpr: string | null
+  isIdentity: boolean
+  isGenerated: boolean
+  /** null = PK-nın hissəsi deyil; rəqəm = PK-dakı sırası */
+  pkOrd: number | null
+  refSchema: string | null
+  refTable: string | null
+  refColumn: string | null
+  comment: string | null
+}
+
+export type DbOp =
+  | 'eq'
+  | 'neq'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'like'
+  | 'ilike'
+  | 'isnull'
+  | 'notnull'
+
+export interface DbFilter {
+  column: string
+  op: DbOp
+  /** `isnull`/`notnull` üçün nəzərə alınmır */
+  value: string | null
+}
+
+export interface DbOrder {
+  column: string
+  dir: 'asc' | 'desc'
+}
+
+export interface DbRowsPage {
+  columns: DbColumn[]
+  rows: DbRow[]
+  /** null = dəqiq say hesablanmadı (cədvəl böyükdür) */
+  total: number | null
+  editable: boolean
+  editableReason: string | null
+}
+
+export interface DbCompletion {
+  tables: Array<{ schema: string; table: string; columns: string[] }>
+}

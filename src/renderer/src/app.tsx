@@ -8,6 +8,8 @@ import { Mark, Wordmark } from './components/brand'
 import { Dashboard } from './routes/dashboard'
 import { ConfigRoute } from './routes/config'
 import { AuthRoute } from './routes/auth'
+import { TablesRoute } from './routes/tables'
+import { SqlRoute } from './routes/sql'
 import { SecretsRoute } from './routes/secrets'
 import { MigrationsRoute } from './routes/migrations'
 import { FunctionsRoute } from './routes/functions'
@@ -18,6 +20,8 @@ export type RouteId =
   | 'dashboard'
   | 'config'
   | 'auth'
+  | 'tables'
+  | 'sql'
   | 'secrets'
   | 'migrations'
   | 'functions'
@@ -28,6 +32,8 @@ const NAV: Array<{ id: RouteId; label: string; icon: string; needsProject: boole
   { id: 'dashboard', label: 'Ümumi', icon: '▣', needsProject: false },
   { id: 'config', label: 'Konfiqurasiya', icon: '⚙', needsProject: true },
   { id: 'auth', label: 'Auth', icon: '⚿', needsProject: true },
+  { id: 'tables', label: 'Cədvəllər', icon: '▤', needsProject: true },
+  { id: 'sql', label: 'SQL', icon: '⌗', needsProject: true },
   { id: 'secrets', label: 'Secrets', icon: '✱', needsProject: true },
   { id: 'migrations', label: 'Miqrasiyalar', icon: '⇅', needsProject: true },
   { id: 'functions', label: 'Funksiyalar', icon: 'ƒ', needsProject: true },
@@ -118,6 +124,11 @@ function Content({
       return <ConfigRoute project={project} />
     case 'auth':
       return <AuthRoute project={project} />
+    // key: layihə dəyişəndə sxem/cədvəl/redaktor vəziyyəti sıfırlansın
+    case 'tables':
+      return <TablesRoute key={project.id} project={project} />
+    case 'sql':
+      return <SqlRoute key={project.id} project={project} />
     case 'secrets':
       return <SecretsRoute project={project} />
     case 'migrations':

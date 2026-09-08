@@ -5,7 +5,7 @@
  * MIGRATION_HISTORY.md`), ona görə üç mənbə də ayrıca oxunur və heç biri
  * digərindən nəticə çıxarmır.
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { supabase } from './cli.js'
 import { logBus } from './log.js'
@@ -133,6 +133,21 @@ export async function create(id: string, name: string): Promise<{ file: string }
   const created = listFiles(project.path).find((f) => !before.has(f.file))
   if (!created) throw new Error('Yeni miqrasiya faylı tapılmadı')
   return { file: created.file }
+}
+
+/**
+ * SQL redaktorundakı mətni yeni timestamped miqrasiya faylına yazır.
+ * `create()` CLI ilə boş fayl yaradır — ad yoxlaması və «yeni yaranan faylı
+ * tap» məntiqi olduğu kimi təkrar istifadə olunur.
+ */
+export async function createWithBody(
+  id: string,
+  name: string,
+  sql: string
+): Promise<{ file: string }> {
+  const { file } = await create(id, name)
+  writeFileSync(file, sql.endsWith('\n') ? sql : `${sql}\n`, 'utf8')
+  return { file }
 }
 
 export async function up(id: string): Promise<TaskResult> {

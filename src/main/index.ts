@@ -4,12 +4,18 @@ import { app, BrowserWindow, shell } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { registerIpc, pipeEvents } from './ipc/router.js'
 import { stopAllTails } from './core/docker.js'
+import { closeAll as closeSqlPools } from './core/sql/pool.js'
 import { migrateUserData } from './core/userdata.js'
+import { fixPath } from './core/env-path.js'
 import { logBus } from './core/log.js'
 
 // Dev-də paket adı, produksiyada `productName` işlənir — ikisi eyni qovluğa
 // baxsın deyə adı burada, hər şeydən əvvəl sabitləyirik.
 app.setName('Localbase')
+
+// Finder/.dmg-dən açılanda GUI prosesi login shell PATH-ini almır — `supabase`
+// və digər CLI-lər tapılmır. Hər şeydən əvvəl PATH-i bərpa edirik.
+fixPath()
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -80,7 +86,11 @@ void app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   stopAllTails()
+  closeSqlPools()
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', stopAllTails)
+app.on('before-quit', () => {
+  stopAllTails()
+  closeSqlPools()
+})

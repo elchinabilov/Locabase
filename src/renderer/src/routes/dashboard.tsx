@@ -211,12 +211,50 @@ function Services({
   )
 
   const total = services.reduce((sum, s) => sum + (s.memory ?? 0), 0)
-  const running = services.filter((s) => s.state === 'running').length
+
+  // Sətirlər `SERVICE_GROUPS`-dur, konteynerlər yox: Kong+PostgREST kimi
+  // qruplarda bir sətrin arxasında iki konteyner dayanır. Başlıqdakı say da
+  // gözlə görünən sətirləri saysın deyə eyni siyahıdan gəlir.
+  const rows = SERVICE_GROUPS.map((group) => {
+    const members = group.keys.map((k) => byKey.get(k)).filter(Boolean) as ServiceStatus[]
+    const live = members.filter((m) => m.state === 'running')
+    // Həqiqət mənbəyi `config.toml`-dur; açar faylda yoxdursa konteynerin
+    // işləyib-işləməməsinə baxırıq (CLI default-u onda qüvvədədir).
+    const fv = group.configPath ? configValues?.[group.configPath] : undefined
+    const enabled =
+      group.configPath === null ? true : fv?.present ? fv.value === true : live.length > 0
+    const mem = members.reduce((sum, m) => sum + (m.memory ?? 0), 0)
+    const isRunning = live.length > 0
+    // Konfiqurasiya «açıq» deyir, amma konteyner qalxmayıb: stack köhnə
+    // konfiqurasiya ilə işləyir — keçid yaşıl yox, sarı görünməlidir.
+    const pending = enabled && !isRunning && (status?.running ?? false)
+    const tone: 'ok' | 'warn' | 'danger' | 'muted' = !isRunning
+      ? pending
+        ? 'warn'
+        : 'muted'
+      : members.some((m) => m.health === 'unhealthy')
+        ? 'danger'
+        : members.some((m) => m.health === 'starting')
+          ? 'warn'
+          : 'ok'
+    const statusText = !enabled
+      ? 'söndürülüb'
+      : isRunning
+        ? (members[0]?.health ?? 'running')
+        : pending
+          ? 'restart lazım'
+          : 'dayanıb'
+    return { group, members, enabled, mem, isRunning, pending, tone, statusText }
+  })
+
+  // Məxrəc — siyahıdakı bütün sətirlər (söndürülmüşlər də daxil), sol tərəf isə
+  // hazırda işləyənlər. İkisi də eyni vahiddədir: sətir, konteyner yox.
+  const running = rows.filter((r) => r.isRunning).length
 
   return (
     <Card
       title="Servislər"
-      subtitle={`${running} / ${services.length} işləyir${total > 0 ? ` · ${formatBytes(total)} RAM` : ''}`}
+      subtitle={`${running} / ${rows.length} işləyir${total > 0 ? ` · ${formatBytes(total)} RAM` : ''}`}
     >
       {error && (
         <div className="px-3.5 pt-2.5">
@@ -224,36 +262,7 @@ function Services({
         </div>
       )}
       <ul className="divide-y divide-line-soft">
-        {SERVICE_GROUPS.map((group) => {
-          const members = group.keys.map((k) => byKey.get(k)).filter(Boolean) as ServiceStatus[]
-          const live = members.filter((m) => m.state === 'running')
-          // Həqiqət mənbəyi `config.toml`-dur; açar faylda yoxdursa konteynerin
-          // işləyib-işləməməsinə baxırıq (CLI default-u onda qüvvədədir).
-          const fv = group.configPath ? configValues?.[group.configPath] : undefined
-          const enabled =
-            group.configPath === null ? true : fv?.present ? fv.value === true : live.length > 0
-          const mem = members.reduce((sum, m) => sum + (m.memory ?? 0), 0)
-          const isRunning = live.length > 0
-          // Konfiqurasiya «açıq» deyir, amma konteyner qalxmayıb: stack köhnə
-          // konfiqurasiya ilə işləyir — keçid yaşıl yox, sarı görünməlidir.
-          const pending = enabled && !isRunning && (status?.running ?? false)
-          const tone: 'ok' | 'warn' | 'danger' | 'muted' =
-            !isRunning
-              ? pending
-                ? 'warn'
-                : 'muted'
-              : members.some((m) => m.health === 'unhealthy')
-                ? 'danger'
-                : members.some((m) => m.health === 'starting')
-                  ? 'warn'
-                  : 'ok'
-          const statusText = !enabled
-            ? 'söndürülüb'
-            : isRunning
-              ? (members[0]?.health ?? 'running')
-              : pending
-                ? 'restart lazım'
-                : 'dayanıb'
+        {rows.map(({ group, members, enabled, mem, pending, tone, statusText }) => {
           const open = expanded === group.label
 
           return (

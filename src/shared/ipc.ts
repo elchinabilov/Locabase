@@ -4,6 +4,15 @@
  */
 import type {
   BackupInfo,
+  DbCells,
+  DbColumn,
+  DbCompletion,
+  DbFilter,
+  DbOrder,
+  DbRow,
+  DbRowsPage,
+  DbSchema,
+  DbTable,
   ConfigDocument,
   ConfigPatch,
   DeployPlan,
@@ -17,6 +26,8 @@ import type {
   Project,
   RemoteEnv,
   RemoteService,
+  SavedQuery,
+  SqlRun,
   StackStatus,
   SyncReport,
   TaskResult,
@@ -102,6 +113,67 @@ export interface IpcContract {
     res: TaskResult
   }
 
+  /* --- SQL redaktoru --- */
+  /**
+   * SQL icra et. Uğursuz sorğu İSTİSNA ATMIR — xəta `res.error`-dədir ki,
+   * `position`/`hint`/`detail` itməsin (router yalnız `string` qaytarır).
+   */
+  'sql:execute': {
+    req: {
+      id: string
+      sql: string
+      readOnly: boolean
+      maxRows: number
+      timeoutMs: number
+      /** Ləğv üçün təsadüfi açar */
+      token?: string
+    }
+    res: SqlRun
+  }
+  'sql:cancel': { req: { id: string; token: string }; res: { cancelled: boolean } }
+  /** Redaktordakı SQL-i yeni timestamped miqrasiya faylına yaz */
+  'sql:saveAsMigration': { req: { id: string; name: string; sql: string }; res: { file: string } }
+
+  /* --- saxlanmış sorğular (supabase/.localbase/queries) --- */
+  'queries:list': { req: { id: string }; res: SavedQuery[] }
+  'queries:read': { req: { id: string; name: string }; res: { name: string; sql: string } }
+  'queries:write': { req: { id: string; name: string; sql: string }; res: SavedQuery }
+  'queries:rename': { req: { id: string; name: string; to: string }; res: SavedQuery }
+  'queries:remove': { req: { id: string; name: string }; res: void }
+
+  /* --- cədvəl redaktoru --- */
+  'db:schemas': { req: { id: string; includeSystem?: boolean }; res: DbSchema[] }
+  'db:tables': { req: { id: string; schema: string }; res: DbTable[] }
+  'db:columns': { req: { id: string; schema: string; table: string }; res: DbColumn[] }
+  /** Avtotamamlama üçün bütün sxem/cədvəl/sütun adları */
+  'db:completion': { req: { id: string }; res: DbCompletion }
+  'db:rows': {
+    req: {
+      id: string
+      schema: string
+      table: string
+      limit: number
+      offset: number
+      orderBy: DbOrder | null
+      filters: DbFilter[]
+      /** Böyük cədvəldə `count(*)` yalnız açıq tələblə işləyir */
+      exactCount?: boolean
+    }
+    res: DbRowsPage
+  }
+  'db:insertRow': {
+    req: { id: string; schema: string; table: string; values: DbCells }
+    res: { row: DbRow }
+  }
+  'db:updateRow': {
+    req: { id: string; schema: string; table: string; pk: DbCells; patch: DbCells }
+    res: { row: DbRow }
+  }
+  'db:deleteRows': {
+    req: { id: string; schema: string; table: string; pks: DbCells[] }
+    res: { deleted: number }
+  }
+
   /* --- sistem --- */
   'system:doctor': {
     req: void
@@ -164,6 +236,22 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'remote:verify',
   'remote:services',
   'remote:setService',
+  'sql:execute',
+  'sql:cancel',
+  'sql:saveAsMigration',
+  'queries:list',
+  'queries:read',
+  'queries:write',
+  'queries:rename',
+  'queries:remove',
+  'db:schemas',
+  'db:tables',
+  'db:columns',
+  'db:completion',
+  'db:rows',
+  'db:insertRow',
+  'db:updateRow',
+  'db:deleteRows',
   'system:doctor'
 ]
 

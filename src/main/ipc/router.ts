@@ -15,6 +15,8 @@ import * as migrations from '../core/migrations.js'
 import * as functions from '../core/functions.js'
 import * as sync from '../core/sync.js'
 import * as secrets from '../core/secrets.js'
+import * as sql from '../core/sql/index.js'
+import * as queries from '../core/queries.js'
 import { adapterFor } from '../core/remote/index.js'
 import { logBus as bus } from '../core/log.js'
 import type { EnvEntry } from '@shared/types.js'
@@ -57,9 +59,29 @@ const handlers: Handlers = {
   'stack:status': async ({ id, withStats }) => stack.status(id, withStats ?? false),
   'stack:setService': async ({ id, configPath, on }) => stack.setService(id, configPath, on),
   'stack:start': async ({ id }) => stack.start(id),
-  'stack:stop': async ({ id, noBackup }) => stack.stop(id, noBackup ?? true),
-  'stack:restart': async ({ id }) => stack.restart(id),
-  'stack:reset': async ({ id, confirm }) => stack.reset(id, confirm),
+  // Stack dayananda/yenidən qalxanda hovuzdakı bağlantılar ölür — atırıq
+  'stack:stop': async ({ id, noBackup }) => {
+    try {
+      return await stack.stop(id, noBackup ?? true)
+    } finally {
+      sql.invalidate(id)
+    }
+  },
+  'stack:restart': async ({ id }) => {
+    try {
+      return await stack.restart(id)
+    } finally {
+      sql.invalidate(id)
+    }
+  },
+  'stack:reset': async ({ id, confirm }) => {
+    try {
+      return await stack.reset(id, confirm)
+    } finally {
+      sql.invalidate(id)
+      sql.introspect.forgetColumns(id)
+    }
+  },
   'stack:openUrl': async ({ url }) => {
     if (!/^https?:\/\//i.test(url)) throw new Error('Yalnız http/https ünvanları açıla bilər')
     await shell.openExternal(url)
@@ -159,6 +181,37 @@ const handlers: Handlers = {
       return { ok: false, code: null, output: '', error: (err as Error).message }
     }
   },
+
+  /* --- SQL redaktoru --- */
+  'sql:execute': async ({ id, sql: text, readOnly, maxRows, timeoutMs, token }) => {
+    const run = await sql.execute(id, text, { readOnly, maxRows, timeoutMs, token })
+    // DDL sxemi dəyişdirmiş ola bilər — sütun keşi köhnəlir
+    if (run.ok && !readOnly) sql.introspect.forgetColumns(id)
+    return run
+  },
+  'sql:cancel': async ({ id, token }) => sql.cancel(id, token),
+  'sql:saveAsMigration': async ({ id, name, sql: text }) =>
+    migrations.createWithBody(id, name, text),
+
+  /* --- saxlanmış sorğular --- */
+  'queries:list': async ({ id }) => queries.list(id),
+  'queries:read': async ({ id, name }) => queries.read(id, name),
+  'queries:write': async ({ id, name, sql: text }) => queries.write(id, name, text),
+  'queries:rename': async ({ id, name, to }) => queries.rename(id, name, to),
+  'queries:remove': async ({ id, name }) => queries.remove(id, name),
+
+  /* --- cədvəl redaktoru --- */
+  'db:schemas': async ({ id, includeSystem }) => sql.introspect.schemas(id, includeSystem ?? false),
+  'db:tables': async ({ id, schema }) => sql.introspect.tables(id, schema),
+  'db:columns': async ({ id, schema, table }) => sql.introspect.columns(id, schema, table),
+  'db:completion': async ({ id }) => sql.introspect.completion(id),
+  'db:rows': async ({ id, ...req }) => sql.selectRows(id, req),
+  'db:insertRow': async ({ id, schema, table, values }) =>
+    sql.insertRow(id, schema, table, values),
+  'db:updateRow': async ({ id, schema, table, pk, patch }) =>
+    sql.updateRow(id, schema, table, pk, patch),
+  'db:deleteRows': async ({ id, schema, table, pks }) =>
+    sql.deleteRows(id, schema, table, pks),
 
   /* --- sistem --- */
   'system:doctor': async () => stack.doctor()
