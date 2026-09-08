@@ -1,10 +1,17 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import type { DeployStep, HealthReport, Project, RemoteEnv, SyncReport } from '@shared/types'
+import type {
+  DeployStep,
+  HealthReport,
+  Project,
+  RemoteEnv,
+  SyncReport
+} from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx, timeAgo } from '../lib/format'
 import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Skeleton } from '../components/ui'
 import { EnvForm } from '../components/env-form'
 import { RemoteServices } from '../components/remote-services'
+import { DRIFT, FunctionDiffModal } from '../components/function-diff'
 
 export function SyncRoute({
   project,
@@ -105,6 +112,8 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
   const [pickedFunctions, setPickedFunctions] = useState<Set<string>>(new Set())
   const [pickedSecrets, setPickedSecrets] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)
+  /** fərqinə baxılan funksiya */
+  const [diffFn, setDiffFn] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -115,7 +124,13 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
       setPickedMigrations(
         new Set(r.migrations.items.filter((m) => m.state === 'pending-remote').map((m) => m.version))
       )
-      setPickedFunctions(new Set(r.functions.items.filter((f) => f.remote === null && f.path).map((f) => f.name)))
+      setPickedFunctions(
+        new Set(
+          r.functions.items
+            .filter((f) => f.path !== '' && (f.drift === 'local-only' || f.drift === 'changed'))
+            .map((f) => f.name)
+        )
+      )
       setPickedSecrets(new Set())
     } catch (err) {
       setError((err as Error).message)
@@ -238,28 +253,41 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
               error={report.functions.error}
               count={pickedFunctions.size}
             >
-              {report.functions.items
-                .filter((f) => f.path !== '')
-                .map((f) => (
-                  <Pick
-                    key={f.name}
-                    checked={pickedFunctions.has(f.name)}
-                    onChange={(v) =>
-                      setPickedFunctions((prev) => {
-                        const next = new Set(prev)
-                        if (v) next.add(f.name)
-                        else next.delete(f.name)
-                        return next
-                      })
-                    }
-                    label={<code className="font-mono">{f.name}</code>}
-                    right={
-                      <span className="text-[11px] text-muted">
-                        {f.remote === null ? 'remote-da yoxdur' : `remote v${f.remote.version ?? '?'}`}
-                      </span>
-                    }
-                  />
-                ))}
+              {report.functions.items.map((f) => (
+                <Pick
+                  key={f.name}
+                  checked={pickedFunctions.has(f.name)}
+                  disabled={f.path === ''}
+                  onChange={(v) =>
+                    setPickedFunctions((prev) => {
+                      const next = new Set(prev)
+                      if (v) next.add(f.name)
+                      else next.delete(f.name)
+                      return next
+                    })
+                  }
+                  label={<code className="font-mono">{f.name}</code>}
+                  right={
+                    <span className="flex items-center gap-2">
+                      {f.remote?.version != null && (
+                        <span className="text-[11px] text-muted">v{f.remote.version}</span>
+                      )}
+                      <Badge tone={DRIFT[f.drift].tone}>{DRIFT[f.drift].label}</Badge>
+                      <button
+                        onClick={(e) => {
+                          // <label> daxilindəyik — klik checkbox-a keçməsin
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setDiffFn(f.name)
+                        }}
+                        className="rounded border border-line px-1.5 py-0.5 text-[11px] text-muted hover:border-accent-dim hover:text-accent"
+                      >
+                        fərqə bax
+                      </button>
+                    </span>
+                  }
+                />
+              ))}
               {report.functions.items.length === 0 && <Clean text="Funksiya yoxdur." />}
             </Axis>
 
@@ -299,6 +327,15 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
           </>
         )}
       </div>
+
+      {diffFn && (
+        <FunctionDiffModal
+          projectId={project.id}
+          envId={env.id}
+          name={diffFn}
+          onClose={() => setDiffFn(null)}
+        />
+      )}
 
       {confirming && (
         <DeployModal

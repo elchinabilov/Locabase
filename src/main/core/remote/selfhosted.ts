@@ -9,11 +9,14 @@
 import { basename } from 'node:path'
 import { run } from '../cli.js'
 import { paths } from '../projects.js'
+import { MAX_FILE_BYTES } from '../filetree.js'
 import { parseBytes } from '@shared/services.js'
 import type {
   BackupInfo,
   HealthReport,
   Project,
+  RemoteFile,
+  RemoteFileChecksum,
   RemoteFunctionInfo,
   RemoteService,
   SelfHostedEnv,
@@ -42,6 +45,91 @@ function serviceKeyOf(container: string, suffix: string): string {
 function parseHealth(status: string): string | null {
   const m = /\((healthy|unhealthy|health: starting|starting)\)/i.exec(status)
   return m ? m[1]!.toLowerCase().replace('health: ', '') : null
+}
+
+/**
+ * Uzaq `.env`-i stdin-dən gələn `KEY=value` sətirləri ilə birləşdirən bash
+ * skripti: eyniadlı açar əvəzlənir, qalanı olduğu kimi qalır, nəticə 0600
+ * hüquqla atomik köçürülür.
+ *
+ * Sətirlər `\n` ilə birləşir — `;` ilə `while … do;` sintaksis xətası verir.
+ */
+export function envMergeScript(file: string): string {
+  return [
+    'set -e',
+    'T="$(mktemp)"',
+    'trap \'rm -f "$T" "$T.old"\' EXIT',
+    'cat > "$T"',
+    `TARGET=${sq(file)}`,
+    'touch "$TARGET"',
+    'cp "$TARGET" "$T.old"',
+    'while IFS= read -r line; do',
+    '  [ -z "$line" ] && continue',
+    '  K="${line%%=*}"',
+    '  grep -v "^${K}=" "$T.old" > "$T.new" || true',
+    '  mv "$T.new" "$T.old"',
+    'done < "$T"',
+    'cat "$T" >> "$T.old"',
+    'chmod 600 "$T.old"',
+    'mv "$T.old" "$TARGET"',
+    'echo updated'
+  ].join('\n')
+}
+
+/**
+ * Qovluğun bütün fayllarını `<token><yol>` başlığı + base64 məzmun kimi
+ * axıdan bash skripti. Böyük fayl üçün məzmun əvəzinə `<token>!` markeri
+ * gedir — fayl siyahıdan düşməsin ki, «yalnız lokalda var» kimi görünməsin.
+ */
+export function dumpScript(dir: string, token: string): string {
+  return [
+    `cd ${sq(dir)}`,
+    // nöqtə ilə başlayan fayllar atılır — lokal ağac da onları saymır
+    `find . -type f -not -path '*/.*' | sort | while IFS= read -r f; do`,
+    `  printf '%s%s\\n' ${sq(token)} "\${f#./}"`,
+    `  if [ "$(wc -c < "$f")" -le ${MAX_FILE_BYTES} ]; then`,
+    '    base64 < "$f"',
+    '  else',
+    `    printf '%s!\\n' ${sq(token)}`,
+    '  fi',
+    'done'
+  ].join('\n')
+}
+
+/** `<token><yol>` başlığı + base64 sətirləri (və ya `<token>!` markeri) → fayllar. */
+export function decodeDump(out: string, token: string): RemoteFile[] {
+  const files: RemoteFile[] = []
+  let path: string | null = null
+  let b64: string[] = []
+  let skipped = false
+  const flush = (): void => {
+    if (path === null) return
+    if (skipped) {
+      files.push({ path, content: null, binary: true })
+    } else {
+      const buf = Buffer.from(b64.join(''), 'base64')
+      const binary = buf.includes(0)
+      files.push({ path, content: binary ? null : buf.toString('utf8'), binary })
+    }
+    path = null
+    b64 = []
+    skipped = false
+  }
+  for (const line of out.split('\n')) {
+    if (line.startsWith(token)) {
+      const rest = line.slice(token.length).trim()
+      if (rest === '!') {
+        skipped = true
+        continue
+      }
+      flush()
+      path = rest
+      continue
+    }
+    if (path !== null) b64.push(line.trim())
+  }
+  flush()
+  return files.sort((a, b) => a.path.localeCompare(b.path))
 }
 
 const LEDGER_QUERY =
@@ -215,25 +303,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
 
     // Skript uzaq əmrin özündədir, stdin isə **dəyərlərdir** — belədə heç bir
     // secret nə arqumentə, nə də shell tarixçəsinə düşür.
-    const script = [
-      'set -e',
-      'T="$(mktemp)"',
-      'trap \'rm -f "$T" "$T.old"\' EXIT',
-      'cat > "$T"',
-      `TARGET=${sq(file)}`,
-      'touch "$TARGET"',
-      'cp "$TARGET" "$T.old"',
-      'while IFS= read -r line; do',
-      '  [ -z "$line" ] && continue',
-      '  K="${line%%=*}"',
-      '  grep -v "^${K}=" "$T.old" > "$T.new" || true',
-      '  mv "$T.new" "$T.old"',
-      'done < "$T"',
-      'cat "$T" >> "$T.old"',
-      'chmod 600 "$T.old"',
-      'mv "$T.old" "$TARGET"',
-      'echo updated'
-    ].join('; ')
+    const script = envMergeScript(file)
 
     const payload = `${entries.map(([k, v]) => `${k}=${v}`).join('\n')}\n`
     await this.ssh(`bash -c ${sq(script)}`, { input: payload, quiet: true, timeoutMs: 60_000 })
@@ -246,11 +316,62 @@ export class SelfHostedAdapter implements RemoteAdapter {
       `ls -1 ${sq(dir)} 2>/dev/null | grep -v '^_' || true`,
       { quiet: true }
     )
-    return out
+    const names = out
       .split('\n')
       .map((l) => l.trim())
       .filter(Boolean)
-      .map((name) => ({ name, version: null, status: null, updatedAt: null, verifyJwt: null }))
+
+    // Bütün funksiyaların fayl md5-ləri **bir** ssh çağırışı ilə gəlir —
+    // fərqi göstərmək üçün faylları çəkmək lazım deyil.
+    const checksums = await this.functionChecksums(dir)
+    return names.map((name) => ({
+      name,
+      version: null,
+      status: null,
+      updatedAt: null,
+      verifyJwt: null,
+      files: checksums?.get(name) ?? (checksums ? [] : null)
+    }))
+  }
+
+  /** `<funksiya adı> → [{path, md5}]`; md5sum yoxdursa null. */
+  private async functionChecksums(dir: string): Promise<Map<string, RemoteFileChecksum[]> | null> {
+    let out: string
+    try {
+      out = await this.ssh(
+        `cd ${sq(dir)} 2>/dev/null && find . -type f -not -path './_*' -not -path '*/.*' -exec md5sum {} + 2>/dev/null || true`,
+        { quiet: true, maxOutputLines: 20_000 }
+      )
+    } catch {
+      return null
+    }
+    const byName = new Map<string, RemoteFileChecksum[]>()
+    let seen = false
+    for (const line of out.split('\n')) {
+      const m = /^([0-9a-f]{32})\s+\.\/(.+)$/.exec(line.trim())
+      if (!m) continue
+      seen = true
+      const rel = m[2]!
+      const slash = rel.indexOf('/')
+      if (slash === -1) continue
+      const name = rel.slice(0, slash)
+      const path = rel.slice(slash + 1)
+      byName.set(name, [...(byName.get(name) ?? []), { path, md5: m[1]! }])
+    }
+    return seen || out.trim() === '' ? byName : null
+  }
+
+  async readFunction(name: string): Promise<RemoteFile[]> {
+    if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error(`yararsız funksiya adı: ${name}`)
+    const dir = `${this.env.remoteDir}/volumes/functions/${name}`
+    // Ayırıcı hər çağırışda təsadüfidir — fayl məzmunu onunla üst-üstə düşə bilməsin
+    const token = `__LOCABASE_${randomUUID().replace(/-/g, '')}__`
+    const out = await this.ssh(`bash -c ${sq(dumpScript(dir, token))}`, {
+      quiet: true,
+      maxOutputLines: 200_000,
+      timeoutMs: 120_000
+    })
+    return decodeDump(out, token)
   }
 
   /**

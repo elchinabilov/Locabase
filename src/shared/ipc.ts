@@ -17,6 +17,7 @@ import type {
   ConfigPatch,
   DeployPlan,
   EnvEntry,
+  FunctionDiff,
   FunctionInfo,
   HealthReport,
   LogLine,
@@ -95,6 +96,8 @@ export interface IpcContract {
 
   /* --- funksiyalar --- */
   'functions:list': { req: { id: string; envId: string | null }; res: FunctionInfo[] }
+  /** Bir funksiyanın lokal ↔ uzaq məzmun fərqi (fayl-fayl) */
+  'functions:diff': { req: { id: string; envId: string; name: string }; res: FunctionDiff }
   'functions:create': { req: { id: string; name: string }; res: { path: string } }
   'functions:setVerifyJwt': { req: { id: string; name: string; verifyJwt: boolean }; res: void }
   'functions:serve': { req: { id: string; on: boolean }; res: void }
@@ -245,6 +248,7 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'migrations:diff',
   'migrations:repair',
   'functions:list',
+  'functions:diff',
   'functions:create',
   'functions:setVerifyJwt',
   'functions:serve',

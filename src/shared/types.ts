@@ -244,6 +244,27 @@ export interface FunctionInfo {
   verifyJwt: boolean
   files: number
   remote: RemoteFunctionInfo | null
+  /**
+   * Lokal ilə uzağın **məzmun** fərqi. `unknown` — uzaq tərəf fayl siyahısı
+   * vermir (managed: yalnız versiya nömrəsi var), ona görə fərq yalnız
+   * «Fərqə bax» ilə, tələb üzərinə hesablanır.
+   */
+  drift: FunctionDrift
+}
+
+export type FunctionDrift = 'same' | 'changed' | 'local-only' | 'remote-only' | 'unknown'
+
+/** Uzaqdan gətirilmiş fayl. `content` null — binar və ya çox böyük. */
+export interface RemoteFile {
+  path: string
+  content: string | null
+  binary: boolean
+}
+
+/** Uzaq fayl və onun md5-i — fərqin ucuz (bir çağırışlıq) hesablanması üçün. */
+export interface RemoteFileChecksum {
+  path: string
+  md5: string
 }
 
 export interface RemoteFunctionInfo {
@@ -252,6 +273,26 @@ export interface RemoteFunctionInfo {
   status: string | null
   updatedAt: string | null
   verifyJwt: boolean | null
+  /** null — uzaq nəqliyyat fayl siyahısı vermir */
+  files: RemoteFileChecksum[] | null
+}
+
+/* ------------------------------------------------------- funksiya fərqi */
+
+export interface FunctionFileDiff {
+  path: string
+  status: 'same' | 'changed' | 'local-only' | 'remote-only'
+  /** mətn məzmunu; binar və ya çox böyük fayllarda null */
+  local: string | null
+  remote: string | null
+  binary: boolean
+}
+
+export interface FunctionDiff {
+  name: string
+  files: FunctionFileDiff[]
+  /** dəyişən/əlavə/silinən fayl sayı */
+  changed: number
 }
 
 /* ---------------------------------------------------------------- remote */

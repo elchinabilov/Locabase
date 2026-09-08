@@ -5,37 +5,44 @@
  */
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
+import { checksums, readTree } from './filetree.js'
 import { parse as parseToml } from 'smol-toml'
 import { get as getProject, getEnv, paths } from './projects.js'
 import { adapterFor } from './remote/index.js'
 import { write as writeConfig } from './config.js'
 import { supabase } from './cli.js'
 import { logBus } from './log.js'
-import type { FunctionInfo } from '@shared/types.js'
+import type {
+  FunctionDiff,
+  FunctionDrift,
+  FunctionFileDiff,
+  FunctionInfo,
+  RemoteFile,
+  RemoteFileChecksum
+} from '@shared/types.js'
 
-function walk(dir: string, base = dir): string[] {
-  const out: string[] = []
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name.startsWith('.')) continue
-    const full = join(dir, entry.name)
-    if (entry.isDirectory()) out.push(...walk(full, base))
-    else out.push(relative(base, full))
+/**
+ * Qovluğun məzmun hash-i + fayl-fayl md5-lər. Fayllar bir dəfə oxunur: eyni
+ * siyahı həm ümumi hash, həm də uzaqla tutuşdurma üçün işlədilir.
+ */
+export function hashDir(dir: string): { hash: string; files: number; checksums: RemoteFileChecksum[] } {
+  const list = checksums(dir)
+  const h = createHash('sha256')
+  for (const f of list) {
+    h.update(f.path)
+    h.update('\0')
+    h.update(f.md5)
+    h.update('\0')
   }
-  return out.sort()
+  return { hash: h.digest('hex').slice(0, 16), files: list.length, checksums: list }
 }
 
-/** Qovluğun bütün fayllarının məzmun hash-i — sıra sabit saxlanılır. */
-export function hashDir(dir: string): { hash: string; files: number } {
-  const files = walk(dir)
-  const h = createHash('sha256')
-  for (const f of files) {
-    h.update(f)
-    h.update('\0')
-    h.update(readFileSync(join(dir, f)))
-    h.update('\0')
-  }
-  return { hash: h.digest('hex').slice(0, 16), files: files.length }
+/** Uzaq və lokal fayl md5-lərini tutuşdur. */
+function driftOf(local: RemoteFileChecksum[], remote: RemoteFileChecksum[]): FunctionDrift {
+  const r = new Map(remote.map((f) => [f.path, f.md5]))
+  if (local.length !== r.size) return 'changed'
+  return local.every((f) => r.get(f.path) === f.md5) ? 'same' : 'changed'
 }
 
 function verifyJwtOf(configPath: string, name: string): boolean {
@@ -55,11 +62,13 @@ export async function list(id: string, envId: string | null): Promise<FunctionIn
   if (!existsSync(dir)) return []
 
   const configPath = paths.configToml(project)
+  const localSums = new Map<string, RemoteFileChecksum[]>()
   const local: FunctionInfo[] = readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith('_') && !e.name.startsWith('.'))
     .map((e) => {
       const path = join(dir, e.name)
-      const { hash, files } = hashDir(path)
+      const { hash, files, checksums: sums } = hashDir(path)
+      localSums.set(e.name, sums)
       const entrypoint = ['index.ts', 'index.js', 'main.ts'].find((f) =>
         existsSync(join(path, f))
       )
@@ -70,7 +79,9 @@ export async function list(id: string, envId: string | null): Promise<FunctionIn
         hash,
         files,
         verifyJwt: verifyJwtOf(configPath, e.name),
-        remote: null
+        remote: null,
+        // remote siyahısı oxunana qədər fərq bilinmir
+        drift: 'unknown' as FunctionDrift
       }
     })
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -80,7 +91,19 @@ export async function list(id: string, envId: string | null): Promise<FunctionIn
   try {
     const remote = await adapterFor(project, getEnv(id, envId)).listFunctions()
     const byName = new Map(remote.map((r) => [r.name, r]))
-    for (const fn of local) fn.remote = byName.get(fn.name) ?? null
+    for (const fn of local) {
+      fn.remote = byName.get(fn.name) ?? null
+      if (!fn.remote) {
+        fn.drift = 'local-only'
+        continue
+      }
+      // Uzaq tərəf fayl siyahısı verməyəndə (managed) fərq bilinmir —
+      // «Fərqə bax» onu tələb üzərinə hesablayır.
+      fn.drift =
+        fn.remote.files === null
+          ? 'unknown'
+          : driftOf(localSums.get(fn.name) ?? [], fn.remote.files)
+    }
     for (const r of remote) {
       if (local.some((l) => l.name === r.name)) continue
       local.push({
@@ -88,15 +111,47 @@ export async function list(id: string, envId: string | null): Promise<FunctionIn
         path: '',
         entrypoint: '(yalnız remote)',
         hash: '',
-        files: 0,
+        files: r.files?.length ?? 0,
         verifyJwt: r.verifyJwt ?? true,
-        remote: r
+        remote: r,
+        drift: 'remote-only'
       })
     }
   } catch (err) {
     logBus.push('functions', 'warn', `Remote funksiyalar oxunmadı: ${(err as Error).message}`)
   }
   return local
+}
+
+/**
+ * Bir funksiyanın lokal və uzaq **məzmun** fərqi. Uzaq fayllar tələb üzərinə
+ * gətirilir: self-hosted-də ssh ilə, managed-də `functions download` ilə
+ * müvəqqəti qovluğa.
+ */
+export async function diff(id: string, envId: string, name: string): Promise<FunctionDiff> {
+  const project = getProject(id)
+  const dir = join(paths.functionsDir(project), name)
+  const localFiles = existsSync(dir) ? readTree(dir) : []
+  let remoteFiles: RemoteFile[] = []
+  try {
+    remoteFiles = await adapterFor(project, getEnv(id, envId)).readFunction(name)
+  } catch (err) {
+    if (localFiles.length === 0) throw err
+    // uzaqda yoxdursa bu normaldır — hamısı «yalnız lokal» kimi göstərilir
+    logBus.push('functions', 'warn', `${name}: uzaq mənbə oxunmadı — ${(err as Error).message}`)
+  }
+
+  const byPath = new Map(remoteFiles.map((f) => [f.path, f]))
+  const allPaths = [...new Set([...localFiles.map((f) => f.path), ...byPath.keys()])].sort()
+  const files: FunctionFileDiff[] = allPaths.map((path) => {
+    const l = localFiles.find((f) => f.path === path) ?? null
+    const r = byPath.get(path) ?? null
+    const binary = (l?.binary ?? false) || (r?.binary ?? false)
+    const status: FunctionFileDiff['status'] =
+      l === null ? 'remote-only' : r === null ? 'local-only' : l.content === r.content ? 'same' : 'changed'
+    return { path, status, local: l?.content ?? null, remote: r?.content ?? null, binary }
+  })
+  return { name, files, changed: files.filter((f) => f.status !== 'same').length }
 }
 
 const TEMPLATE = `// <name> — Supabase Edge Function (Deno)

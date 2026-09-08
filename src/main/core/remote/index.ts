@@ -7,6 +7,7 @@ import type {
   HealthReport,
   Project,
   RemoteEnv,
+  RemoteFile,
   RemoteFunctionInfo,
   RemoteService,
   SqlRun,
@@ -38,6 +39,11 @@ export interface RemoteAdapter {
   listSecretNames(): Promise<string[]>
   setSecrets(kv: Record<string, string>, log: LogFn): Promise<void>
   listFunctions(): Promise<RemoteFunctionInfo[]>
+  /**
+   * Bir funksiyanın uzaqdakı **fayl məzmunu** — «Fərqə bax» üçün. Tələb
+   * üzərinə çağırılır, `report()` axınında yox.
+   */
+  readFunction(name: string): Promise<RemoteFile[]>
   deployFunctions(names: string[], log: LogFn): Promise<void>
   /** Ledger sətrini əlavə et / sil — fayllarla ledger uyğunsuzluğunu düzəltmək üçün. */
   repairLedger(version: string, status: 'applied' | 'reverted', log: LogFn): Promise<void>

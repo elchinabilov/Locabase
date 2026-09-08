@@ -3,6 +3,7 @@ import type { Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
 import { Badge, Button, Card, ErrorNote, Input, Modal, Select, SkeletonList, Toggle } from '../components/ui'
+import { DRIFT, FunctionDiffModal } from '../components/function-diff'
 
 export function FunctionsRoute({ project }: { project: Project }): ReactNode {
   const [envId, setEnvId] = useState<string>(project.environments[0]?.id ?? '')
@@ -12,6 +13,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
   const [error, setError] = useState<string | null>(null)
   const [deploying, setDeploying] = useState<string | null>(null)
   const [confirmDeploy, setConfirmDeploy] = useState<string[] | null>(null)
+  const [diffFn, setDiffFn] = useState<string | null>(null)
 
   const items = list.data ?? []
   const local = items.filter((f) => f.path !== '')
@@ -86,9 +88,10 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <code className="text-[12.5px] text-text">{fn.name}</code>
-                      {fn.path === '' && <Badge tone="warn">yalnız remote</Badge>}
-                      {envId && fn.path !== '' && fn.remote === null && (
-                        <Badge tone="info">deploy olunmayıb</Badge>
+                      {envId ? (
+                        <Badge tone={DRIFT[fn.drift].tone}>{DRIFT[fn.drift].label}</Badge>
+                      ) : (
+                        fn.path === '' && <Badge tone="warn">yalnız remote</Badge>
                       )}
                       {fn.remote?.version && <Badge tone="muted">v{fn.remote.version}</Badge>}
                     </div>
@@ -116,6 +119,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
                       disabled={fn.path === ''}
                       onChange={(v) => void setVerify(fn.name, v)}
                     />
+                    {envId && <Button onClick={() => setDiffFn(fn.name)}>fərq</Button>}
                     {envId && fn.path !== '' && (
                       <Button
                         loading={deploying === fn.name}
@@ -136,6 +140,15 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
           </p>
         </div>
       </div>
+
+      {diffFn && envId && (
+        <FunctionDiffModal
+          projectId={project.id}
+          envId={envId}
+          name={diffFn}
+          onClose={() => setDiffFn(null)}
+        />
+      )}
 
       {creating && (
         <Modal

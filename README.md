@@ -22,7 +22,7 @@ boşluğu doldurur: **hər şey UI-dan, faylı əl ilə açmadan.**
 | **SQL** | CodeMirror redaktoru (sxem avtotamamlaması, ⌘↵), yalnız-oxu rejimi, çoxifadəli skript nəticələri, sorğuların repo-da saxlanması, «miqrasiya kimi saxla» |
 | **Miqrasiyalar** | Fayllar · lokal ledger · remote ledger yan-yana; new/up/diff/repair |
 | **Funksiyalar** | Siyahı, şablondan yaratma, lokal serve, `verify_jwt`, tək-tək və ya toplu deploy |
-| **Sync / Deploy** | Beş ox üzrə fərq (miqrasiya, sxem, funksiya, secret, auth), seçmə deploy, quru rejim, **remote konteynerlərin on/off və RAM-ı** |
+| **Sync / Deploy** | Beş ox üzrə fərq (miqrasiya, sxem, funksiya, secret, auth), **funksiyaların fayl-fayl məzmun diffi**, seçmə deploy, quru rejim, **remote konteynerlərin on/off və RAM-ı** |
 
 ## Layihə əlavə etmək
 
@@ -78,6 +78,19 @@ dəyişir, ona görə səhv sətri yeniləmək riski var). Görünüşlər də y
 Saxlanmış sorğular `supabase/.locabase/queries/<ad>.sql` faylıdır — commit
 olunur ki, komanda paylaşsın. Şəxsi saxlamaq üçün `.gitignore`-a
 `supabase/.locabase/` əlavə et.
+
+## Funksiya fərqi
+
+Self-hosted mühitdə uzaq faylların md5-i **bir** ssh çağırışı ilə oxunur, ona
+görə siyahı «üst-üstə düşür / məzmun fərqlidir / remote-da yoxdur» kimi dəqiq
+vəziyyət göstərir — versiya nömrəsi ilə təxmin etmir. Managed tərəfdə
+Management API fayl siyahısı vermir, vəziyyət `bilinmir` qalır.
+
+«Fərqə bax» uzaq mənbəni **tələb üzərinə** gətirir (self-hosted: ssh + base64;
+managed: `functions download` müvəqqəti iş qovluğuna — layihənin öz
+`supabase/functions/` qovluğu heç vaxt üstündən yazılmır) və fayl-fayl diff
+göstərir: `−` uzaqdakı, `+` lokaldakı sətir. 512 KB-dan böyük və binar fayllar
+siyahıda qalır, məzmunu açılmır.
 
 ## Servis keçidləri və RAM
 

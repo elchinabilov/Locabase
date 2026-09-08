@@ -50,7 +50,11 @@ export async function report(id: string, envId: string): Promise<SyncReport> {
 
   /* --- funksiyalar --- */
   const [functions, fnErr] = await safe(() => listFunctions(id, envId), [] as FunctionInfo[])
-  const fnDirty = functions.filter((f) => f.path !== '' && f.remote === null)
+  // Yalnız məzmunu fərqlənən (və ya uzaqda olmayan) funksiyalar «çirkli»dir;
+  // `unknown` — uzaq tərəf fayl vermir, fərq tələb üzərinə hesablanır.
+  const fnDirty = functions.filter(
+    (f) => f.path !== '' && (f.drift === 'local-only' || f.drift === 'changed')
+  )
 
   /* --- secret adları --- */
   const localNames = [...readMap(paths.envFile(project)).keys()]

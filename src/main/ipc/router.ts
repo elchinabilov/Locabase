@@ -154,6 +154,7 @@ const handlers: Handlers = {
 
   /* --- funksiyalar --- */
   'functions:list': async ({ id, envId }) => functions.list(id, envId),
+  'functions:diff': async ({ id, envId, name }) => functions.diff(id, envId, name),
   'functions:create': async ({ id, name }) => functions.create(id, name),
   'functions:setVerifyJwt': async ({ id, name, verifyJwt }) =>
     functions.setVerifyJwt(id, name, verifyJwt),

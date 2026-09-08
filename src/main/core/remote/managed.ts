@@ -10,11 +10,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { supabase, supabaseJson } from '../cli.js'
 import { get as getSecret, keys } from '../secrets.js'
+import { readTree } from '../filetree.js'
 import type {
   BackupInfo,
   HealthReport,
   ManagedEnv,
   Project,
+  RemoteFile,
   RemoteFunctionInfo,
   RemoteService,
   SqlColumn,
@@ -190,8 +192,35 @@ export class ManagedAdapter implements RemoteAdapter {
       version: r.version ?? null,
       status: r.status ?? null,
       updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
-      verifyJwt: r.verify_jwt ?? null
+      verifyJwt: r.verify_jwt ?? null,
+      // Management API fayl siyahısı vermir — fərq yalnız `readFunction` ilə
+      files: null
     }))
+  }
+
+  /**
+   * Uzaq mənbə `functions download` ilə **müvəqqəti** iş qovluğuna endirilir —
+   * layihənin öz `supabase/functions/` qovluğu heç vaxt üstündən yazılmır.
+   */
+  async readFunction(name: string): Promise<RemoteFile[]> {
+    if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error(`yararsız funksiya adı: ${name}`)
+    const work = mkdtempSync(join(tmpdir(), 'locabase-fn-'))
+    try {
+      mkdirSync(join(work, 'supabase'), { recursive: true })
+      writeFileSync(join(work, 'supabase', 'config.toml'), `project_id = "download"\n`, 'utf8')
+      const args = ['functions', 'download', name, '--project-ref', this.env.projectRef, '--workdir', work]
+      const opts = { cwd: work, env: this.cliEnv(), stream: this.stream, timeoutMs: 5 * 60 * 1000 }
+      // `--use-api` server tərəfdə unbundle edir — Docker tələb olunmur.
+      // Köhnə CLI bu bayrağı tanımır, onda adi yolla təkrarlanır.
+      let res = await supabase([...args, '--use-api'], opts)
+      if (!res.ok && /unknown flag|unknown shorthand/i.test(res.output)) {
+        res = await supabase(args, opts)
+      }
+      if (!res.ok) throw new Error(res.error ?? res.output.trim())
+      return readTree(join(work, 'supabase', 'functions', name))
+    } finally {
+      rmSync(work, { recursive: true, force: true })
+    }
   }
 
   async deployFunctions(names: string[], log: LogFn): Promise<void> {
