@@ -183,10 +183,10 @@ const handlers: Handlers = {
   },
 
   /* --- SQL redaktoru --- */
-  'sql:execute': async ({ id, sql: text, readOnly, maxRows, timeoutMs, token }) => {
-    const run = await sql.execute(id, text, { readOnly, maxRows, timeoutMs, token })
+  'sql:execute': async ({ id, envId, sql: text, readOnly, maxRows, timeoutMs, token }) => {
+    const run = await sql.execute(id, text, { envId, readOnly, maxRows, timeoutMs, token })
     // DDL sxemi dəyişdirmiş ola bilər — sütun keşi köhnəlir
-    if (run.ok && !readOnly) sql.introspect.forgetColumns(id)
+    if (run.ok && !readOnly) sql.introspect.forgetColumns(id, envId)
     return run
   },
   'sql:cancel': async ({ id, token }) => sql.cancel(id, token),
@@ -201,17 +201,19 @@ const handlers: Handlers = {
   'queries:remove': async ({ id, name }) => queries.remove(id, name),
 
   /* --- cədvəl redaktoru --- */
-  'db:schemas': async ({ id, includeSystem }) => sql.introspect.schemas(id, includeSystem ?? false),
-  'db:tables': async ({ id, schema }) => sql.introspect.tables(id, schema),
-  'db:columns': async ({ id, schema, table }) => sql.introspect.columns(id, schema, table),
-  'db:completion': async ({ id }) => sql.introspect.completion(id),
+  'db:schemas': async ({ id, envId, includeSystem }) =>
+    sql.introspect.schemas(id, envId, includeSystem ?? false),
+  'db:tables': async ({ id, envId, schema }) => sql.introspect.tables(id, envId, schema),
+  'db:columns': async ({ id, envId, schema, table }) =>
+    sql.introspect.columns(id, envId, schema, table),
+  'db:completion': async ({ id, envId }) => sql.introspect.completion(id, envId),
   'db:rows': async ({ id, ...req }) => sql.selectRows(id, req),
-  'db:insertRow': async ({ id, schema, table, values }) =>
-    sql.insertRow(id, schema, table, values),
-  'db:updateRow': async ({ id, schema, table, pk, patch }) =>
-    sql.updateRow(id, schema, table, pk, patch),
-  'db:deleteRows': async ({ id, schema, table, pks }) =>
-    sql.deleteRows(id, schema, table, pks),
+  'db:insertRow': async ({ id, envId, schema, table, values }) =>
+    sql.insertRow(id, envId, schema, table, values),
+  'db:updateRow': async ({ id, envId, schema, table, pk, patch }) =>
+    sql.updateRow(id, envId, schema, table, pk, patch),
+  'db:deleteRows': async ({ id, envId, schema, table, pks }) =>
+    sql.deleteRows(id, envId, schema, table, pks),
 
   /* --- sistem --- */
   'system:doctor': async () => stack.doctor()

@@ -1,6 +1,6 @@
-<img src="resources/logo-128.png" width="64" alt="Localbase">
+<img src="resources/logo-128.png" width="64" alt="Locabase">
 
-# Localbase
+# Locabase
 
 Lokal Supabase stack-ini idarə etmək, `config.toml`-u forma üzərindən redaktə
 etmək və lokal ilə remote (managed **və** self-hosted) arasındakı fərqi görüb
@@ -26,11 +26,29 @@ boşluğu doldurur: **hər şey UI-dan, faylı əl ilə açmadan.**
 
 ## SQL və cədvəl redaktoru
 
-Hər ikisi **yalnız lokal** Postgres-ə (`127.0.0.1:<config.toml db.port>`)
-qoşulur — remote mühitlərə birbaşa SQL yoxdur.
+Hər iki ekranın yuxarısında **mühit seçimi** var. Default **lokal**-dır
+(`127.0.0.1:<config.toml db.port>`) və elə qalır — uzaq mühit yalnız açıq
+seçimlə işə düşür.
+
+Nəqliyyat mühitə görə dəyişir, sorğu mətnləri isə eynidir:
+
+| Mühit | Necə gedir | Məhdudiyyət |
+| --- | --- | --- |
+| Lokal | `pg` sürücüsü, `$n` parametrləri | — |
+| Managed | Management API `database/query` | Sütun tipləri yoxdur, eyniadlı sütunlar birləşir, `read_only` API tərəfindən tətbiq olunur |
+| Self-hosted | SSH + `docker exec psql -q --csv` | Bir nəticə bloku, xəta mövqeyi yoxdur |
+
+Uzaq nəqliyyatda `$n` bağlana bilmədiyinə görə **bizim qurduğumuz** sorğularda
+dəyər `quoteLiteral()` ilə yapışdırılır (istifadəçinin SQL-i heç vaxt buradan
+keçmir). Sorğunu ləğv etmək (`pg_cancel_backend`) yalnız lokalda mümkündür.
+
+Uzaq mühitdə sətir yazmaq `json_agg` sarğısından yox, birbaşa yuxarı səviyyəli
+ifadədən keçir — Postgres datanı dəyişən CTE-nin alt sorğuda olmasına icazə
+vermir.
 
 **Yalnız oxu default açıqdır** və hər açılışda sıfırlanır. Yazma server tərəfdə
-`begin read only` ilə bloklanır, SQL-i regex ilə yoxlamaqla yox — çünki
+bloklanır (lokal və self-hosted: `begin read only`; managed: API-nin
+`read_only` bayrağı), SQL-i regex ilə yoxlamaqla yox — çünki
 `with x as (delete … returning *) select * from x` istənilən regex-i keçir.
 
 Əhatə qəsdən asimmetrikdir: **cədvəl redaktorunda DDL yoxdur** (yalnız sətir
@@ -42,9 +60,9 @@ PK-sı olmayan cədvəlin sətirləri redaktə olunmur (Studio-nun `ctid` fallba
 qəsdən tətbiq edilməyib — `ctid` hər `UPDATE`-dən və `VACUUM FULL`-dan sonra
 dəyişir, ona görə səhv sətri yeniləmək riski var). Görünüşlər də yalnız oxunur.
 
-Saxlanmış sorğular `supabase/.localbase/queries/<ad>.sql` faylıdır — commit
+Saxlanmış sorğular `supabase/.locabase/queries/<ad>.sql` faylıdır — commit
 olunur ki, komanda paylaşsın. Şəxsi saxlamaq üçün `.gitignore`-a
-`supabase/.localbase/` əlavə et.
+`supabase/.locabase/` əlavə et.
 
 ## Servis keçidləri və RAM
 

@@ -17,11 +17,14 @@ import type {
   RemoteFunctionInfo,
   RemoteService,
   SelfHostedEnv,
+  SqlRun,
   VerifyReport
 } from '@shared/types.js'
 import type { MigrationFile } from '../migrations.js'
 import { readMigration } from '../migrations.js'
-import type { LedgerRow, LogFn, RemoteAdapter } from './index.js'
+import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
+import { parsePsqlCsv, parsePsqlError } from '../sql/csv.js'
+import { randomUUID } from 'node:crypto'
 
 /** Uzaq shell üçün təhlükəsiz sətir. */
 function sq(value: string): string {
@@ -66,27 +69,37 @@ export class SelfHostedAdapter implements RemoteAdapter {
   /** Uzaqda əmr icra et. `input` varsa stdin-ə ötürülür. */
   private async ssh(
     command: string,
-    opts: { input?: string; timeoutMs?: number; quiet?: boolean } = {}
+    opts: {
+      input?: string
+      timeoutMs?: number
+      quiet?: boolean
+      maxOutputLines?: number
+    } = {}
   ): Promise<string> {
     const res = await run('ssh', [...this.sshArgs(), this.env.sshHost, command], {
       stream: this.stream,
       input: opts.input,
       timeoutMs: opts.timeoutMs ?? 120_000,
-      quiet: opts.quiet
+      quiet: opts.quiet,
+      maxOutputLines: opts.maxOutputLines
     })
     if (!res.ok) throw new Error(res.error ?? (res.output.trim() || 'ssh əmri uğursuz oldu'))
     return res.output
   }
 
   /** `docker exec -i <db> psql ...` — prod.sh-dəki `psql_remote` funksiyası. */
-  private psql(sql: string, flags: string[] = []): Promise<string> {
+  private psql(
+    sql: string,
+    flags: string[] = [],
+    opts: { timeoutMs?: number; maxOutputLines?: number } = {}
+  ): Promise<string> {
     const cmd = [
       'docker exec -i',
       sq(this.env.dbContainer),
       'psql -U postgres -d postgres -v ON_ERROR_STOP=1',
       ...flags
     ].join(' ')
-    return this.ssh(cmd, { input: sql, quiet: true })
+    return this.ssh(cmd, { input: sql, quiet: true, ...opts })
   }
 
   async ping(): Promise<HealthReport> {
@@ -386,5 +399,91 @@ export class SelfHostedAdapter implements RemoteAdapter {
       }
     }
     return { ok: checks.every((c) => c.ok), checks }
+  }
+
+  /* ------------------------------------------------------------ SQL */
+
+  /**
+   * Sərbəst SQL — `psql -q --csv` ilə. CSV seçilib, çünki dəyərin içindəki
+   * vergül, sətir keçidi və dırnaq itmir; `-P null=<uuid>` isə NULL ilə boş
+   * sətri ayırır (CSV-də ikisi də boş sahədir).
+   *
+   * `-q` command tag-ları söndürür, ona görə çıxış tək bir nəticə blokudur:
+   * ÇOXİFADƏLİ SKRİPTDƏ yalnız birinci bloka baxmaq düzgün olmazdı, ona görə
+   * uzaq mühitdə bir nəticə göstərilir və UI bunu qeyd edir.
+   */
+  async runSql(sql: string, opts: RemoteSqlOpts): Promise<SqlRun> {
+    const started = Date.now()
+    const nullToken = `lbnull-${randomUUID()}`
+    const timeout = Math.max(1000, Math.min(600_000, Math.trunc(opts.timeoutMs)))
+    // Yalnız-oxu SERVER tərəfdə tətbiq olunur — SQL-i regex ilə yoxlamaq
+    // etibarsızdır. psql stdin bitəndə bağlantı qapanır və tranzaksiya geri
+    // qayıdır, ona görə `rollback` yazmağa ehtiyac yoxdur.
+    const prelude = opts.readOnly
+      ? `begin read only;\nset local statement_timeout = ${timeout};\n`
+      : `set statement_timeout = ${timeout};\n`
+    try {
+      const out = await this.psql(
+        `${prelude}${sql}`,
+        ['-q', '--csv', '-P', `null=${nullToken}`],
+        // nəticə kəsilməməlidir: default 200 sətirlik log limiti datanı korlayardı
+        { maxOutputLines: 200_000, timeoutMs: timeout + 30_000 }
+      )
+      const parsed = parsePsqlCsv(out, nullToken)
+      const truncated = parsed.rows.length > opts.maxRows
+      return {
+        ok: true,
+        results: [
+          {
+            command: null,
+            columns: parsed.columns.map((name) => ({ name, typeOid: 0, typeName: 'text' })),
+            rows: truncated ? parsed.rows.slice(0, opts.maxRows) : parsed.rows,
+            rowCount: parsed.rows.length,
+            truncated
+          }
+        ],
+        durationMs: Date.now() - started,
+        readOnly: opts.readOnly,
+        error: null
+      }
+    } catch (err) {
+      const parsed = parsePsqlError((err as Error).message)
+      return {
+        ok: false,
+        results: [],
+        durationMs: Date.now() - started,
+        readOnly: opts.readOnly,
+        error: {
+          message: parsed.message,
+          code: null,
+          severity: null,
+          detail: parsed.detail,
+          hint: parsed.hint,
+          // psql `position` vermir — dalğalı işarə yalnız lokalda görünür
+          position: null,
+          where: null,
+          table: null,
+          column: null,
+          constraint: null
+        }
+      }
+    }
+  }
+
+  /**
+   * Daxili sorğu. `json_agg` ilə bütün nəticə bir xanaya yığılır: belədə
+   * tiplər (bool, ədəd, null) CSV-nin mətn dünyasından keçmədən qorunur.
+   */
+  async queryJson<T>(sql: string): Promise<T[]> {
+    // Alias qəsdən nadir addır: sarınan sorğunun öz CTE adları ilə toqquşmasın
+    const wrapped = `select coalesce(json_agg(__lbq), '[]'::json)::text from (${sql}) __lbq;`
+    const out = await this.psql(wrapped, ['-q', '-A', '-t'], { maxOutputLines: 200_000 })
+    const text = out.trim()
+    if (!text) return []
+    try {
+      return JSON.parse(text) as T[]
+    } catch {
+      throw new Error(`Nəticə JSON kimi oxunmadı: ${text.slice(0, 200)}`)
+    }
   }
 }

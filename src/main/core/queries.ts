@@ -1,9 +1,9 @@
 /**
- * Saxlanmış SQL sorğuları — `supabase/.localbase/queries/<ad>.sql`.
+ * Saxlanmış SQL sorğuları — `supabase/.locabase/queries/<ad>.sql`.
  *
  * Repo-nun içində saxlanır ki, komanda ilə git vasitəsilə paylaşılsın və adi
  * fayl kimi redaktə oluna bilsin. `.gitignore`-a heç nə əlavə edilmir —
- * istəyən `supabase/.localbase/` sətrini özü yaza bilər.
+ * istəyən `supabase/.locabase/` sətrini özü yaza bilər.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
@@ -17,7 +17,7 @@ import type { Project, SavedQuery } from '@shared/types.js'
 const NAME_RE = /^[A-Za-z0-9əöğışçüĞÖİŞÇÜƏ _-]{1,64}$/
 
 export function dirFor(project: Project): string {
-  return resolve(join(paths.supabaseDir(project), '.localbase', 'queries'))
+  return resolve(join(paths.supabaseDir(project), '.locabase', 'queries'))
 }
 
 export function fileFor(project: Project, name: string): string {
@@ -35,15 +35,15 @@ export function fileFor(project: Project, name: string): string {
   return file
 }
 
-const README = `# .localbase
+const README = `# .locabase
 
-Localbase tətbiqinin layihəyə aid faylları.
+Locabase tətbiqinin layihəyə aid faylları.
 
 - \`queries/\` — SQL redaktorunda saxlanmış sorğular. Adi \`.sql\` faylıdır,
   redaktorda da, burada da dəyişdirilə bilər.
 
 Bu qovluq qəsdən commit olunur ki, komanda sorğuları paylaşsın. Şəxsi saxlamaq
-istəyirsənsə \`.gitignore\`-a \`supabase/.localbase/\` əlavə et.
+istəyirsənsə \`.gitignore\`-a \`supabase/.locabase/\` əlavə et.
 `
 
 function ensureDir(project: Project): string {

@@ -39,7 +39,7 @@ function entryFor(projectId: string): Entry {
     connectionTimeoutMillis: 4_000,
     statement_timeout: 30_000,
     idle_in_transaction_session_timeout: 60_000,
-    application_name: 'localbase'
+    application_name: 'locabase'
   })
   pool.on('error', (err) => {
     logBus.push('sql', 'warn', `hovuz bağlantısı düşdü: ${err.message}`)

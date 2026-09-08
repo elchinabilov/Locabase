@@ -121,11 +121,13 @@ export interface IpcContract {
   'sql:execute': {
     req: {
       id: string
+      /** null = lokal Postgres; əks halda `Project.environments`-dəki mühit */
+      envId: string | null
       sql: string
       readOnly: boolean
       maxRows: number
       timeoutMs: number
-      /** Ləğv üçün təsadüfi açar */
+      /** Ləğv üçün təsadüfi açar. Yalnız lokalda işləyir. */
       token?: string
     }
     res: SqlRun
@@ -134,7 +136,7 @@ export interface IpcContract {
   /** Redaktordakı SQL-i yeni timestamped miqrasiya faylına yaz */
   'sql:saveAsMigration': { req: { id: string; name: string; sql: string }; res: { file: string } }
 
-  /* --- saxlanmış sorğular (supabase/.localbase/queries) --- */
+  /* --- saxlanmış sorğular (supabase/.locabase/queries) --- */
   'queries:list': { req: { id: string }; res: SavedQuery[] }
   'queries:read': { req: { id: string; name: string }; res: { name: string; sql: string } }
   'queries:write': { req: { id: string; name: string; sql: string }; res: SavedQuery }
@@ -142,14 +144,21 @@ export interface IpcContract {
   'queries:remove': { req: { id: string; name: string }; res: void }
 
   /* --- cədvəl redaktoru --- */
-  'db:schemas': { req: { id: string; includeSystem?: boolean }; res: DbSchema[] }
-  'db:tables': { req: { id: string; schema: string }; res: DbTable[] }
-  'db:columns': { req: { id: string; schema: string; table: string }; res: DbColumn[] }
+  'db:schemas': {
+    req: { id: string; envId: string | null; includeSystem?: boolean }
+    res: DbSchema[]
+  }
+  'db:tables': { req: { id: string; envId: string | null; schema: string }; res: DbTable[] }
+  'db:columns': {
+    req: { id: string; envId: string | null; schema: string; table: string }
+    res: DbColumn[]
+  }
   /** Avtotamamlama üçün bütün sxem/cədvəl/sütun adları */
-  'db:completion': { req: { id: string }; res: DbCompletion }
+  'db:completion': { req: { id: string; envId: string | null }; res: DbCompletion }
   'db:rows': {
     req: {
       id: string
+      envId: string | null
       schema: string
       table: string
       limit: number
@@ -162,15 +171,22 @@ export interface IpcContract {
     res: DbRowsPage
   }
   'db:insertRow': {
-    req: { id: string; schema: string; table: string; values: DbCells }
+    req: { id: string; envId: string | null; schema: string; table: string; values: DbCells }
     res: { row: DbRow }
   }
   'db:updateRow': {
-    req: { id: string; schema: string; table: string; pk: DbCells; patch: DbCells }
+    req: {
+      id: string
+      envId: string | null
+      schema: string
+      table: string
+      pk: DbCells
+      patch: DbCells
+    }
     res: { row: DbRow }
   }
   'db:deleteRows': {
-    req: { id: string; schema: string; table: string; pks: DbCells[] }
+    req: { id: string; envId: string | null; schema: string; table: string; pks: DbCells[] }
     res: { deleted: number }
   }
 

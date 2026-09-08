@@ -9,6 +9,7 @@ import type {
   RemoteEnv,
   RemoteFunctionInfo,
   RemoteService,
+  SqlRun,
   VerifyReport
 } from '@shared/types.js'
 import type { MigrationFile } from '../migrations.js'
@@ -21,6 +22,12 @@ export interface LedgerRow {
 }
 
 export type LogFn = (text: string) => void
+
+export interface RemoteSqlOpts {
+  readOnly: boolean
+  maxRows: number
+  timeoutMs: number
+}
 
 export interface RemoteAdapter {
   readonly kind: RemoteEnv['kind']
@@ -39,6 +46,22 @@ export interface RemoteAdapter {
   /** Konteyneri dayandır / başlat. */
   setServiceState(container: string, on: boolean, log: LogFn): Promise<void>
   verify(): Promise<VerifyReport>
+
+  /**
+   * Sərbəst SQL — SQL redaktoru üçün. Lokal `execute()` kimi İSTİSNA ATMIR:
+   * SQL xətası `SqlRun.error`-da qayıdır.
+   */
+  runSql(sql: string, opts: RemoteSqlOpts): Promise<SqlRun>
+
+  /**
+   * Daxili sorğu (introspeksiya, sətir CRUD). Nəticə JSON obyektləri kimi
+   * qayıdır — tiplər (bool, ədəd, null) qorunur.
+   *
+   * DİQQƏT: uzaq nəqliyyat `$n` parametri bağlaya bilmir, ona görə çağıran
+   * tərəf `inlineParams()` ilə literal yapışdırır. Bu YALNIZ bizim qurduğumuz
+   * mətnlərə tətbiq olunur — istifadəçi SQL-i heç vaxt buradan keçmir.
+   */
+  queryJson<T>(sql: string): Promise<T[]>
 }
 
 export function adapterFor(project: Project, env: RemoteEnv): RemoteAdapter {

@@ -23,6 +23,12 @@ export interface RunOptions {
   quiet?: boolean
   /** abort edildikdə prosesə SIGTERM, 3 san. sonra SIGKILL göndərilir */
   signal?: AbortSignal
+  /**
+   * Çıxışın saxlanan son sətir sayı. Default 200 — loglar üçün kifayətdir,
+   * amma `psql --csv` kimi NƏTİCƏ qaytaran əmrlərdə kəsilmə datanı sakitcə
+   * korlayardı, ona görə onlar bu limiti qaldırır.
+   */
+  maxOutputLines?: number
 }
 
 const MAX_OUTPUT_LINES = 200
@@ -89,11 +95,12 @@ export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise
       settled = true
       if (timer) clearTimeout(timer)
       const all = chunks.join('')
+      const limit = opts.maxOutputLines ?? MAX_OUTPUT_LINES
       const lines = all.split('\n')
       resolve({
         ok: code === 0 && error === null,
         code,
-        output: lines.slice(-MAX_OUTPUT_LINES).join('\n'),
+        output: lines.length > limit ? lines.slice(-limit).join('\n') : all,
         error
       })
     }

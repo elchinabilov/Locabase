@@ -11,7 +11,7 @@ import { logBus } from './core/log.js'
 
 // Dev-də paket adı, produksiyada `productName` işlənir — ikisi eyni qovluğa
 // baxsın deyə adı burada, hər şeydən əvvəl sabitləyirik.
-app.setName('Localbase')
+app.setName('Locabase')
 
 // Finder/.dmg-dən açılanda GUI prosesi login shell PATH-ini almır — `supabase`
 // və digər CLI-lər tapılmır. Hər şeydən əvvəl PATH-i bərpa edirik.
@@ -69,7 +69,7 @@ function createWindow(): BrowserWindow {
 }
 
 void app.whenReady().then(() => {
-  electronApp.setAppUserModelId('app.localbase')
+  electronApp.setAppUserModelId('app.locabase')
 
   const migrated = migrateUserData()
   if (migrated) logBus.push('app', 'info', `Köhnə ayarlar köçürüldü: ${migrated}`)

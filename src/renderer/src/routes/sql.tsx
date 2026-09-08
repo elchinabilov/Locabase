@@ -12,10 +12,20 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Project, SqlErrorInfo, SqlRun } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
-import { Badge, Button, ErrorNote, Input, Modal, Select, SkeletonRows, SkeletonTable, Spinner } from '../components/ui'
+import {
+  Badge,
+  Button,
+  ErrorNote,
+  Input,
+  Modal,
+  Select,
+  SkeletonRows,
+  SkeletonTable,
+  Spinner
+} from '../components/ui'
 import { DataGrid } from '../components/data-grid'
 import { SqlEditor, type SqlEditorHandle } from '../components/sql-editor'
-import { StackDown, useDbUp } from '../components/db-gate'
+import { EnvPicker, RemoteNote, envOf, useDbGate } from '../components/env-picker'
 
 const MAX_ROWS = [100, 500, 1000, 5000]
 const TIMEOUTS: Array<{ value: number; label: string }> = [
@@ -29,7 +39,10 @@ select * from auth.users limit 20;
 `
 
 export function SqlRoute({ project }: { project: Project }): ReactNode {
-  const { dbUp, checking } = useDbUp(project.id)
+  // Default lokal — uzaq mühit yalnız açıq seçimlə
+  const [envId, setEnvId] = useState<string | null>(null)
+  const { ready, blocked } = useDbGate(project.id, envId)
+  const env = envOf(project, envId)
 
   const [readOnly, setReadOnly] = useState(true)
   const [maxRows, setMaxRows] = useState(500)
@@ -47,7 +60,9 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
 
   const editor = useRef<SqlEditorHandle | null>(null)
   const saved = useQuery('queries:list', { id: project.id }, [project.id])
-  const completion = useQuery('db:completion', { id: project.id }, [project.id], { enabled: dbUp })
+  const completion = useQuery('db:completion', { id: project.id, envId }, [project.id, envId], {
+    enabled: ready
+  })
 
   const execute = useCallback(async () => {
     const text = editor.current?.read() ?? doc
@@ -57,6 +72,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
     try {
       const res = await call('sql:execute', {
         id: project.id,
+        envId,
         sql: text,
         readOnly,
         maxRows,
@@ -79,7 +95,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
     } finally {
       setBusy(null)
     }
-  }, [project.id, doc, readOnly, maxRows, timeoutMs, completion])
+  }, [project.id, envId, doc, readOnly, maxRows, timeoutMs, completion])
 
   const cancel = useCallback(async () => {
     if (!busy) return
@@ -110,8 +126,8 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
   const statements = useMemo(() => countStatements(doc), [doc])
   const results = run?.results ?? []
   const current = results[tab] ?? null
-
-  if (!dbUp) return <StackDown checking={checking} />
+  // Ləğv yalnız lokalda: uzaq nəqliyyatda backend pid-i tutmaq mümkün deyil
+  const canCancel = envId === null
 
   return (
     <div className="flex h-full min-h-0">
@@ -150,7 +166,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
           ))}
         </div>
         <p className="border-t border-line-soft px-3 py-2 text-[10.5px] leading-relaxed text-muted">
-          <code>supabase/.localbase/queries/</code> — git ilə paylaşılır.
+          <code>supabase/.locabase/queries/</code> — git ilə paylaşılır.
         </p>
       </aside>
 
@@ -161,7 +177,9 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
             {dirty && <span className="ml-1 text-accent">•</span>}
           </h1>
 
-          <label className="ml-2 flex items-center gap-1.5 text-[11.5px] text-muted">
+          <EnvPicker project={project} envId={envId} onChange={setEnvId} />
+
+          <label className="ml-1 flex items-center gap-1.5 text-[11.5px] text-muted">
             <input
               type="checkbox"
               checked={readOnly}
@@ -195,102 +213,110 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
               Sil
             </Button>
           )}
-          {busy ? (
+          {busy && canCancel ? (
             <Button variant="danger" onClick={() => void cancel()}>
               <Spinner /> Ləğv et
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => void execute()}>
+            <Button variant="primary" loading={Boolean(busy)} onClick={() => void execute()}>
               İşlət ⌘↵
             </Button>
           )}
         </header>
 
+        {env && <RemoteNote env={env} />}
         {!readOnly && (
           <p className="border-b border-line-soft bg-[#1c1708] px-3 py-1.5 text-[11.5px] text-warn">
-            Yazma rejimi açıqdır. Sxemi dəyişirsənsə — «Miqrasiya kimi saxla», əks halda ledger ilə
-            baza arasında drift yaranır.
+            Yazma rejimi açıqdır{env ? ` — hədəf «${env.name}»` : ''}. Sxemi dəyişirsənsə —
+            «Miqrasiya kimi saxla», əks halda ledger ilə baza arasında drift yaranır.
           </p>
         )}
+        {blocked && <div className="flex-1">{blocked}</div>}
 
-        <div className="min-h-[180px] flex-1 border-b border-line">
-          <SqlEditor
-            key={docKey}
-            initialDoc={doc}
-            onRun={() => void execute()}
-            onChange={(v) => {
-              setDoc(v)
-              setDirty(true)
-            }}
-            completion={completion.data}
-            errorPosition={run?.error?.position ?? null}
-            handleRef={(h) => (editor.current = h)}
-          />
-        </div>
+        {ready && (
+          <>
+            <div className="min-h-[180px] flex-1 border-b border-line">
+              <SqlEditor
+                key={docKey}
+                initialDoc={doc}
+                onRun={() => void execute()}
+                onChange={(v) => {
+                  setDoc(v)
+                  setDirty(true)
+                }}
+                completion={completion.data}
+                errorPosition={run?.error?.position ?? null}
+                handleRef={(h) => (editor.current = h)}
+              />
+            </div>
 
-        <div className="flex h-[46%] min-h-[140px] flex-col">
-          <div className="flex items-center gap-2 border-b border-line-soft px-3 py-1.5 text-[11.5px]">
-            {busy && <span className="text-muted">işləyir…</span>}
-            {!busy && run === null && (
-              <span className="text-muted">
-                Nəticə yoxdur.
-                {statements > 1 && ' Bir neçə ifadə = bir tranzaksiya.'}
-              </span>
-            )}
-            {run?.ok && current && (
-              <>
-                <span className="text-text">{current.command ?? 'OK'}</span>
-                <span className="text-muted">· {current.rows.length} sətir</span>
-                <span className="text-muted">· {run.durationMs} ms</span>
-                {current.truncated && <Badge tone="warn">ilk {current.rows.length} sətir</Badge>}
-                {run.readOnly && <Badge tone="muted">yalnız oxu</Badge>}
-              </>
-            )}
-            {run && !run.ok && <span className="text-danger">Xəta</span>}
-            <div className="flex-1" />
-            {results.length > 1 && (
-              <div className="flex gap-1">
-                {results.map((r, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setTab(i)}
-                    className={cx(
-                      'rounded px-1.5 py-0.5 text-[11px]',
-                      i === tab ? 'bg-panel-2 text-text' : 'text-muted hover:text-text'
+            <div className="flex h-[46%] min-h-[140px] flex-col">
+              <div className="flex items-center gap-2 border-b border-line-soft px-3 py-1.5 text-[11.5px]">
+                {busy && <span className="text-muted">işləyir…</span>}
+                {!busy && run === null && (
+                  <span className="text-muted">
+                    Nəticə yoxdur.
+                    {statements > 1 && ' Bir neçə ifadə = bir tranzaksiya.'}
+                  </span>
+                )}
+                {run?.ok && current && (
+                  <>
+                    <span className="text-text">{current.command ?? 'OK'}</span>
+                    <span className="text-muted">· {current.rows.length} sətir</span>
+                    <span className="text-muted">· {run.durationMs} ms</span>
+                    {current.truncated && (
+                      <Badge tone="warn">ilk {current.rows.length} sətir</Badge>
                     )}
-                  >
-                    {i + 1} · {r.command ?? '—'} {r.rowCount ?? 0}
-                  </button>
-                ))}
+                    {run.readOnly && <Badge tone="muted">yalnız oxu</Badge>}
+                  </>
+                )}
+                {run && !run.ok && <span className="text-danger">Xəta</span>}
+                <div className="flex-1" />
+                {results.length > 1 && (
+                  <div className="flex gap-1">
+                    {results.map((r, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setTab(i)}
+                        className={cx(
+                          'rounded px-1.5 py-0.5 text-[11px]',
+                          i === tab ? 'bg-panel-2 text-text' : 'text-muted hover:text-text'
+                        )}
+                      >
+                        {i + 1} · {r.command ?? '—'} {r.rowCount ?? 0}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="min-h-0 flex-1 overflow-auto">
-            {busy && <SkeletonTable rows={12} cols={5} className="p-1" />}
-            {!busy && run && !run.ok && run.error && (
-              <SqlError
-                error={run.error}
-                onGoTo={(pos) => editor.current?.focusPosition(pos)}
-              />
-            )}
-            {!busy && run?.ok && current && current.columns.length > 0 && (
-              <DataGrid
-                columns={current.columns.map((c) => ({
-                  name: c.name,
-                  hint: c.typeName,
-                  sortable: false
-                }))}
-                rows={current.rows}
-              />
-            )}
-            {!busy && run?.ok && current && current.columns.length === 0 && (
-              <p className="px-3.5 py-6 text-center text-[12px] text-muted">
-                {current.command ?? 'OK'} — {current.rowCount ?? 0} sətir təsirləndi.
-              </p>
-            )}
-          </div>
-        </div>
+              <div className="min-h-0 flex-1 overflow-auto">
+                {busy && <SkeletonTable rows={12} cols={5} className="p-1" />}
+                {!busy && run && !run.ok && run.error && (
+                  <SqlError
+                    error={run.error}
+                    onGoTo={(pos) => editor.current?.focusPosition(pos)}
+                  />
+                )}
+                {!busy && run?.ok && current && current.columns.length > 0 && (
+                  <DataGrid
+                    columns={current.columns.map((c) => ({
+                      name: c.name,
+                      hint: c.typeName,
+                      sortable: false
+                    }))}
+                    rows={current.rows}
+                  />
+                )}
+                {!busy && run?.ok && current && current.columns.length === 0 && (
+                  <p className="px-3.5 py-6 text-center text-[12px] text-muted">
+                    {current.command ?? 'OK'} — {current.rowCount ?? 0} sətir təsirləndi.
+                  </p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         <p className="border-t border-line-soft px-3 py-1.5 text-[11px] text-muted">
           Burada işlədilən SQL miqrasiya ledger-inə yazılmır.
@@ -301,7 +327,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
         <NameModal
           title="Sorğunu saxla"
           initial={activeName ?? ''}
-          hint="Hərf, rəqəm, boşluq, `_` və `-`. Fayl `supabase/.localbase/queries/<ad>.sql` kimi yaranır."
+          hint="Hərf, rəqəm, boşluq, `_` və `-`. Fayl `supabase/.locabase/queries/<ad>.sql` kimi yaranır."
           valid={(v) => /^[\wəöğışçüĞÖİŞÇÜƏ -]{1,64}$/.test(v)}
           onClose={() => setDialog(null)}
           onSubmit={async (name) => {

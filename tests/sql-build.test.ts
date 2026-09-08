@@ -192,3 +192,18 @@ describe('buildDelete', () => {
     expect(() => buildDelete('public', 't', COLS, [])).toThrow(/seçilməyib/)
   })
 })
+
+describe('buildSelect castText', () => {
+  it('hər sütunu ::text-ə çevirir', () => {
+    const f = buildSelect('public', 't', [col('a'), col('b')], {
+      filters: [],
+      orderBy: null,
+      limit: 10,
+      offset: 0,
+      castText: true
+    })
+    expect(f.text).toBe(
+      'select "a"::text as "a", "b"::text as "b" from "public"."t" limit 10 offset 0'
+    )
+  })
+})

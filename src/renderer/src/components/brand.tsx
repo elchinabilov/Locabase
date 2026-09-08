@@ -12,7 +12,7 @@ export function Mark({ size = 20 }: { size?: number }): ReactNode {
       height={size}
       viewBox="0 0 1024 1024"
       role="img"
-      aria-label="Localbase"
+      aria-label="Locabase"
       className="shrink-0"
     >
       <defs>
@@ -34,7 +34,7 @@ export function Mark({ size = 20 }: { size?: number }): ReactNode {
 export function Wordmark(): ReactNode {
   return (
     <span className="text-[13px] font-semibold tracking-[-0.01em] text-text select-none">
-      Local<span className="font-normal text-muted">base</span>
+      Loca<span className="font-normal text-muted">base</span>
     </span>
   )
 }

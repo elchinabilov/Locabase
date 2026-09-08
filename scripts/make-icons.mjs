@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow } from 'electron'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const work = mkdtempSync(join(tmpdir(), 'localbase-icons-'))
+const work = mkdtempSync(join(tmpdir(), 'locabase-icons-'))
 
 /** Bütün işlər üçün tək pəncərə: hər dəfə yeni pəncərə açmaq yarışa səbəb olur. */
 let win = null

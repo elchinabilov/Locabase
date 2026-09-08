@@ -5,20 +5,24 @@
  * getməlidir, əks halda ledger ilə baza arasında drift yaranır.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type {
-  DbCells,
-  DbColumn,
-  DbFilter,
-  DbOp,
-  DbRow,
-  DbTable,
-  Project
-} from '@shared/types'
+import type { DbCells, DbColumn, DbFilter, DbOp, DbRow, DbTable, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
-import { Badge, Button, Dot, Empty, ErrorNote, Input, Modal, Select, SkeletonRows, SkeletonTable, Toggle } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Dot,
+  Empty,
+  ErrorNote,
+  Input,
+  Modal,
+  Select,
+  SkeletonRows,
+  SkeletonTable,
+  Toggle
+} from '../components/ui'
 import { DataGrid, type GridSort } from '../components/data-grid'
-import { StackDown, useDbUp } from '../components/db-gate'
+import { EnvPicker, RemoteNote, envOf, useDbGate } from '../components/env-picker'
 
 const PAGE_SIZES = [25, 50, 100, 500]
 
@@ -44,7 +48,10 @@ const KIND_LABEL: Record<string, string> = {
 }
 
 export function TablesRoute({ project }: { project: Project }): ReactNode {
-  const { dbUp, checking } = useDbUp(project.id)
+  // Default lokal — uzaq mühit yalnız açıq seçimlə
+  const [envId, setEnvId] = useState<string | null>(null)
+  const { ready, blocked } = useDbGate(project.id, envId)
+  const env = envOf(project, envId)
   const [includeSystem, setIncludeSystem] = useState(false)
   const [schema, setSchema] = useState('public')
   const [table, setTable] = useState<string | null>(null)
@@ -53,15 +60,15 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
 
   const schemas = useQuery(
     'db:schemas',
-    { id: project.id, includeSystem },
-    [project.id, includeSystem],
-    { enabled: dbUp }
+    { id: project.id, envId, includeSystem },
+    [project.id, envId, includeSystem],
+    { enabled: ready }
   )
   const tables = useQuery(
     'db:tables',
-    { id: project.id, schema },
-    [project.id, schema],
-    { enabled: dbUp && schema.length > 0 }
+    { id: project.id, envId, schema },
+    [project.id, envId, schema],
+    { enabled: ready && schema.length > 0 }
   )
 
   const list = useMemo(() => {
@@ -70,8 +77,8 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
     return q ? all.filter((t) => t.name.toLowerCase().includes(q)) : all
   }, [tables.data, filter])
 
-  // Sxem dəyişəndə seçim sıfırlanır
-  useEffect(() => setTable(null), [schema])
+  // Sxem və ya mühit dəyişəndə seçim sıfırlanır
+  useEffect(() => setTable(null), [schema, envId])
 
   const active = useMemo(
     () => (tables.data ?? []).find((t) => t.name === table) ?? null,
@@ -84,12 +91,11 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
     setTab('rows')
   }, [])
 
-  if (!dbUp) return <StackDown checking={checking} />
-
   return (
     <div className="flex h-full min-h-0">
       <aside className="flex w-[248px] shrink-0 flex-col border-r border-line bg-panel">
         <div className="border-b border-line-soft p-2.5">
+          <EnvPicker project={project} envId={envId} onChange={setEnvId} className="mb-2 w-full" />
           <Select
             value={schema}
             onChange={setSchema}
@@ -114,7 +120,12 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
             <p className="px-2 py-3 text-[11.5px] text-muted">Bu sxemdə cədvəl yoxdur.</p>
           )}
           {list.map((t) => (
-            <TableItem key={t.name} table={t} active={t.name === table} onClick={() => setTable(t.name)} />
+            <TableItem
+              key={t.name}
+              table={t}
+              active={t.name === table}
+              onClick={() => setTable(t.name)}
+            />
           ))}
         </div>
 
@@ -125,10 +136,12 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
-        {!active && (
+        {env && <RemoteNote env={env} />}
+        {blocked}
+        {ready && !active && (
           <Empty title="Cədvəl seç" hint="Sol tərəfdən bir cədvəl və ya görünüş seç." />
         )}
-        {active && (
+        {ready && active && (
           <>
             <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
               <h1 className="text-[14px] font-medium">
@@ -156,9 +169,14 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
             </header>
 
             {tab === 'rows' ? (
-              <RowsPane key={`${schema}.${active.name}`} project={project} table={active} />
+              <RowsPane
+                key={`${envId ?? 'local'}.${schema}.${active.name}`}
+                project={project}
+                envId={envId}
+                table={active}
+              />
             ) : (
-              <StructurePane project={project} table={active} onNavigate={goTo} />
+              <StructurePane project={project} envId={envId} table={active} onNavigate={goTo} />
             )}
           </>
         )}
@@ -195,7 +213,15 @@ function TableItem({
 
 /* ------------------------------------------------------------------ sətirlər */
 
-function RowsPane({ project, table }: { project: Project; table: DbTable }): ReactNode {
+function RowsPane({
+  project,
+  envId,
+  table
+}: {
+  project: Project
+  envId: string | null
+  table: DbTable
+}): ReactNode {
   const [pageSize, setPageSize] = useState(50)
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState<GridSort | null>(null)
@@ -210,6 +236,7 @@ function RowsPane({ project, table }: { project: Project; table: DbTable }): Rea
     'db:rows',
     {
       id: project.id,
+      envId,
       schema: table.schema,
       table: table.name,
       limit: pageSize,
@@ -217,7 +244,7 @@ function RowsPane({ project, table }: { project: Project; table: DbTable }): Rea
       orderBy: sort,
       filters
     },
-    [project.id, table.schema, table.name, pageSize, page, sort, filters]
+    [project.id, envId, table.schema, table.name, pageSize, page, sort, filters]
   )
 
   // Filtr/sıralama dəyişəndə birinci səhifəyə qayıt
@@ -273,13 +300,7 @@ function RowsPane({ project, table }: { project: Project; table: DbTable }): Rea
             options={PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} sətir` }))}
           />
         </div>
-        <Pager
-          page={page}
-          pageSize={pageSize}
-          count={data.length}
-          total={total}
-          onPage={setPage}
-        />
+        <Pager page={page} pageSize={pageSize} count={data.length} total={total} onPage={setPage} />
         <Button onClick={refresh} loading={rows.loading}>
           ↻
         </Button>
@@ -335,6 +356,7 @@ function RowsPane({ project, table }: { project: Project; table: DbTable }): Rea
             const ok = await run(() =>
               call('db:insertRow', {
                 id: project.id,
+                envId,
                 schema: table.schema,
                 table: table.name,
                 values
@@ -362,6 +384,7 @@ function RowsPane({ project, table }: { project: Project; table: DbTable }): Rea
             const ok = await run(() =>
               call('db:updateRow', {
                 id: project.id,
+                envId,
                 schema: table.schema,
                 table: table.name,
                 pk: pkCells(cols, current),
@@ -386,6 +409,7 @@ function RowsPane({ project, table }: { project: Project; table: DbTable }): Rea
             const ok = await run(() =>
               call('db:deleteRows', {
                 id: project.id,
+                envId,
                 schema: table.schema,
                 table: table.name,
                 pks
@@ -513,17 +537,19 @@ function FilterBar({
 
 function StructurePane({
   project,
+  envId,
   table,
   onNavigate
 }: {
   project: Project
+  envId: string | null
   table: DbTable
   onNavigate: (schema: string, table: string) => void
 }): ReactNode {
   const cols = useQuery(
     'db:columns',
-    { id: project.id, schema: table.schema, table: table.name },
-    [project.id, table.schema, table.name]
+    { id: project.id, envId, schema: table.schema, table: table.name },
+    [project.id, envId, table.schema, table.name]
   )
 
   return (
@@ -575,8 +601,8 @@ function StructurePane({
           </tbody>
         </table>
         <p className="mt-4 text-[11.5px] leading-relaxed text-muted">
-          DDL burada yoxdur — cədvəl və sütun dəyişikliyi miqrasiya faylı ilə getməlidir, əks
-          halda ledger ilə baza arasında drift yaranır.
+          DDL burada yoxdur — cədvəl və sütun dəyişikliyi miqrasiya faylı ilə getməlidir, əks halda
+          ledger ilə baza arasında drift yaranır.
         </p>
       </div>
     </div>
@@ -648,7 +674,10 @@ function RowModal({
           const canDefault = row === null && (c.defaultExpr !== null || c.isIdentity)
           const multiline = /json|text|xml/.test(c.dataType)
           return (
-            <div key={c.name} className="grid grid-cols-[minmax(160px,220px)_1fr] items-start gap-3">
+            <div
+              key={c.name}
+              className="grid grid-cols-[minmax(160px,220px)_1fr] items-start gap-3"
+            >
               <div className="pt-1.5">
                 <div className="font-mono text-[12px] text-text">{c.name}</div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted">

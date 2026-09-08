@@ -16,7 +16,7 @@ let root: string
 let project: Project
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'localbase-q-'))
+  root = mkdtempSync(join(tmpdir(), 'locabase-q-'))
   project = {
     id: 'p1',
     name: 'test',
@@ -35,7 +35,7 @@ describe('saxlanmış sorğular', () => {
 
   it('write → list → read → rename → remove dövrü', () => {
     writeFor(project, 'aktiv istifadəçilər', 'select * from auth.users;')
-    expect(existsSync(join(root, 'supabase', '.localbase', 'queries', 'aktiv istifadəçilər.sql'))).toBe(true)
+    expect(existsSync(join(root, 'supabase', '.locabase', 'queries', 'aktiv istifadəçilər.sql'))).toBe(true)
 
     const all = listFor(project)
     expect(all).toHaveLength(1)
@@ -53,7 +53,7 @@ describe('saxlanmış sorğular', () => {
 
   it('qovluğu rekursiv yaradır və README qoyur', () => {
     writeFor(project, 'q', 'select 1')
-    expect(existsSync(join(root, 'supabase', '.localbase', 'README.md'))).toBe(true)
+    expect(existsSync(join(root, 'supabase', '.locabase', 'README.md'))).toBe(true)
   })
 
   it('mövcud ada rename rədd olunur', () => {
@@ -90,7 +90,7 @@ describe('saxlanmış sorğular', () => {
 
   it('qonşu qovluğa (queries-evil) qaça bilmir', () => {
     expect(() => writeFor(project, '../queries-evil/x', 'select 1')).toThrow()
-    expect(existsSync(join(root, 'supabase', '.localbase', 'queries-evil'))).toBe(false)
+    expect(existsSync(join(root, 'supabase', '.locabase', 'queries-evil'))).toBe(false)
   })
 
   it('Azərbaycan hərfli, boşluqlu, defisli adı qəbul edir', () => {

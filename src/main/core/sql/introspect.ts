@@ -5,7 +5,7 @@
  * gizlədir, `attidentity`/`attgenerated`-i təmiz vermir, sətir təxmini yoxdur
  * və nəzərəçarpacaq dərəcədə yavaşdır.
  */
-import { poolFor } from './pool.js'
+import { rowsOf, targetFor } from './target.js'
 import { qualify } from './ident.js'
 import type { DbColumn, DbCompletion, DbRelKind, DbSchema, DbTable } from '@shared/types.js'
 
@@ -36,12 +36,17 @@ const SCHEMAS_SQL = `
   order by (n.nspname = 'public') desc, n.nspname
 `
 
-export async function schemas(id: string, includeSystem: boolean): Promise<DbSchema[]> {
-  const res = await poolFor(id).query<{ name: string; owner: string; comment: string | null }>(
+export async function schemas(
+  id: string,
+  envId: string | null,
+  includeSystem: boolean
+): Promise<DbSchema[]> {
+  const rows = await rowsOf<{ name: string; owner: string; comment: string | null }>(
+    targetFor(id, envId),
     SCHEMAS_SQL,
     [includeSystem]
   )
-  return res.rows.map((r) => ({
+  return rows.map((r) => ({
     name: r.name,
     owner: r.owner,
     comment: r.comment,
@@ -69,7 +74,7 @@ const TABLES_SQL = `
   order by c.relkind, c.relname
 `
 
-interface TableRaw {
+interface TableRaw extends Record<string, unknown> {
   name: string
   kind: string
   estimate: string
@@ -79,9 +84,13 @@ interface TableRaw {
   has_pk: boolean
 }
 
-export async function tables(id: string, schema: string): Promise<DbTable[]> {
-  const res = await poolFor(id).query<TableRaw>(TABLES_SQL, [schema])
-  return res.rows.map((r) => {
+export async function tables(
+  id: string,
+  envId: string | null,
+  schema: string
+): Promise<DbTable[]> {
+  const rows = await rowsOf<TableRaw>(targetFor(id, envId), TABLES_SQL, [schema])
+  return rows.map((r) => {
     const kind = r.kind as DbRelKind
     const isTable = kind === 'r' || kind === 'p'
     const editable = isTable && r.has_pk
@@ -147,7 +156,7 @@ const COLUMNS_SQL = `
   order by a.attnum
 `
 
-interface ColumnRaw {
+interface ColumnRaw extends Record<string, unknown> {
   position: number
   name: string
   data_type: string
@@ -167,22 +176,27 @@ interface ColumnRaw {
 const COL_TTL_MS = 5_000
 const colCache = new Map<string, { at: number; cols: DbColumn[] }>()
 
-export async function columns(id: string, schema: string, table: string): Promise<DbColumn[]> {
-  const key = `${id}\0${schema}\0${table}`
+export async function columns(
+  id: string,
+  envId: string | null,
+  schema: string,
+  table: string
+): Promise<DbColumn[]> {
+  const key = `${id}\0${envId ?? ''}\0${schema}\0${table}`
   const hit = colCache.get(key)
   if (hit && Date.now() - hit.at < COL_TTL_MS) return hit.cols
 
-  const res = await poolFor(id).query<ColumnRaw>(COLUMNS_SQL, [qualify(schema, table)])
-  const cols: DbColumn[] = res.rows.map((r) => ({
-    position: r.position,
+  const rows = await rowsOf<ColumnRaw>(targetFor(id, envId), COLUMNS_SQL, [qualify(schema, table)])
+  const cols: DbColumn[] = rows.map((r) => ({
+    position: Number(r.position),
     name: r.name,
     dataType: r.data_type,
-    typeOid: r.type_oid,
+    typeOid: Number(r.type_oid),
     nullable: r.nullable,
     defaultExpr: r.default_expr,
     isIdentity: r.is_identity,
     isGenerated: r.is_generated,
-    pkOrd: r.pk_ord,
+    pkOrd: r.pk_ord === null ? null : Number(r.pk_ord),
     refSchema: r.ref_schema,
     refTable: r.ref_table,
     refColumn: r.ref_column,
@@ -192,10 +206,11 @@ export async function columns(id: string, schema: string, table: string): Promis
   return cols
 }
 
-/** DDL-dən sonra keşi at. */
-export function forgetColumns(id: string): void {
+/** DDL-dən sonra keşi at. `envId` verilməsə layihənin bütün mühitləri təmizlənir. */
+export function forgetColumns(id: string, envId?: string | null): void {
+  const prefix = envId === undefined ? `${id}\0` : `${id}\0${envId ?? ''}\0`
   for (const key of [...colCache.keys()]) {
-    if (key.startsWith(`${id}\0`)) colCache.delete(key)
+    if (key.startsWith(prefix)) colCache.delete(key)
   }
 }
 
@@ -210,12 +225,13 @@ const COMPLETION_SQL = `
 `
 
 /** Avtotamamlama üçün bütün sxem/cədvəl/sütun adları — bir gediş-gəlişdə. */
-export async function completion(id: string): Promise<DbCompletion> {
-  const res = await poolFor(id).query<{ schema: string; table: string; column: string }>(
+export async function completion(id: string, envId: string | null): Promise<DbCompletion> {
+  const rows = await rowsOf<{ schema: string; table: string; column: string }>(
+    targetFor(id, envId),
     COMPLETION_SQL
   )
   const map = new Map<string, { schema: string; table: string; columns: string[] }>()
-  for (const row of res.rows) {
+  for (const row of rows) {
     const key = `${row.schema}.${row.table}`
     const entry = map.get(key) ?? { schema: row.schema, table: row.table, columns: [] }
     entry.columns.push(row.column)

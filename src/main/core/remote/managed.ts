@@ -17,10 +17,14 @@ import type {
   Project,
   RemoteFunctionInfo,
   RemoteService,
+  SqlColumn,
+  SqlResult,
+  SqlRun,
   VerifyReport
 } from '@shared/types.js'
 import type { MigrationFile } from '../migrations.js'
-import type { LedgerRow, LogFn, RemoteAdapter } from './index.js'
+import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
+import { toSqlError } from '../sql/build.js'
 
 const API = 'https://api.supabase.com'
 
@@ -244,4 +248,76 @@ export class ManagedAdapter implements RemoteAdapter {
     }
     return { ok: checks.every((c) => c.ok), checks }
   }
+
+  /* ------------------------------------------------------------ SQL */
+
+  /**
+   * Management API-nin `database/query` endpoint-i. Nəticə JSON sətir
+   * obyektləri kimi gəlir — nə sütun metadata-sı, nə də command tag var.
+   *
+   * `read_only` SERVER tərəfdə tətbiq olunur: bu bizim yeganə qorunmamızdır,
+   * çünki bu nəqliyyatda `begin read only` göndərməyin yolu yoxdur.
+   */
+  private async queryApi(query: string, readOnly: boolean): Promise<Array<Record<string, unknown>>> {
+    return this.api<Array<Record<string, unknown>>>(
+      `/v1/projects/${this.env.projectRef}/database/query`,
+      { method: 'POST', body: JSON.stringify({ query, read_only: readOnly }) }
+    )
+  }
+
+  async queryJson<T>(sql: string): Promise<T[]> {
+    return (await this.queryApi(sql, true)) as T[]
+  }
+
+  async runSql(sql: string, opts: RemoteSqlOpts): Promise<SqlRun> {
+    const started = Date.now()
+    try {
+      const rows = await this.queryApi(sql, opts.readOnly)
+      return {
+        ok: true,
+        results: [jsonToResult(rows, opts.maxRows)],
+        durationMs: Date.now() - started,
+        readOnly: opts.readOnly,
+        error: null
+      }
+    } catch (err) {
+      return {
+        ok: false,
+        results: [],
+        durationMs: Date.now() - started,
+        readOnly: opts.readOnly,
+        error: toSqlError(err)
+      }
+    }
+  }
+}
+
+/**
+ * JSON sətirlərini şəbəkə formasına çevirir. Sütun sırası ilk sətrin açar
+ * sırasıdır — API sütun metadata-sı vermir, ona görə eyniadlı sütunlar
+ * (`select 1 as a, 2 as a`) burada birləşir. Lokal yolda belə deyil.
+ */
+function jsonToResult(rows: Array<Record<string, unknown>>, maxRows: number): SqlResult {
+  const names: string[] = []
+  for (const row of rows) {
+    for (const key of Object.keys(row)) if (!names.includes(key)) names.push(key)
+  }
+  const columns: SqlColumn[] = names.map((name) => ({ name, typeOid: 0, typeName: 'json' }))
+  const truncated = rows.length > maxRows
+  const kept = truncated ? rows.slice(0, maxRows) : rows
+  return {
+    command: null,
+    columns,
+    rows: kept.map((row) => names.map((n) => cellText(row[n]))),
+    rowCount: rows.length,
+    truncated
+  }
+}
+
+/** Bütün xanalar mətn olmalıdır — lokal yoldakı `TEXT_TYPES` ilə eyni müqavilə. */
+function cellText(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return JSON.stringify(value)
 }

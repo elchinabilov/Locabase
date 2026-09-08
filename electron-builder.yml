@@ -1,5 +1,5 @@
-appId: app.localbase
-productName: Localbase
+appId: app.locabase
+productName: Locabase
 icon: resources/icon.png
 directories:
   buildResources: resources

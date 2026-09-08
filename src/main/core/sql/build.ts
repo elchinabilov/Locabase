@@ -156,14 +156,28 @@ export function buildSelect(
   schema: string,
   table: string,
   cols: DbColumn[],
-  opts: { filters: DbFilter[]; orderBy: DbOrder | null; limit: number; offset: number }
+  opts: {
+    filters: DbFilter[]
+    orderBy: DbOrder | null
+    limit: number
+    offset: number
+    /**
+     * Hər sütunu `::text`-ə çevir. Uzaq mühitdə nəticə `json_agg` ilə gəlir və
+     * tiplər JSON tiplərinə düşərdi (jsonb → obyekt, int → ədəd); mətnə
+     * çevirmək lokaldakı `TEXT_TYPES` ilə eyni nəticəni verir.
+     */
+    castText?: boolean
+  }
 ): Fragment {
   const where = buildWhere(cols, opts.filters, 1)
   const order = buildOrder(cols, opts.orderBy)
   const limit = clampInt(opts.limit, 1, 5000)
   const offset = clampInt(opts.offset, 0, 100_000_000)
+  const projection = opts.castText
+    ? cols.map((c) => `${quoteIdent(c.name)}::text as ${quoteIdent(c.name)}`).join(', ')
+    : '*'
   const text = [
-    `select * from ${qualify(schema, table)}`,
+    `select ${projection} from ${qualify(schema, table)}`,
     where.text,
     order,
     `limit ${limit} offset ${offset}`
