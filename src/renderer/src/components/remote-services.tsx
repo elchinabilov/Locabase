@@ -2,7 +2,7 @@ import { useCallback, useState, type ReactNode } from 'react'
 import type { Project, RemoteEnv } from '@shared/types'
 import { formatBytes } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
-import { Badge, Button, Card, Dot, ErrorNote, Spinner, Toggle } from '../components/ui'
+import { Badge, Button, Card, Dot, ErrorNote, Skeleton, Toggle } from '../components/ui'
 
 /**
  * Uzaq serverdəki konteynerlər. Managed layihədə belə bir idarəetmə yoxdur —
@@ -76,9 +76,17 @@ export function RemoteServices({
       }
     >
       {services.loading && items.length === 0 && (
-        <p className="px-3.5 py-4 text-[12px] text-muted">
-          <Spinner /> serverə baxılır…
-        </p>
+        <ul className="divide-y divide-line-soft" role="status" aria-label="serverə baxılır">
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} className="flex items-center gap-2.5 px-3.5 py-2">
+              <Skeleton w={32} h={18} delay={i * 90} className="shrink-0 rounded-full" />
+              <Skeleton w={6} h={6} round delay={i * 90 + 30} />
+              <Skeleton h={10} w={`${54 - (i % 3) * 12}%`} delay={i * 90 + 50} />
+              <div className="flex-1" />
+              <Skeleton w={50} h={10} delay={i * 90 + 80} className="shrink-0" />
+            </li>
+          ))}
+        </ul>
       )}
       {services.error && (
         <div className="px-3.5 py-3">

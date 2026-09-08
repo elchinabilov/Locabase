@@ -12,7 +12,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Project, SqlErrorInfo, SqlRun } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
-import { Badge, Button, ErrorNote, Input, Modal, Select, Spinner } from '../components/ui'
+import { Badge, Button, ErrorNote, Input, Modal, Select, SkeletonRows, SkeletonTable, Spinner } from '../components/ui'
 import { DataGrid } from '../components/data-grid'
 import { SqlEditor, type SqlEditorHandle } from '../components/sql-editor'
 import { StackDown, useDbUp } from '../components/db-gate'
@@ -129,7 +129,8 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-1.5">
-          {(saved.data ?? []).length === 0 && (
+          {saved.loading && saved.data === null && <SkeletonRows rows={5} />}
+          {saved.data !== null && saved.data.length === 0 && (
             <p className="px-2 py-3 text-[11.5px] leading-relaxed text-muted">
               Hələ saxlanmış sorğu yoxdur.
             </p>
@@ -229,7 +230,8 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
 
         <div className="flex h-[46%] min-h-[140px] flex-col">
           <div className="flex items-center gap-2 border-b border-line-soft px-3 py-1.5 text-[11.5px]">
-            {run === null && (
+            {busy && <span className="text-muted">işləyir…</span>}
+            {!busy && run === null && (
               <span className="text-muted">
                 Nəticə yoxdur.
                 {statements > 1 && ' Bir neçə ifadə = bir tranzaksiya.'}
@@ -265,13 +267,14 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
           </div>
 
           <div className="min-h-0 flex-1 overflow-auto">
-            {run && !run.ok && run.error && (
+            {busy && <SkeletonTable rows={12} cols={5} className="p-1" />}
+            {!busy && run && !run.ok && run.error && (
               <SqlError
                 error={run.error}
                 onGoTo={(pos) => editor.current?.focusPosition(pos)}
               />
             )}
-            {run?.ok && current && current.columns.length > 0 && (
+            {!busy && run?.ok && current && current.columns.length > 0 && (
               <DataGrid
                 columns={current.columns.map((c) => ({
                   name: c.name,
@@ -281,7 +284,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
                 rows={current.rows}
               />
             )}
-            {run?.ok && current && current.columns.length === 0 && (
+            {!busy && run?.ok && current && current.columns.length === 0 && (
               <p className="px-3.5 py-6 text-center text-[12px] text-muted">
                 {current.command ?? 'OK'} — {current.rowCount ?? 0} sətir təsirləndi.
               </p>

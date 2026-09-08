@@ -2,7 +2,7 @@ import { useCallback, useState, type ReactNode } from 'react'
 import type { Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
-import { Badge, Button, Card, ErrorNote, Input, Modal, Select, Spinner, Toggle } from '../components/ui'
+import { Badge, Button, Card, ErrorNote, Input, Modal, Select, SkeletonList, Toggle } from '../components/ui'
 
 export function FunctionsRoute({ project }: { project: Project }): ReactNode {
   const [envId, setEnvId] = useState<string>(project.environments[0]?.id ?? '')
@@ -74,11 +74,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
           )}
 
           <Card title={`${items.length} funksiya`} subtitle="supabase/functions">
-            {list.loading && (
-              <p className="px-3.5 py-6 text-[12px] text-muted">
-                <Spinner /> oxunur…
-              </p>
-            )}
+            {list.loading && <SkeletonList rows={4} trailing />}
             {!list.loading && items.length === 0 && (
               <p className="px-3.5 py-6 text-center text-[12px] text-muted">
                 Funksiya yoxdur. «+ funksiya» ilə şablondan yarat.

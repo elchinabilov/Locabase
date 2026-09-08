@@ -8,7 +8,7 @@
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { DbRow } from '@shared/types'
 import { cx } from '../lib/format'
-import { Modal } from './ui'
+import { Modal, Skeleton, SkeletonTable } from './ui'
 
 const ROW_H = 28
 /** Bundan az sətir sadəcə render olunur — pəncərələmənin xərcinə dəyməz. */
@@ -36,6 +36,7 @@ export function DataGrid({
   selected,
   onSelectedChange,
   rowActions,
+  loading,
   emptyText = 'Sətir yoxdur'
 }: {
   columns: GridColumn[]
@@ -46,6 +47,8 @@ export function DataGrid({
   selected?: Set<number>
   onSelectedChange?: (next: Set<number>) => void
   rowActions?: (rowIndex: number) => ReactNode
+  /** İlk yükləmə — sətir gəlməyib. Başlıq qalır, gövdə skeleton olur. */
+  loading?: boolean
   emptyText?: string
 }): ReactNode {
   const scroller = useRef<HTMLDivElement>(null)
@@ -93,9 +96,13 @@ export function DataGrid({
     [onSort, sort]
   )
 
+  // Sütunlar hələ gəlməyibsə başlıq da çəkilə bilmir — bütöv skeleton cədvəl.
   if (columns.length === 0) {
+    if (loading) return <SkeletonTable rows={10} cols={5} className="p-1" />
     return <p className="px-3.5 py-6 text-center text-[12px] text-muted">{emptyText}</p>
   }
+
+  const skeletonCols = columns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)
 
   return (
     <>
@@ -137,7 +144,22 @@ export function DataGrid({
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && (
+            {loading &&
+              rows.length === 0 &&
+              Array.from({ length: 12 }, (_, r) => (
+                <tr key={`sk-${r}`} style={{ height: ROW_H }} className="border-b border-line-soft">
+                  {Array.from({ length: skeletonCols }, (_, c) => (
+                    <td key={c} className="px-2.5">
+                      <Skeleton
+                        h={9}
+                        w={c === 0 ? '70%' : `${Math.max(38, 84 - c * 9)}%`}
+                        delay={r * 55 + c * 25}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            {!loading && rows.length === 0 && (
               <tr>
                 <td
                   colSpan={columns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)}

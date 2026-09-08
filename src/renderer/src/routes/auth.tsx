@@ -3,7 +3,7 @@ import type { ConfigField, ConfigPatch, FieldValue, PatchPreview, Project } from
 import { AUTH_PROVIDERS, callbackUrl, envVarName } from '@shared/providers'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
-import { Badge, Button, Card, ErrorNote, Modal, Spinner, Toggle } from '../components/ui'
+import { Badge, Button, Card, ErrorNote, Modal, SkeletonList, Toggle } from '../components/ui'
 import { DiffView } from '../components/diff-view'
 import { draftFrom, FieldEditor, sameDraft, toPatchValue, type Draft } from '../components/field-editor'
 
@@ -146,9 +146,9 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
           </p>
 
           {doc.loading && (
-            <p className="p-4 text-[12px] text-muted">
-              <Spinner /> oxunur…
-            </p>
+            <Card title="Providerlər">
+              <SkeletonList rows={5} avatar trailing />
+            </Card>
           )}
           {doc.error && <ErrorNote>{doc.error}</ErrorNote>}
           {error && <ErrorNote>{error}</ErrorNote>}

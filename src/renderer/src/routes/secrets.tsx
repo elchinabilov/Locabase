@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
-import { Badge, Button, Card, ErrorNote, Input, Modal, Spinner } from '../components/ui'
+import { Badge, Button, Card, ErrorNote, Input, Modal, SkeletonList } from '../components/ui'
 
 export function SecretsRoute({ project }: { project: Project }): ReactNode {
   const [reveal, setReveal] = useState(false)
@@ -98,11 +98,7 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
             title="Lokal backend dəyişənləri"
             subtitle="Supabase CLI `config.toml`-dakı hər env() referensini buradan oxuyur"
           >
-            {entries.loading && (
-              <p className="px-3.5 py-6 text-[12px] text-muted">
-                <Spinner /> oxunur…
-              </p>
-            )}
+            {entries.loading && <SkeletonList rows={5} trailing />}
             {!entries.loading && list.length === 0 && (
               <p className="px-3.5 py-6 text-center text-[12px] text-muted">
                 {project.envFile} faylı boşdur və ya yoxdur.

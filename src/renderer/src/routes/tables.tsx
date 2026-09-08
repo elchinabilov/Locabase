@@ -16,7 +16,7 @@ import type {
 } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
-import { Badge, Button, Dot, Empty, ErrorNote, Input, Modal, Select, Spinner, Toggle } from '../components/ui'
+import { Badge, Button, Dot, Empty, ErrorNote, Input, Modal, Select, SkeletonRows, SkeletonTable, Toggle } from '../components/ui'
 import { DataGrid, type GridSort } from '../components/data-grid'
 import { StackDown, useDbUp } from '../components/db-gate'
 
@@ -108,11 +108,7 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-1.5">
-          {tables.loading && (
-            <p className="px-2 py-3 text-[12px] text-muted">
-              <Spinner /> oxunur…
-            </p>
-          )}
+          {tables.loading && <SkeletonRows rows={7} />}
           {tables.error && <ErrorNote>{tables.error}</ErrorNote>}
           {!tables.loading && list.length === 0 && (
             <p className="px-2 py-3 text-[11.5px] text-muted">Bu sxemdə cədvəl yoxdur.</p>
@@ -307,6 +303,7 @@ function RowsPane({ project, table }: { project: Project; table: DbTable }): Rea
 
       <div className="min-h-0 flex-1">
         <DataGrid
+          loading={rows.loading && rows.data === null}
           columns={cols.map((c) => ({ name: c.name, hint: shortType(c) }))}
           rows={data}
           sort={sort}
@@ -543,6 +540,13 @@ function StructurePane({
             </tr>
           </thead>
           <tbody>
+            {cols.loading && cols.data === null && (
+              <tr>
+                <td colSpan={4} className="p-0">
+                  <SkeletonTable rows={8} cols={4} widths={['30%', '22%', '26%', '14%']} />
+                </td>
+              </tr>
+            )}
             {(cols.data ?? []).map((c) => (
               <tr key={c.name} className="border-b border-line-soft last:border-0">
                 <td className="px-2 py-1.5 font-mono text-[11.5px] text-text">{c.name}</td>

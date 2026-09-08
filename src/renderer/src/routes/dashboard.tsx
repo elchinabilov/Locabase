@@ -3,7 +3,7 @@ import type { FieldValue, Project, ServiceStatus, StackStatus } from '@shared/ty
 import { formatBytes, SERVICE_GROUPS } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
 import { cx, timeAgo } from '../lib/format'
-import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Row, Toggle } from '../components/ui'
+import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Row, Skeleton, Toggle } from '../components/ui'
 import type { RouteId } from '../app'
 
 export function Dashboard({
@@ -137,6 +137,7 @@ function ProjectView({
       <div className="grid grid-cols-2 gap-3">
         <Services
           status={s}
+          loading={status.loading && status.data === null}
           projectId={project.id}
           configValues={config.data?.values}
           onToggled={() => {
@@ -145,7 +146,11 @@ function ProjectView({
           }}
         />
         <div className="flex flex-col gap-3">
-          <QuickLinks vars={s?.vars ?? {}} running={running} />
+          <QuickLinks
+            vars={s?.vars ?? {}}
+            running={running}
+            loading={status.loading && status.data === null}
+          />
           <Environments project={project} onRoute={onRoute} onChanged={onChanged} />
         </div>
       </div>
@@ -168,11 +173,14 @@ function ProjectView({
  */
 function Services({
   status,
+  loading,
   projectId,
   configValues,
   onToggled
 }: {
   status: StackStatus | null
+  /** İlk `stack:status` hələ gəlməyib — hər sətir «dayanıb» görünməsin. */
+  loading?: boolean
   projectId: string
   configValues: Record<string, FieldValue> | undefined
   onToggled: () => void
@@ -250,6 +258,24 @@ function Services({
   // Məxrəc — siyahıdakı bütün sətirlər (söndürülmüşlər də daxil), sol tərəf isə
   // hazırda işləyənlər. İkisi də eyni vahiddədir: sətir, konteyner yox.
   const running = rows.filter((r) => r.isRunning).length
+
+  if (loading) {
+    return (
+      <Card title="Servislər" subtitle="docker yoxlanılır…">
+        <ul className="divide-y divide-line-soft" role="status" aria-label="yüklənir">
+          {SERVICE_GROUPS.map((group, i) => (
+            <li key={group.label} className="flex items-center gap-2.5 px-3.5 py-2">
+              <Skeleton w={32} h={18} delay={i * 70} className="shrink-0 rounded-full" />
+              <Skeleton w={6} h={6} round delay={i * 70 + 30} />
+              <Skeleton h={10} w={`${58 - (i % 4) * 10}%`} delay={i * 70 + 50} />
+              <div className="flex-1" />
+              <Skeleton w={46} h={9} delay={i * 70 + 80} className="shrink-0" />
+            </li>
+          ))}
+        </ul>
+      </Card>
+    )
+  }
 
   return (
     <Card
@@ -364,10 +390,12 @@ const LINKS: Array<{ key: string; label: string; open: boolean }> = [
 
 function QuickLinks({
   vars,
-  running
+  running,
+  loading
 }: {
   vars: Record<string, string>
   running: boolean
+  loading?: boolean
 }): ReactNode {
   const [copied, setCopied] = useState<string | null>(null)
 
@@ -379,7 +407,16 @@ function QuickLinks({
 
   return (
     <Card title="Sürətli linklər">
-      {!running ? (
+      {loading ? (
+        <ul className="divide-y divide-line-soft" role="status" aria-label="yüklənir">
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} className="flex items-center gap-2 px-3.5 py-2">
+              <Skeleton w={104} h={10} delay={i * 80} className="shrink-0" />
+              <Skeleton h={9} w={`${64 - (i % 3) * 12}%`} delay={i * 80 + 40} />
+            </li>
+          ))}
+        </ul>
+      ) : !running ? (
         <p className="px-3.5 py-6 text-center text-[12px] text-muted">
           Stack qalxanda ünvanlar burada görünür.
         </p>

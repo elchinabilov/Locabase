@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '../lib/ipc'
-import { Badge, Card, Spinner } from '../components/ui'
+import { Badge, Card, Skeleton } from '../components/ui'
 
 export function SettingsRoute(): ReactNode {
   const doctor = useQuery('system:doctor', undefined)
@@ -13,9 +13,15 @@ export function SettingsRoute(): ReactNode {
 
       <Card title="Mühit yoxlaması" subtitle="Tool bu əmrlərə arxalanır">
         {doctor.loading && (
-          <p className="px-3.5 py-4 text-[12px] text-muted">
-            <Spinner /> yoxlanılır…
-          </p>
+          <ul className="divide-y divide-line-soft" role="status" aria-label="yoxlanılır">
+            {[0, 1, 2].map((i) => (
+              <li key={i} className="flex items-center gap-3 px-3.5 py-2">
+                <Skeleton w={110} h={11} delay={i * 90} className="shrink-0" />
+                <Skeleton w={44} h={15} delay={i * 90 + 40} className="shrink-0 rounded" />
+                <Skeleton h={9} w="45%" delay={i * 90 + 80} />
+              </li>
+            ))}
+          </ul>
         )}
         <ul className="divide-y divide-line-soft">
           {(doctor.data ?? []).map((c) => (

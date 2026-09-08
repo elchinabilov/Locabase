@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { DeployStep, HealthReport, Project, RemoteEnv, SyncReport } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx, timeAgo } from '../lib/format'
-import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Spinner } from '../components/ui'
+import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Skeleton } from '../components/ui'
 import { EnvForm } from '../components/env-form'
 import { RemoteServices } from '../components/remote-services'
 
@@ -333,9 +333,15 @@ function Health({
       subtitle={env.kind === 'managed' ? `managed · ${env.projectRef}` : `self-hosted · ${env.sshHost}`}
     >
       {loading && (
-        <p className="px-3.5 py-3 text-[12px] text-muted">
-          <Spinner /> yoxlanılır…
-        </p>
+        <ul className="divide-y divide-line-soft" role="status" aria-label="yoxlanılır">
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} className="flex items-center gap-2.5 px-3.5 py-2">
+              <Skeleton w={6} h={6} round delay={i * 90} />
+              <Skeleton w={110} h={10} delay={i * 90} className="shrink-0" />
+              <Skeleton h={9} w={`${52 - (i % 3) * 10}%`} delay={i * 90 + 50} />
+            </li>
+          ))}
+        </ul>
       )}
       {error && (
         <div className="px-3.5 py-3">

@@ -3,7 +3,7 @@ import type { ConfigPatch, PatchPreview, Project } from '@shared/types'
 import { CONFIG_FIELDS, CONFIG_GROUPS } from '@shared/config-schema'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
-import { Badge, Button, Card, ErrorNote, Modal, Spinner } from '../components/ui'
+import { Badge, Button, Card, ErrorNote, Modal, Skeleton } from '../components/ui'
 import { DiffView } from '../components/diff-view'
 import {
   draftFrom,
@@ -165,9 +165,22 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
 
         <div className="min-w-0 flex-1 overflow-auto p-3">
           {doc.loading && (
-            <p className="p-4 text-[12px] text-muted">
-              <Spinner /> oxunur…
-            </p>
+            <Card title="Yüklənir">
+              <div className="divide-y divide-line-soft">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="grid grid-cols-[minmax(180px,260px)_1fr] items-start gap-4 px-3.5 py-2.5"
+                  >
+                    <div className="flex flex-col gap-1.5 pt-1">
+                      <Skeleton h={10} w={`${72 - (i % 3) * 14}%`} delay={i * 80} />
+                      <Skeleton h={8} w="90%" delay={i * 80 + 40} />
+                    </div>
+                    <Skeleton h={30} delay={i * 80 + 60} className="rounded-md" />
+                  </div>
+                ))}
+              </div>
+            </Card>
           )}
           {doc.error && <ErrorNote>{doc.error}</ErrorNote>}
           {values && (

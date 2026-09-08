@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { MigrationRow, MigrationState, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
-import { Badge, Button, Card, ErrorNote, Input, Modal, Select, Spinner } from '../components/ui'
+import { Badge, Button, Card, ErrorNote, Input, Modal, Select, SkeletonTable } from '../components/ui'
 
 const STATE_META: Record<MigrationState, { tone: 'ok' | 'warn' | 'danger' | 'info' | 'muted'; label: string }> = {
   synced: { tone: 'ok', label: 'sinxron' },
@@ -110,9 +110,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
 
           <Card title={`${rows.length} miqrasiya`} subtitle="fayllar · lokal ledger · remote ledger">
             {report.loading && (
-              <p className="px-3.5 py-6 text-[12px] text-muted">
-                <Spinner /> oxunur…
-              </p>
+              <SkeletonTable rows={6} cols={5} widths={['26%', '30%', 42, 42, 42]} />
             )}
             {!report.loading && rows.length === 0 && (
               <p className="px-3.5 py-6 text-center text-[12px] text-muted">

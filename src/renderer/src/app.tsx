@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type { Project } from '@shared/types'
 import { call, useQuery } from './lib/ipc'
 import { cx, shortPath } from './lib/format'
-import { Badge, Button, Dot, Empty, ErrorNote, Spinner } from './components/ui'
+import { Badge, Button, Dot, Empty, ErrorNote, SkeletonRows } from './components/ui'
 import { LogDrawer } from './components/log-drawer'
 import { Mark, Wordmark } from './components/brand'
 import { Dashboard } from './routes/dashboard'
@@ -182,11 +182,7 @@ function Sidebar({
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-2 pb-2">
-        {loading && (
-          <div className="px-2 py-3 text-[12px] text-muted">
-            <Spinner /> yüklənir…
-          </div>
-        )}
+        {loading && <SkeletonRows rows={4} className="px-0.5 py-1" />}
         {error && <ErrorNote>{error}</ErrorNote>}
         {!loading && projects.length === 0 && (
           <p className="px-2 py-3 text-[11.5px] leading-relaxed text-muted">

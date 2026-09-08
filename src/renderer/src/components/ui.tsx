@@ -301,3 +301,154 @@ export function Row({
     </div>
   )
 }
+
+/* ---------------------------------------------------------------- Skeleton */
+
+/**
+ * Yüklənmə göstəricisinin əsas kərpici. Spinner əvəzinə gələcək məzmunun
+ * *formasını* çəkir — beləcə səhifə tullanmır və gözləmə qısa görünür.
+ * `delay` siyahılarda dalğa effekti üçündür (hər sətir bir az gec canlanır).
+ */
+export function Skeleton({
+  className,
+  w,
+  h = 12,
+  delay = 0,
+  round
+}: {
+  className?: string
+  /** eni: rəqəm = px, sətir = CSS dəyəri (məs. '60%'). Verilməyibsə tam en. */
+  w?: number | string
+  h?: number | string
+  delay?: number
+  round?: boolean
+}): ReactNode {
+  return (
+    <span
+      aria-hidden
+      className={cx('skeleton block', round && 'rounded-full', className)}
+      style={{
+        width: w === undefined ? '100%' : typeof w === 'number' ? `${w}px` : w,
+        height: typeof h === 'number' ? `${h}px` : h,
+        ['--sk-delay' as string]: `${delay}ms`
+      }}
+    />
+  )
+}
+
+/** Bir neçə sətirlik mətn bloku; sonuncu sətir qısadır ki, abzas kimi görünsün. */
+export function SkeletonText({
+  lines = 3,
+  delay = 0,
+  className
+}: {
+  lines?: number
+  delay?: number
+  className?: string
+}): ReactNode {
+  return (
+    <div className={cx('flex flex-col gap-2', className)} role="status" aria-label="yüklənir">
+      {Array.from({ length: lines }, (_, i) => (
+        <Skeleton
+          key={i}
+          h={10}
+          w={i === lines - 1 ? '55%' : `${88 - (i % 3) * 9}%`}
+          delay={delay + i * 70}
+        />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * `divide-y` siyahıların (Card içindəki `<ul>`) yüklənmə əvəzi. `avatar` sola
+ * dairəvi nöqtə/toggle yeri qoyur, `trailing` sağdakı badge sütununu.
+ */
+export function SkeletonList({
+  rows = 4,
+  avatar,
+  trailing,
+  compact,
+  className
+}: {
+  rows?: number
+  avatar?: boolean
+  trailing?: boolean
+  compact?: boolean
+  className?: string
+}): ReactNode {
+  return (
+    <ul
+      className={cx('divide-y divide-line-soft', className)}
+      role="status"
+      aria-label="yüklənir"
+    >
+      {Array.from({ length: rows }, (_, i) => (
+        <li
+          key={i}
+          className={cx('flex items-center gap-3 px-3.5', compact ? 'py-2' : 'py-2.5')}
+        >
+          {avatar && <Skeleton w={14} h={14} round delay={i * 80} />}
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <Skeleton h={10} w={`${58 - (i % 3) * 11}%`} delay={i * 80} />
+            {!compact && <Skeleton h={8} w={`${34 + (i % 2) * 12}%`} delay={i * 80 + 40} />}
+          </div>
+          {trailing && <Skeleton w={52} h={14} delay={i * 80 + 60} className="rounded" />}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Sidebar/panel siyahıları üçün — kartsız, sətirlər arasında ayırıcı yoxdur. */
+export function SkeletonRows({
+  rows = 5,
+  className
+}: {
+  rows?: number
+  className?: string
+}): ReactNode {
+  return (
+    <div className={cx('flex flex-col gap-0.5', className)} role="status" aria-label="yüklənir">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="flex items-center gap-2 rounded-md px-2.5 py-2">
+          <Skeleton w={6} h={6} round delay={i * 80} />
+          <Skeleton h={10} w={`${70 - (i % 4) * 13}%`} delay={i * 80} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Cədvəl formalı yüklənmə — sütun sayı və eni gerçək başlıqlara uyğunlaşır. */
+export function SkeletonTable({
+  rows = 6,
+  cols = 4,
+  widths,
+  className
+}: {
+  rows?: number
+  cols?: number
+  widths?: Array<number | string>
+  className?: string
+}): ReactNode {
+  return (
+    <div className={cx('flex flex-col', className)} role="status" aria-label="yüklənir">
+      {Array.from({ length: rows }, (_, r) => (
+        <div
+          key={r}
+          className="flex items-center gap-3 border-b border-line-soft px-3.5 py-2 last:border-0"
+        >
+          {Array.from({ length: cols }, (_, c) => (
+            <Skeleton
+              key={c}
+              h={10}
+              w={widths?.[c] ?? (c === 0 ? '22%' : `${Math.max(9, 20 - c * 3)}%`)}
+              delay={r * 70 + c * 30}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
