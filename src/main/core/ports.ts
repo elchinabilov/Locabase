@@ -6,7 +6,18 @@
 import { readFileSync } from 'node:fs'
 import { parse as parseToml } from 'smol-toml'
 import { list as listProjects, paths } from './projects.js'
-import type { PortConflict, PortUsage, Project } from '@shared/types.js'
+import type { ConfigPatch, PortConflict, PortUsage, Project } from '@shared/types.js'
+
+/** Supabase-in standart port bazası: 543xx. */
+export const DEFAULT_PORT_BASE = 543
+
+/**
+ * `edge_runtime.inspector_port` standartda 8083-dür — 543xx blokundan
+ * kənarda. Yeni layihədə onu da layihənin öz blokuna salırıq ki, yan-yana
+ * işləyən stack-lər bir-birinin inspector portunu tutmasın.
+ */
+const INSPECTOR_PATH = 'edge_runtime.inspector_port'
+const INSPECTOR_OFFSET = 83
 
 /** `config.toml`-da port saxlayan açarlar. */
 const PORT_PATHS: string[] = [
@@ -73,8 +84,29 @@ export function suggestRange(): number {
   for (const project of listProjects()) {
     for (const usage of portsOf(project)) used.add(Math.floor(usage.port / 100))
   }
-  for (let base = 543; base < 655; base += 1) {
+  for (let base = DEFAULT_PORT_BASE; base < 655; base += 1) {
     if (!used.has(base)) return base
   }
-  return 543
+  return DEFAULT_PORT_BASE
+}
+
+/**
+ * Təzə `supabase init`-in 543xx portlarını `base`xx blokuna köçürən yamaqlar.
+ * `parsed` — parse olunmuş `config.toml`; yalnız faylda **mövcud** açarlar
+ * qaytarılır, beləcə CLI versiyasında olmayan açar əlavə edilmir.
+ */
+export function remapPatches(parsed: unknown, base: number): ConfigPatch[] {
+  if (base === DEFAULT_PORT_BASE) return []
+  const out: ConfigPatch[] = []
+  for (const path of PORT_PATHS) {
+    const current = pick(parsed, path)
+    if (typeof current !== 'number' || current <= 0) continue
+    if (path === INSPECTOR_PATH) {
+      out.push({ path, value: base * 100 + INSPECTOR_OFFSET })
+      continue
+    }
+    if (Math.floor(current / 100) !== DEFAULT_PORT_BASE) continue
+    out.push({ path, value: base * 100 + (current % 100) })
+  }
+  return out
 }

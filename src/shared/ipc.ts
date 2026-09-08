@@ -38,6 +38,11 @@ export interface IpcContract {
   /* --- layihələr --- */
   'projects:list': { req: void; res: Project[] }
   'projects:add': { req: { path: string }; res: Project }
+  /** Seçilmiş qovluqda sıfırdan `supabase init` işlədib layihəni qeydə alır */
+  'projects:create': {
+    req: { path: string; name?: string; portBase?: number }
+    res: Project
+  }
   'projects:remove': { req: { id: string }; res: void }
   'projects:update': { req: { id: string; patch: Partial<Project> }; res: Project }
   /** Qovluq seçimi dialoqu; ləğv edilsə null */
@@ -213,6 +218,7 @@ export type IpcEventName = keyof IpcEvents
 export const IPC_CHANNELS: IpcChannel[] = [
   'projects:list',
   'projects:add',
+  'projects:create',
   'projects:remove',
   'projects:update',
   'projects:pickFolder',

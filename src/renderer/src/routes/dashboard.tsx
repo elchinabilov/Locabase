@@ -9,12 +9,14 @@ import type { RouteId } from '../app'
 export function Dashboard({
   project,
   onChanged,
-  onAdd,
+  onOpen,
+  onNew,
   onRoute
 }: {
   project: Project | null
   onChanged: () => void
-  onAdd: () => void
+  onOpen: () => void
+  onNew: () => void
   onRoute: (r: RouteId) => void
 }): ReactNode {
   if (!project) {
@@ -24,12 +26,16 @@ export function Dashboard({
         hint={
           <div className="flex flex-col items-center gap-3">
             <p>
-              İçində <code className="text-accent">supabase/config.toml</code> olan bir repo seç.
-              Tool heç nə kopyalamır — bütün fayllar olduğu yerdə qalır.
+              Boş qovluqda sıfırdan yeni layihə qur, ya da içində{' '}
+              <code className="text-accent">supabase/config.toml</code> olan repo-nu aç. Mövcud
+              layihədə tool heç nə kopyalamır — bütün fayllar olduğu yerdə qalır.
             </p>
-            <Button variant="primary" onClick={onAdd}>
-              Layihə əlavə et
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="primary" onClick={onNew}>
+                Yeni layihə
+              </Button>
+              <Button onClick={onOpen}>Mövcud layihəni aç</Button>
+            </div>
           </div>
         }
       />

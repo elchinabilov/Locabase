@@ -5,6 +5,7 @@ import { cx, shortPath } from './lib/format'
 import { Badge, Button, Dot, Empty, ErrorNote, SkeletonRows } from './components/ui'
 import { LogDrawer } from './components/log-drawer'
 import { Mark, Wordmark } from './components/brand'
+import { AddProjectModal, NewProjectModal } from './components/new-project'
 import { Dashboard } from './routes/dashboard'
 import { ConfigRoute } from './routes/config'
 import { AuthRoute } from './routes/auth'
@@ -46,6 +47,10 @@ export function App(): ReactNode {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [route, setRoute] = useState<RouteId>('dashboard')
   const [logOpen, setLogOpen] = useState(false)
+  /** «+» → yeni/mövcud seçimi */
+  const [addOpen, setAddOpen] = useState(false)
+  /** «Yeni layihə» üçün seçilmiş qovluq; modal bunun üstündə açılır */
+  const [newProjectDir, setNewProjectDir] = useState<string | null>(null)
 
   const list = projects.data ?? []
   const selected = useMemo(
@@ -58,13 +63,18 @@ export function App(): ReactNode {
     if (selectedId && !list.some((p) => p.id === selectedId)) setSelectedId(list[0]?.id ?? null)
   }, [list, selectedId])
 
-  const addProject = useCallback(async () => {
+  const openProject = useCallback(async () => {
     const path = await call('projects:pickFolder')
     if (!path) return
     const project = await call('projects:add', { path })
     projects.refresh()
     setSelectedId(project.id)
   }, [projects])
+
+  const newProject = useCallback(async () => {
+    const path = await call('projects:pickFolder')
+    if (path) setNewProjectDir(path)
+  }, [])
 
   return (
     <div className="flex h-full flex-col">
@@ -74,7 +84,7 @@ export function App(): ReactNode {
           projects={list}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          onAdd={addProject}
+          onAdd={() => setAddOpen(true)}
           route={route}
           onRoute={setRoute}
           loading={projects.loading}
@@ -86,13 +96,32 @@ export function App(): ReactNode {
               route={route}
               project={selected}
               onProjectsChanged={projects.refresh}
-              onAdd={addProject}
+              onOpen={() => void openProject()}
+              onNew={() => void newProject()}
               onRoute={setRoute}
             />
           </div>
           <LogDrawer open={logOpen} onToggle={() => setLogOpen((v) => !v)} />
         </main>
       </div>
+      {addOpen && (
+        <AddProjectModal
+          onClose={() => setAddOpen(false)}
+          onNew={() => void newProject()}
+          onOpen={() => void openProject()}
+        />
+      )}
+      {newProjectDir && (
+        <NewProjectModal
+          dir={newProjectDir}
+          onClose={() => setNewProjectDir(null)}
+          onDone={(project) => {
+            setNewProjectDir(null)
+            projects.refresh()
+            setSelectedId(project.id)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -101,19 +130,27 @@ function Content({
   route,
   project,
   onProjectsChanged,
-  onAdd,
+  onOpen,
+  onNew,
   onRoute
 }: {
   route: RouteId
   project: Project | null
   onProjectsChanged: () => void
-  onAdd: () => void
+  onOpen: () => void
+  onNew: () => void
   onRoute: (r: RouteId) => void
 }): ReactNode {
   if (route === 'settings') return <SettingsRoute />
   if (route === 'dashboard') {
     return (
-      <Dashboard project={project} onChanged={onProjectsChanged} onAdd={onAdd} onRoute={onRoute} />
+      <Dashboard
+        project={project}
+        onChanged={onProjectsChanged}
+        onOpen={onOpen}
+        onNew={onNew}
+        onRoute={onRoute}
+      />
     )
   }
   if (!project) {
@@ -186,8 +223,8 @@ function Sidebar({
         {error && <ErrorNote>{error}</ErrorNote>}
         {!loading && projects.length === 0 && (
           <p className="px-2 py-3 text-[11.5px] leading-relaxed text-muted">
-            Hələ layihə yoxdur. <span className="text-accent">+</span> ilə `supabase/` qovluğu olan
-            bir repo seç.
+            Hələ layihə yoxdur. <span className="text-accent">+</span> ilə yeni layihə qur və ya
+            `supabase/` qovluğu olan repo-nu aç.
           </p>
         )}
         {projects.map((p) => (

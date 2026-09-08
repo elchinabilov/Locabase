@@ -1,6 +1,6 @@
 {
 	"name": "locabase",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"description": "Locabase — Supabase control room: local stack, config, auth, functions and local↔remote sync for managed and self-hosted projects",
 	"main": "./out/main/index.js",
 	"author": "Elchin Abilov",

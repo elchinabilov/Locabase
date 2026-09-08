@@ -24,6 +24,21 @@ boşluğu doldurur: **hər şey UI-dan, faylı əl ilə açmadan.**
 | **Funksiyalar** | Siyahı, şablondan yaratma, lokal serve, `verify_jwt`, tək-tək və ya toplu deploy |
 | **Sync / Deploy** | Beş ox üzrə fərq (miqrasiya, sxem, funksiya, secret, auth), seçmə deploy, quru rejim, **remote konteynerlərin on/off və RAM-ı** |
 
+## Layihə əlavə etmək
+
+Sol paneldəki **+** iki yol verir:
+
+- **Yeni layihə** — seçilmiş qovluqda `supabase init` işlədilir (`supabase/`
+  qovluğu orada yaranır), sonra `project_id` verdiyin addan törədilir və
+  portlar **boş 100-lük bloka** köçürülür (543xx tutulubsa 553xx, 563xx…), ona
+  görə yeni stack köhnələrlə toqquşmur. Ardınca `migrations/`, `functions/`,
+  `seed.sql` və `supabase/.gitignore` tamamlanır.
+- **Mövcud layihəni aç** — içində `supabase/config.toml` olan qovluq registry-yə
+  yazılır. Heç nə kopyalanmır və heç nə dəyişdirilmir.
+
+Qovluqda artıq `config.toml` varsa, «Yeni layihə» üstündən yazmır — sadəcə onu
+olduğu kimi əlavə etməyi təklif edir.
+
 ## SQL və cədvəl redaktoru
 
 Hər iki ekranın yuxarısında **mühit seçimi** var. Default **lokal**-dır

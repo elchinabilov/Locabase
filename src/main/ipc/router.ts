@@ -6,6 +6,7 @@ import { dialog, ipcMain, shell, BrowserWindow } from 'electron'
 import { IPC_CHANNELS, type IpcChannel, type IpcContract } from '@shared/ipc.js'
 import { logBus } from '../core/log.js'
 import * as projects from '../core/projects.js'
+import * as scaffold from '../core/scaffold.js'
 import * as stack from '../core/stack.js'
 import * as ports from '../core/ports.js'
 import * as config from '../core/config.js'
@@ -44,14 +45,15 @@ const handlers: Handlers = {
   /* --- layihələr --- */
   'projects:list': async () => projects.list(),
   'projects:add': async ({ path }) => projects.add(path),
+  'projects:create': async ({ path, name, portBase }) => scaffold.create({ path, name, portBase }),
   'projects:remove': async ({ id }) => projects.remove(id),
   'projects:update': async ({ id, patch }) => projects.update(id, patch),
   'projects:inspect': async ({ path }) => projects.inspect(path),
   'projects:pickFolder': async () => {
     const win = BrowserWindow.getFocusedWindow()
     const res = win
-      ? await dialog.showOpenDialog(win, { properties: ['openDirectory'] })
-      : await dialog.showOpenDialog({ properties: ['openDirectory'] })
+      ? await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] })
+      : await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     return res.canceled ? null : (res.filePaths[0] ?? null)
   },
 
