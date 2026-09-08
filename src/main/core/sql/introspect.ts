@@ -1,15 +1,15 @@
 /**
- * Sxem introspeksiyası — `pg_catalog` üzərindən.
+ * Schema introspection — through `pg_catalog`.
  *
- * `information_schema` qəsdən istifadə edilmir: sahibi olmadığın cədvəlləri
- * gizlədir, `attidentity`/`attgenerated`-i təmiz vermir, sətir təxmini yoxdur
- * və nəzərəçarpacaq dərəcədə yavaşdır.
+ * `information_schema` is deliberately avoided: it hides tables you don't own,
+ * doesn't report `attidentity`/`attgenerated` cleanly, has no row estimate, and
+ * is noticeably slower.
  */
 import { rowsOf, targetFor } from './target.js'
 import { qualify } from './ident.js'
 import type { DbColumn, DbCompletion, DbRelKind, DbSchema, DbTable } from '@shared/types.js'
 
-/** Supabase-in öz sxemləri — filtrlənmir, sadəcə UI-da yığılır. */
+/** Supabase's own schemas — not filtered out, just collapsed in the UI. */
 const SUPABASE_SCHEMAS = new Set([
   'auth',
   'storage',
@@ -108,16 +108,16 @@ export async function tables(
         : isTable
           ? 'PK yoxdur'
           : kind === 'v' || kind === 'm'
-            ? 'Görünüş redaktə olunmur'
-            : 'Xarici cədvəl redaktə olunmur'
+            ? 'A view cannot be edited'
+            : 'A foreign table cannot be edited'
     }
   })
 }
 
 /**
- * `$1::regclass` özü injection-a bağlıdır — ya real relation-a həll olur, ya da
- * xəta atır. `pkOrd` bool deyil, sıradır: kompozit PK-da `(a,b) in ((…))`
- * formasının ardıcıllığı bundan asılıdır.
+ * `$1::regclass` is injection-safe by itself — it either resolves to a real
+ * relation or throws. `pkOrd` is an order, not a bool: with a composite PK the
+ * ordering of the `(a,b) in ((…))` form depends on it.
  */
 const COLUMNS_SQL = `
   with pk as (
@@ -172,7 +172,7 @@ interface ColumnRaw extends Record<string, unknown> {
   comment: string | null
 }
 
-/** Sətir CRUD hər əməliyyatda sütunları oxuyur — qısa keş gediş-gəlişi azaldır. */
+/** Row CRUD reads columns on every operation — a short cache cuts the round trips. */
 const COL_TTL_MS = 5_000
 const colCache = new Map<string, { at: number; cols: DbColumn[] }>()
 
@@ -206,7 +206,7 @@ export async function columns(
   return cols
 }
 
-/** DDL-dən sonra keşi at. `envId` verilməsə layihənin bütün mühitləri təmizlənir. */
+/** Drop the cache after DDL. Without `envId` every environment of the project is cleared. */
 export function forgetColumns(id: string, envId?: string | null): void {
   const prefix = envId === undefined ? `${id}\0` : `${id}\0${envId ?? ''}\0`
   for (const key of [...colCache.keys()]) {
@@ -224,7 +224,7 @@ const COMPLETION_SQL = `
   order by n.nspname, c.relname, a.attnum
 `
 
-/** Avtotamamlama üçün bütün sxem/cədvəl/sütun adları — bir gediş-gəlişdə. */
+/** Every schema/table/column name for autocompletion — in one round trip. */
 export async function completion(id: string, envId: string | null): Promise<DbCompletion> {
   const rows = await rowsOf<{ schema: string; table: string; column: string }>(
     targetFor(id, envId),

@@ -1,25 +1,26 @@
 /**
- * Nəticə şəbəkəsi — SQL redaktoru və cədvəl redaktoru üçün ortaq.
+ * The result grid — shared by the SQL editor and the table editor.
  *
- * Virtualizasiya kitabxanası qəsdən yoxdur (repo-da sıfır wrapper prinsipi),
- * amma 5000 sətir × 15 sütun = 75 000 DOM xanası renderer-i dondurur — ona
- * görə sabit sətir hündürlüyü ilə sadə pəncərələmə var.
+ * There is deliberately no virtualization library (the repo's zero-wrapper
+ * principle), but 5000 rows × 15 columns = 75,000 DOM cells freezes the renderer —
+ * so there is simple windowing with a fixed row height.
  */
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { DbRow } from '@shared/types'
 import { cx } from '../lib/format'
+import { useT } from '../i18n'
 import { Modal, Skeleton, SkeletonTable } from './ui'
 
 const ROW_H = 28
-/** Bundan az sətir sadəcə render olunur — pəncərələmənin xərcinə dəyməz. */
+/** Fewer rows than this are just rendered — windowing isn't worth its cost. */
 const WINDOW_FROM = 200
 const CELL_MAX = 140
 
 export interface GridColumn {
   name: string
-  /** Başlıqda kiçik boz yazı — tip adı və ya PK/FK işarəsi */
+  /** small grey text in the header — the type name or a PK/FK marker */
   hint?: string
-  /** `null` = sıralanmır */
+  /** `null` = not sorted */
   sortable?: boolean
 }
 
@@ -37,20 +38,22 @@ export function DataGrid({
   onSelectedChange,
   rowActions,
   loading,
-  emptyText = 'Sətir yoxdur'
+  emptyText
 }: {
   columns: GridColumn[]
   rows: DbRow[]
   sort?: GridSort | null
   onSort?: (next: GridSort | null) => void
-  /** Seçilmiş sətir indeksləri — verilməsə checkbox sütunu göstərilmir */
+  /** Selected row indexes — without this the checkbox column is hidden */
   selected?: Set<number>
   onSelectedChange?: (next: Set<number>) => void
   rowActions?: (rowIndex: number) => ReactNode
-  /** İlk yükləmə — sətir gəlməyib. Başlıq qalır, gövdə skeleton olur. */
+  /** First load — no rows yet. The header stays, the body becomes a skeleton. */
   loading?: boolean
   emptyText?: string
 }): ReactNode {
+  const t = useT()
+  const shownEmptyText = emptyText ?? t('dataGrid.noRows')
   const scroller = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportH, setViewportH] = useState(600)
@@ -88,7 +91,7 @@ export function DataGrid({
   const clickHeader = useCallback(
     (name: string) => {
       if (!onSort) return
-      // asc → desc → sıralamasız
+      // asc → desc → unsorted
       if (!sort || sort.column !== name) onSort({ column: name, dir: 'asc' })
       else if (sort.dir === 'asc') onSort({ column: name, dir: 'desc' })
       else onSort(null)
@@ -96,10 +99,10 @@ export function DataGrid({
     [onSort, sort]
   )
 
-  // Sütunlar hələ gəlməyibsə başlıq da çəkilə bilmir — bütöv skeleton cədvəl.
+  // Without columns even the header can't be drawn — a full skeleton table.
   if (columns.length === 0) {
     if (loading) return <SkeletonTable rows={10} cols={5} className="p-1" />
-    return <p className="px-3.5 py-6 text-center text-[12px] text-muted">{emptyText}</p>
+    return <p className="px-3.5 py-6 text-center text-[12px] text-muted">{shownEmptyText}</p>
   }
 
   const skeletonCols = columns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)
@@ -165,7 +168,7 @@ export function DataGrid({
                   colSpan={columns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)}
                   className="px-3.5 py-8 text-center text-[12px] text-muted"
                 >
-                  {emptyText}
+                  {shownEmptyText}
                 </td>
               </tr>
             )}
@@ -223,10 +226,11 @@ export function DataGrid({
 }
 
 /**
- * `null` ilə boş sətir GÖRÜNÜŞDƏ fərqlənməlidir — bütün xanalar mətn kimi
- * gəldiyinə görə (bax `sql/build.ts` TEXT_TYPES) bu yeganə ayırd edici işarədir.
+ * A `null` and an empty string MUST look different — since every cell arrives as
+ * text (see `TEXT_TYPES` in `sql/build.ts`), this is the only distinguishing mark.
  */
 function Cell({ value, onZoom }: { value: string | null; onZoom: (v: string) => void }): ReactNode {
+  const t = useT()
   if (value === null) {
     return (
       <td className="px-2.5 font-mono text-[11.5px] whitespace-nowrap">
@@ -247,7 +251,7 @@ function Cell({ value, onZoom }: { value: string | null; onZoom: (v: string) => 
   const shown = long ? `${value.slice(0, CELL_MAX).replace(/\n/g, ' ')}…` : value
   return (
     <td
-      title={long ? 'Tam dəyər üçün klikləyin' : value}
+      title={long ? t('dataGrid.clickForFullValue') : value}
       onClick={long ? () => onZoom(value) : undefined}
       className={cx(
         'px-2.5 font-mono text-[11.5px] whitespace-nowrap',
@@ -265,7 +269,7 @@ function pretty(value: string): string {
     try {
       return JSON.stringify(JSON.parse(t), null, 2)
     } catch {
-      // JSON deyilmiş — olduğu kimi göstər
+      // not JSON after all — show it as it is
     }
   }
   return value

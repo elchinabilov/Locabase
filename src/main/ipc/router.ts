@@ -1,6 +1,6 @@
 /**
- * IPC marşrutlayıcısı. Hər kanal `IpcContract`-dakı tipə uyğun bir handler-dir;
- * atılan istisna renderer tərəfdə `{ ok: false, error }` kimi görünür.
+ * The IPC router. Every channel is one handler typed by `IpcContract`; an
+ * exception thrown here shows up on the renderer side as `{ ok: false, error }`.
  */
 import { dialog, ipcMain, shell, BrowserWindow } from 'electron'
 import { IPC_CHANNELS, type IpcChannel, type IpcContract } from '@shared/ipc.js'
@@ -26,7 +26,7 @@ import { readFileSync } from 'node:fs'
 
 type Handlers = { [C in IpcChannel]: (req: IpcContract[C]['req']) => Promise<IpcContract[C]['res']> }
 
-/** `config.toml`-da hansı açarlar bu env dəyişəninə istinad edir. */
+/** Which keys in `config.toml` reference this env variable. */
 function envReferences(projectPath: string): Map<string, string[]> {
   const raw = readFileSync(projectPath, 'utf8')
   const scan = scanToml(raw)
@@ -42,7 +42,7 @@ function envReferences(projectPath: string): Map<string, string[]> {
 }
 
 const handlers: Handlers = {
-  /* --- layihələr --- */
+  /* --- projects --- */
   'projects:list': async () => projects.list(),
   'projects:add': async ({ path }) => projects.add(path),
   'projects:create': async ({ path, name, portBase }) => scaffold.create({ path, name, portBase }),
@@ -61,7 +61,7 @@ const handlers: Handlers = {
   'stack:status': async ({ id, withStats }) => stack.status(id, withStats ?? false),
   'stack:setService': async ({ id, configPath, on }) => stack.setService(id, configPath, on),
   'stack:start': async ({ id }) => stack.start(id),
-  // Stack dayananda/yenidən qalxanda hovuzdakı bağlantılar ölür — atırıq
+  // When the stack stops or comes back up the pooled connections die — drop them
   'stack:stop': async ({ id, noBackup }) => {
     try {
       return await stack.stop(id, noBackup ?? true)
@@ -85,7 +85,7 @@ const handlers: Handlers = {
     }
   },
   'stack:openUrl': async ({ url }) => {
-    if (!/^https?:\/\//i.test(url)) throw new Error('Yalnız http/https ünvanları açıla bilər')
+    if (!/^https?:\/\//i.test(url)) throw new Error('Only http/https addresses can be opened')
     await shell.openExternal(url)
   },
   'stack:tailLogs': async ({ id, container, on }) => {
@@ -124,7 +124,7 @@ const handlers: Handlers = {
     envfile.deleteKey(projects.paths.envFile(projects.get(id)), key)
   },
 
-  /* --- mühitlər --- */
+  /* --- environments --- */
   'envs:upsert': async ({ id, env }) => projects.upsertEnv(id, env),
   'envs:remove': async ({ id, envId }) => {
     for (const key of [
@@ -188,7 +188,7 @@ const handlers: Handlers = {
   /* --- SQL redaktoru --- */
   'sql:execute': async ({ id, envId, sql: text, readOnly, maxRows, timeoutMs, token }) => {
     const run = await sql.execute(id, text, { envId, readOnly, maxRows, timeoutMs, token })
-    // DDL sxemi dəyişdirmiş ola bilər — sütun keşi köhnəlir
+    // DDL may have changed the schema — the column cache is stale
     if (run.ok && !readOnly) sql.introspect.forgetColumns(id, envId)
     return run
   },
@@ -196,14 +196,14 @@ const handlers: Handlers = {
   'sql:saveAsMigration': async ({ id, name, sql: text }) =>
     migrations.createWithBody(id, name, text),
 
-  /* --- saxlanmış sorğular --- */
+  /* --- saved queries --- */
   'queries:list': async ({ id }) => queries.list(id),
   'queries:read': async ({ id, name }) => queries.read(id, name),
   'queries:write': async ({ id, name, sql: text }) => queries.write(id, name, text),
   'queries:rename': async ({ id, name, to }) => queries.rename(id, name, to),
   'queries:remove': async ({ id, name }) => queries.remove(id, name),
 
-  /* --- cədvəl redaktoru --- */
+  /* --- table editor --- */
   'db:schemas': async ({ id, envId, includeSystem }) =>
     sql.introspect.schemas(id, envId, includeSystem ?? false),
   'db:tables': async ({ id, envId, schema }) => sql.introspect.tables(id, envId, schema),
@@ -237,7 +237,7 @@ export function registerIpc(): void {
   }
 }
 
-/** Log avtobusunu bütün pəncərələrə bağla. */
+/** Wire the log bus to every window. */
 export function pipeEvents(): void {
   logBus.on('line', (line) => {
     for (const win of BrowserWindow.getAllWindows()) {

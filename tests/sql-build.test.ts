@@ -39,24 +39,24 @@ const COLS = [
 ]
 
 describe('requireColumn / pkColumns', () => {
-  it('naməlum sütun rədd olunur', () => {
-    expect(() => requireColumn(COLS, 'yox')).toThrow(/Bu cədvəldə belə sütun yoxdur/)
+  it('rejects an unknown column', () => {
+    expect(() => requireColumn(COLS, 'nope')).toThrow(/No such column on this table/)
   })
 
-  it('PK sütunları sıra ilə qayıdır', () => {
+  it('returns PK columns in order', () => {
     expect(pkColumns(COLS).map((c) => c.name)).toEqual(['a', 'b'])
     expect(pkColumns([col('x')])).toEqual([])
   })
 })
 
 describe('buildWhere', () => {
-  it('sadə bərabərlik', () => {
+  it('simple equality', () => {
     const f = buildWhere(COLS, [{ column: 'a', op: 'eq', value: '1' }])
     expect(f.text).toBe('where "a" = $1')
     expect(f.params).toEqual(['1'])
   })
 
-  it('parametrsiz operator nömrələnməni sürüşdürmür', () => {
+  it('a parameterless operator does not shift the numbering', () => {
     const filters: DbFilter[] = [
       { column: 'a', op: 'eq', value: '1' },
       { column: 'b', op: 'isnull', value: null },
@@ -67,17 +67,17 @@ describe('buildWhere', () => {
     expect(f.params).toEqual(['1', '2'])
   })
 
-  it('boş filtr boş fraqment verir', () => {
+  it('an empty filter gives an empty fragment', () => {
     expect(buildWhere(COLS, [])).toEqual({ text: '', params: [] })
   })
 
-  it('naməlum operator rədd olunur', () => {
+  it('rejects an unknown operator', () => {
     expect(() =>
       buildWhere(COLS, [{ column: 'a', op: 'drop' as DbOp, value: null }])
-    ).toThrow(/Naməlum operator/)
+    ).toThrow(/Unknown operator/)
   })
 
-  it('dəyər içindəki injection yalnız parametrdə görünür', () => {
+  it('an injection inside a value only ever appears as a parameter', () => {
     const f = buildWhere(COLS, [{ column: 'a', op: 'eq', value: "1'; drop table t; --" }])
     expect(f.text).toBe('where "a" = $1')
     expect(f.text).not.toContain('drop')
@@ -91,15 +91,15 @@ describe('buildOrder', () => {
     expect(buildOrder(COLS, null)).toBe('')
   })
 
-  it('başqa istiqaməti rədd edir', () => {
+  it('rejects any other direction', () => {
     expect(() =>
       buildOrder(COLS, { column: 'a', dir: 'desc; drop table t' as 'asc' })
-    ).toThrow(/Naməlum sıralama/)
+    ).toThrow(/Unknown sort direction/)
   })
 })
 
 describe('buildSelect / buildCount', () => {
-  it('limit və offset tam ədəd kimi yapışdırılır', () => {
+  it('limit and offset are pasted as integers', () => {
     const f = buildSelect('public', 'users', COLS, {
       filters: [{ column: 'a', op: 'eq', value: 'x' }],
       orderBy: { column: 'b', dir: 'asc' },
@@ -112,7 +112,7 @@ describe('buildSelect / buildCount', () => {
     expect(f.params).toEqual(['x'])
   })
 
-  it('limit/offset saxta dəyərdə clamp olunur', () => {
+  it('limit/offset are clamped on a bogus value', () => {
     const f = buildSelect('public', 'users', COLS, {
       filters: [],
       orderBy: null,
@@ -122,7 +122,7 @@ describe('buildSelect / buildCount', () => {
     expect(f.text).toContain('limit 1 offset 0')
   })
 
-  it('count eyni filtri istifadə edir', () => {
+  it('count uses the same filter', () => {
     const f = buildCount('public', 'users', COLS, [{ column: 'c', op: 'ilike', value: '%a%' }])
     expect(f.text).toBe('select count(*)::int8 as n from "public"."users" where "c" ilike $1')
     expect(f.params).toEqual(['%a%'])
@@ -130,17 +130,17 @@ describe('buildSelect / buildCount', () => {
 })
 
 describe('buildInsert', () => {
-  it('açar sırası ilə parametrləşir', () => {
+  it('parameterizes in key order', () => {
     const f = buildInsert('public', 't', COLS, { a: '1', c: null })
     expect(f.text).toBe('insert into "public"."t" ("a", "c") values ($1, $2) returning *')
     expect(f.params).toEqual(['1', null])
   })
 
-  it('hesablanan sütuna yazmağı rədd edir', () => {
-    expect(() => buildInsert('public', 't', COLS, { gen: '1' })).toThrow(/Hesablanan sütuna/)
+  it('rejects writing to a generated column', () => {
+    expect(() => buildInsert('public', 't', COLS, { gen: '1' })).toThrow(/generated column/)
   })
 
-  it('boş dəyər dəsti default values verir', () => {
+  it('an empty value set gives default values', () => {
     expect(buildInsert('public', 't', COLS, {}).text).toBe(
       'insert into "public"."t" default values returning *'
     )
@@ -148,7 +148,7 @@ describe('buildInsert', () => {
 })
 
 describe('buildUpdate', () => {
-  it('where bütün PK sütunlarını əhatə edir', () => {
+  it('the where clause covers every PK column', () => {
     const f = buildUpdate('public', 't', COLS, { a: '1', b: '2' }, { c: 'yeni' })
     expect(f.text).toBe(
       'update "public"."t" set "c" = $1 where "a" = $2 and "b" = $3 returning *'
@@ -156,25 +156,25 @@ describe('buildUpdate', () => {
     expect(f.params).toEqual(['yeni', '1', '2'])
   })
 
-  it('PK olmayan cədvəldə rədd olunur', () => {
-    expect(() => buildUpdate('public', 't', [col('x')], {}, { x: '1' })).toThrow(/PK yoxdur/)
+  it('rejects a table without a PK', () => {
+    expect(() => buildUpdate('public', 't', [col('x')], {}, { x: '1' })).toThrow(/No PK/)
   })
 
-  it('çatışmayan PK dəyəri rədd olunur', () => {
+  it('rejects a missing PK value', () => {
     expect(() => buildUpdate('public', 't', COLS, { a: '1' }, { c: 'z' })).toThrow(
-      /PK dəyəri çatışmır: b/
+      /Missing PK value: b/
     )
   })
 
-  it('boş patch rədd olunur', () => {
+  it('rejects an empty patch', () => {
     expect(() => buildUpdate('public', 't', COLS, { a: '1', b: '2' }, {})).toThrow(
-      /Dəyişiklik yoxdur/
+      /Nothing changed/
     )
   })
 })
 
 describe('buildDelete', () => {
-  it('kompozit PK üçün sətir konstruktoru qurur', () => {
+  it('builds a row constructor for a composite PK', () => {
     const f = buildDelete('public', 't', COLS, [
       { a: '1', b: '2' },
       { a: '3', b: '4' }
@@ -183,18 +183,18 @@ describe('buildDelete', () => {
     expect(f.params).toEqual(['1', '2', '3', '4'])
   })
 
-  it('500-dən çox sətri rədd edir', () => {
+  it('rejects more than 500 rows', () => {
     const many = Array.from({ length: 501 }, (_, i) => ({ a: String(i), b: '0' }))
-    expect(() => buildDelete('public', 't', COLS, many)).toThrow(/ən çox 500/)
+    expect(() => buildDelete('public', 't', COLS, many)).toThrow(/At most 500 rows/)
   })
 
-  it('boş seçimi rədd edir', () => {
-    expect(() => buildDelete('public', 't', COLS, [])).toThrow(/seçilməyib/)
+  it('rejects an empty selection', () => {
+    expect(() => buildDelete('public', 't', COLS, [])).toThrow(/No rows selected/)
   })
 })
 
 describe('buildSelect castText', () => {
-  it('hər sütunu ::text-ə çevirir', () => {
+  it('casts every column to ::text', () => {
     const f = buildSelect('public', 't', [col('a'), col('b')], {
       filters: [],
       orderBy: null,

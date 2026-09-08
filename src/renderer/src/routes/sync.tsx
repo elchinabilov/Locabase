@@ -8,6 +8,7 @@ import type {
 } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx, timeAgo } from '../lib/format'
+import { useI18n, useT } from '../i18n'
 import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Skeleton } from '../components/ui'
 import { EnvForm } from '../components/env-form'
 import { RemoteServices } from '../components/remote-services'
@@ -20,6 +21,7 @@ export function SyncRoute({
   project: Project
   onChanged: () => void
 }): ReactNode {
+  const t = useT()
   const [envId, setEnvId] = useState<string>(project.environments[0]?.id ?? '')
   const [editing, setEditing] = useState<RemoteEnv | null | 'new'>(null)
   const env = project.environments.find((e) => e.id === envId) ?? null
@@ -28,15 +30,12 @@ export function SyncRoute({
     return (
       <>
         <Empty
-          title="Remote mühit yoxdur"
+          title={t('sync.noEnv.title')}
           hint={
             <div className="flex flex-col items-center gap-3">
-              <p>
-                Managed (supabase.com) və ya self-hosted (SSH + Docker) mühit əlavə et — sonra lokal
-                ilə arasındakı fərqi bir ekranda görəcəksən.
-              </p>
+              <p>{t('sync.noEnv.hint')}</p>
               <Button variant="primary" onClick={() => setEditing('new')}>
-                Mühit əlavə et
+                {t('sync.addEnv')}
               </Button>
             </div>
           }
@@ -56,7 +55,7 @@ export function SyncRoute({
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-2 border-b border-line px-4 py-2.5">
-        <h1 className="mr-2 text-[15px] font-medium">Sync / Deploy</h1>
+        <h1 className="mr-2 text-[15px] font-medium">{t('app.nav.sync')}</h1>
         {project.environments.map((e) => (
           <button
             key={e.id}
@@ -80,12 +79,12 @@ export function SyncRoute({
         <button
           onClick={() => setEditing('new')}
           className="rounded px-1.5 text-[15px] leading-none text-muted hover:text-accent"
-          title="Mühit əlavə et"
+          title={t('sync.addEnv')}
         >
           +
         </button>
         <div className="flex-1" />
-        {env && <Button onClick={() => setEditing(env)}>Mühit ayarları</Button>}
+        {env && <Button onClick={() => setEditing(env)}>{t('sync.envSettings')}</Button>}
       </header>
 
       {env && <EnvPanel key={env.id} project={project} env={env} />}
@@ -103,6 +102,8 @@ export function SyncRoute({
 }
 
 function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): ReactNode {
+  const t = useT()
+  const { locale } = useI18n()
   const [report, setReport] = useState<SyncReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -112,7 +113,7 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
   const [pickedFunctions, setPickedFunctions] = useState<Set<string>>(new Set())
   const [pickedSecrets, setPickedSecrets] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)
-  /** fərqinə baxılan funksiya */
+  /** the function whose diff is open */
   const [diffFn, setDiffFn] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -167,11 +168,11 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
 
         <div className="flex items-center gap-2">
           <Button variant="primary" onClick={() => void load()} loading={loading}>
-            Fərqi hesabla
+            {t('sync.computeDiff')}
           </Button>
           {report && (
             <span className="text-[11.5px] text-muted">
-              hesablandı: {timeAgo(report.generatedAt)}
+              {t('sync.computedAt', { time: timeAgo(report.generatedAt, locale) })}
             </span>
           )}
           <div className="flex-1" />
@@ -186,10 +187,10 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
                   })
                 }
               >
-                Quru rejim (dry-run)
+                {t('sync.dryRun')}
               </Button>
               <Button variant="primary" disabled={nothing} onClick={() => setConfirming(true)}>
-                Deploy et
+                {t('functions.deployNow')}
               </Button>
             </>
           )}
@@ -198,15 +199,13 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
         {error && <ErrorNote>{error}</ErrorNote>}
 
         {!report && !loading && (
-          <p className="px-1 py-6 text-center text-[12px] text-muted">
-            «Fərqi hesabla» ilə beş ox oxunur: miqrasiyalar, sxem, funksiyalar, secret adları, auth.
-          </p>
+          <p className="px-1 py-6 text-center text-[12px] text-muted">{t('sync.beforeReport')}</p>
         )}
 
         {report && (
           <>
             <Axis
-              title="Miqrasiyalar"
+              title={t('app.nav.migrations')}
               dirty={report.migrations.dirty}
               error={report.migrations.error}
               count={report.migrations.items.filter((m) => m.state === 'pending-remote').length}
@@ -237,18 +236,18 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
               {report.migrations.items.every((m) => m.state === 'synced') && <Clean />}
             </Axis>
 
-            <Axis title="Sxem (db diff)" dirty={report.schema.dirty} error={report.schema.error}>
+            <Axis title={t('sync.schema')} dirty={report.schema.dirty} error={report.schema.error}>
               {report.schema.dirty ? (
                 <pre className="max-h-56 overflow-auto px-3.5 py-2 font-mono text-[11px] whitespace-pre-wrap text-[#9fb3c6]">
                   {report.schema.items[0]?.sql.trim().slice(0, 4000)}
                 </pre>
               ) : (
-                <Clean text="Lokal sxem miqrasiyalarla üst-üstə düşür." />
+                <Clean text={t('sync.schemaClean')} />
               )}
             </Axis>
 
             <Axis
-              title="Funksiyalar"
+              title={t('app.nav.functions')}
               dirty={report.functions.dirty}
               error={report.functions.error}
               count={pickedFunctions.size}
@@ -272,27 +271,27 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
                       {f.remote?.version != null && (
                         <span className="text-[11px] text-muted">v{f.remote.version}</span>
                       )}
-                      <Badge tone={DRIFT[f.drift].tone}>{DRIFT[f.drift].label}</Badge>
+                      <Badge tone={DRIFT[f.drift].tone}>{t(DRIFT[f.drift].labelKey)}</Badge>
                       <button
                         onClick={(e) => {
-                          // <label> daxilindəyik — klik checkbox-a keçməsin
+                          // we are inside a <label> — don't let the click reach the checkbox
                           e.preventDefault()
                           e.stopPropagation()
                           setDiffFn(f.name)
                         }}
                         className="rounded border border-line px-1.5 py-0.5 text-[11px] text-muted hover:border-accent-dim hover:text-accent"
                       >
-                        fərqə bax
+                        {t('sync.viewDiff')}
                       </button>
                     </span>
                   }
                 />
               ))}
-              {report.functions.items.length === 0 && <Clean text="Funksiya yoxdur." />}
+              {report.functions.items.length === 0 && <Clean text={t('functions.empty')} />}
             </Axis>
 
             <Axis
-              title="Secret adları"
+              title={t('sync.secretNames')}
               dirty={report.secrets.dirty}
               error={report.secrets.error}
               count={pickedSecrets.size}
@@ -315,15 +314,15 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
                     label={<code className="font-mono">{s.key}</code>}
                     right={
                       <Badge tone={s.where === 'local-only' ? 'info' : 'warn'}>
-                        {s.where === 'local-only' ? 'yalnız lokal' : 'yalnız remote'}
+                        {s.where === 'local-only' ? t('sync.localOnly') : t('functions.remoteOnly')}
                       </Badge>
                     }
                   />
                 ))}
-              {!report.secrets.dirty && <Clean text="Açar adları üst-üstə düşür." />}
+              {!report.secrets.dirty && <Clean text={t('sync.secretsClean')} />}
             </Axis>
 
-            <Axis title="Auth konfiqurasiyası" dirty={false} error={report.authConfig.error} />
+            <Axis title={t('sync.authConfig')} dirty={false} error={report.authConfig.error} />
           </>
         )}
       </div>
@@ -364,13 +363,14 @@ function Health({
   error: string | null
   env: RemoteEnv
 }): ReactNode {
+  const t = useT()
   return (
     <Card
       title={env.name}
       subtitle={env.kind === 'managed' ? `managed · ${env.projectRef}` : `self-hosted · ${env.sshHost}`}
     >
       {loading && (
-        <ul className="divide-y divide-line-soft" role="status" aria-label="yoxlanılır">
+        <ul className="divide-y divide-line-soft" role="status" aria-label={t('common.checking')}>
           {[0, 1, 2, 3].map((i) => (
             <li key={i} className="flex items-center gap-2.5 px-3.5 py-2">
               <Skeleton w={6} h={6} round delay={i * 90} />
@@ -415,13 +415,18 @@ function Axis({
   count?: number
   children?: ReactNode
 }): ReactNode {
+  const t = useT()
   return (
     <Card
       title={title}
       actions={
         <>
-          {count !== undefined && count > 0 && <Badge tone="ok">{count} seçilib</Badge>}
-          <Badge tone={dirty ? 'warn' : 'muted'}>{dirty ? 'fərq var' : 'təmiz'}</Badge>
+          {count !== undefined && count > 0 && (
+            <Badge tone="ok">{t('sync.selectedCount', { count })}</Badge>
+          )}
+          <Badge tone={dirty ? 'warn' : 'muted'}>
+            {dirty ? t('sync.hasDiff') : t('sync.cleanAxis')}
+          </Badge>
         </>
       }
     >
@@ -433,8 +438,9 @@ function Axis({
   )
 }
 
-function Clean({ text = 'Fərq yoxdur.' }: { text?: string }): ReactNode {
-  return <p className="px-3.5 py-3 text-[12px] text-muted">{text}</p>
+function Clean({ text }: { text?: string }): ReactNode {
+  const t = useT()
+  return <p className="px-3.5 py-3 text-[12px] text-muted">{text ?? t('diffView.noDiff')}</p>
 }
 
 function Pick({
@@ -490,6 +496,7 @@ function DeployModal({
   onClose: () => void
   onDone: () => void
 }): ReactNode {
+  const t = useT()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -504,7 +511,7 @@ function DeployModal({
         setResult(res.output)
         setTimeout(onDone, 1200)
       } else {
-        setError(res.error ?? 'Uğursuz oldu')
+        setError(res.error ?? t('dashboard.reset.genericError'))
       }
     } catch (err) {
       setError((err as Error).message)
@@ -515,18 +522,18 @@ function DeployModal({
 
   return (
     <Modal
-      title={`Deploy → ${env.name}`}
+      title={t('sync.deployTitle', { name: env.name })}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Ləğv et</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
             loading={busy}
             disabled={text !== project.name}
             onClick={() => void go()}
           >
-            Başlat
+            {t('sync.start')}
           </Button>
         </>
       }
@@ -536,11 +543,11 @@ function DeployModal({
           <li key={s} className="flex items-center gap-2">
             <span className="text-muted">•</span>
             <span>
-              {s === 'backup' && 'Yedək (sxem dəyişikliyindən əvvəl, həmişə)'}
-              {s === 'migrations' && `Miqrasiyalar: ${plan.migrations.join(', ')}`}
-              {s === 'functions' && `Funksiyalar: ${plan.functions.join(', ')}`}
-              {s === 'secrets' && `Secrets: ${plan.secrets.join(', ')}`}
-              {s === 'verify' && 'Yoxlama (REST, auth, tətbiq)'}
+              {s === 'backup' && t('sync.step.backup')}
+              {s === 'migrations' && t('sync.step.migrations', { list: plan.migrations.join(', ') })}
+              {s === 'functions' && t('sync.step.functions', { list: plan.functions.join(', ') })}
+              {s === 'secrets' && t('sync.step.secrets', { list: plan.secrets.join(', ') })}
+              {s === 'verify' && t('sync.step.verify')}
             </span>
           </li>
         ))}
@@ -548,13 +555,12 @@ function DeployModal({
 
       {env.kind === 'managed' && plan.migrations.length > 0 && (
         <p className="mb-3 rounded-md border border-[#4a3c17] bg-[#211c10] px-3 py-2 text-[11.5px] text-warn">
-          Managed mühitdə seçmə miqrasiya tətbiqi yoxdur — `supabase db push` gözləyən bütün
-          miqrasiyaları sıra ilə tətbiq edir.
+          {t('sync.managedMigrationWarning')}
         </p>
       )}
 
       <label className="mb-1 block text-[12px] text-muted">
-        Təsdiq üçün «{project.name}» yaz
+        {t('dashboard.reset.confirmLabel', { name: project.name })}
       </label>
       <Input value={text} onChange={(e) => setText(e.target.value)} autoFocus />
 

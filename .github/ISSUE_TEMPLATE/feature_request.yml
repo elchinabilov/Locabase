@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest a capability Locabase should have
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you hitting
+      description: Describe the workflow that is painful today, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like Locabase to do
+    validations:
+      required: true
+  - type: dropdown
+    id: environment-kind
+    attributes:
+      label: Which environment does this apply to
+      multiple: true
+      options:
+        - Local stack
+        - Managed (Supabase cloud)
+        - Self-hosted
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today
+      description: The CLI command, the file you edit by hand, the other tool you switch to.

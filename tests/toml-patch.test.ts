@@ -5,11 +5,11 @@ import { parse as parseToml } from 'smol-toml'
 import { applyPatches, serializeValue, TomlPatchError } from '../src/main/core/toml/patch.js'
 import { scanToml } from '../src/main/core/toml/scan.js'
 
-const fixtures = ['next-cv', 'alocar', 'e-tehsil'] as const
+const fixtures = ['sample-a', 'sample-b', 'sample-c'] as const
 const load = (n: string): string =>
   readFileSync(resolve(__dirname, `fixtures/${n}.config.toml`), 'utf8')
 
-/** Sətir-sətir fərq: dəyişən sətirlərin sayı. */
+/** Line-by-line difference: how many lines changed. */
 function lineDiff(a: string, b: string): number {
   const la = a.split('\n')
   const lb = b.split('\n')
@@ -19,7 +19,7 @@ function lineDiff(a: string, b: string): number {
 }
 
 describe('scanToml', () => {
-  it.each(fixtures)('%s: hər açar smol-toml ilə eyni nəticə verir', (name) => {
+  it.each(fixtures)('%s: every key matches what smol-toml reads', (name) => {
     const src = load(name)
     const scan = scanToml(src)
     const parsed = parseToml(src) as Record<string, unknown>
@@ -27,7 +27,7 @@ describe('scanToml', () => {
     expect(scan.entries.length).toBeGreaterThan(20)
 
     for (const entry of scan.entries) {
-      // skan etdiyimiz aralıq tək başına parse olunmalıdır
+      // the range we scanned has to parse on its own
       const raw = src.slice(entry.valueStart, entry.valueEnd)
       const round = parseToml(`x = ${raw}`) as { x: unknown }
       let actual: unknown = parsed
@@ -39,23 +39,23 @@ describe('scanToml', () => {
     }
   })
 
-  it('next-cv: cədvəllər və şərh sətirləri düzgün ayrılır', () => {
-    const scan = scanToml(load('next-cv'))
+  it('sample-c: tables and comment lines are separated correctly', () => {
+    const scan = scanToml(load('sample-c'))
     expect(scan.tableByPath.has('auth.external.linkedin_oidc')).toBe(true)
     expect(scan.byPath.get('auth.external.linkedin_oidc.client_id')).toBeDefined()
     expect(scan.byPath.get('project_id')).toBeDefined()
-    // şərh içindəki `[edge_runtime]` kimi mətnlər cədvəl kimi tutulmamalıdır
+    // text like `[edge_runtime]` inside a comment must not be taken for a table
     expect(scan.tableByPath.has('functions')).toBe(false)
   })
 })
 
 describe('applyPatches — round-trip', () => {
-  it.each(fixtures)('%s: yamaqsız → bayt-bayt eyni', (name) => {
+  it.each(fixtures)('%s: no patches → byte-for-byte identical', (name) => {
     const src = load(name)
     expect(applyPatches(src, []).text).toBe(src)
   })
 
-  it.each(fixtures)('%s: eyni dəyər yazılanda fayl dəyişmir', (name) => {
+  it.each(fixtures)('%s: writing the same value leaves the file unchanged', (name) => {
     const src = load(name)
     const parsed = parseToml(src) as Record<string, unknown>
     const patches = scanToml(src)
@@ -77,25 +77,25 @@ describe('applyPatches — round-trip', () => {
   })
 })
 
-describe('applyPatches — nöqtəvi dəyişiklik', () => {
-  it('next-cv: auth.jwt_expiry → tam bir sətir dəyişir, şərhlər yerində', () => {
-    const src = load('next-cv')
+describe('applyPatches — a pinpoint change', () => {
+  it('sample-c: auth.jwt_expiry → exactly one line changes, comments stay put', () => {
+    const src = load('sample-c')
     const out = applyPatches(src, [{ path: 'auth.jwt_expiry', value: 7200 }])
     expect(lineDiff(src, out.text)).toBe(1)
     expect(out.text).toContain('jwt_expiry = 7200')
-    // qonşu şərh blokları toxunulmamışdır
-    expect(out.text).toContain('# Mailpit — lokalda göndərilən e-poçtlar həqiqətən getmir')
+    // the neighbouring comment blocks are untouched
+    expect(out.text).toContain('# Mailpit — mail sent locally never really leaves')
     expect(out.text.split('\n').length).toBe(src.split('\n').length)
   })
 
-  it('inline şərhli sətirdə şərh qalır', () => {
-    const src = ['[db]', 'port = 54322 # portu dəyişmə', ''].join('\n')
+  it('an inline comment survives on the line', () => {
+    const src = ['[db]', 'port = 54322 # do not change the port', ''].join('\n')
     const out = applyPatches(src, [{ path: 'db.port', value: 56322 }])
-    expect(out.text).toBe(['[db]', 'port = 56322 # portu dəyişmə', ''].join('\n'))
+    expect(out.text).toBe(['[db]', 'port = 56322 # do not change the port', ''].join('\n'))
   })
 
-  it('massiv dəyəri əvəz olunur', () => {
-    const src = load('next-cv')
+  it('an array value is replaced', () => {
+    const src = load('sample-c')
     const out = applyPatches(src, [
       { path: 'api.schemas', value: ['public', 'graphql_public', 'storage'] }
     ])
@@ -103,8 +103,8 @@ describe('applyPatches — nöqtəvi dəyişiklik', () => {
     expect(lineDiff(src, out.text)).toBe(1)
   })
 
-  it('env() referensi yazılır', () => {
-    const src = load('next-cv')
+  it('an env() reference is written', () => {
+    const src = load('sample-c')
     const out = applyPatches(src, [
       { path: 'auth.external.google.secret', value: { env: 'GOOGLE_SECRET_2' } }
     ])
@@ -112,22 +112,22 @@ describe('applyPatches — nöqtəvi dəyişiklik', () => {
   })
 })
 
-describe('applyPatches — əlavə və silmə', () => {
-  it('mövcud cədvələ yeni açar onun sonuna düşür', () => {
-    const src = load('next-cv')
+describe('applyPatches — adding and deleting', () => {
+  it('a new key lands at the end of its existing table', () => {
+    const src = load('sample-c')
     const out = applyPatches(src, [{ path: 'auth.external.google.tenant_id', value: 'abc' }])
     const lines = out.text.split('\n')
     const idx = lines.findIndex((l) => l.includes('tenant_id = "abc"'))
     expect(idx).toBeGreaterThan(-1)
-    // google seksiyasının içində, növbəti `[` başlığından əvvəl
+    // inside the google section, before the next `[` header
     const gh = lines.findIndex((l) => l.trim() === '[auth.external.google]')
     expect(idx).toBeGreaterThan(gh)
     const nextHeader = lines.findIndex((l, i) => i > gh && l.trim().startsWith('['))
     expect(idx).toBeLessThan(nextHeader)
   })
 
-  it('olmayan cədvəl faylın sonuna əlavə olunur və parse olunur', () => {
-    const src = load('next-cv')
+  it('a missing table is appended at the end of the file and parses', () => {
+    const src = load('sample-c')
     const out = applyPatches(src, [
       { path: 'auth.external.apple.enabled', value: true },
       { path: 'auth.external.apple.client_id', value: { env: 'APPLE_CLIENT_ID' } }
@@ -135,12 +135,12 @@ describe('applyPatches — əlavə və silmə', () => {
     const parsed = parseToml(out.text) as any
     expect(parsed.auth.external.apple.enabled).toBe(true)
     expect(parsed.auth.external.apple.client_id).toBe('env(APPLE_CLIENT_ID)')
-    // mövcud hissə toxunulmayıb
+    // the existing part is untouched
     expect(out.text.startsWith(src.trimEnd())).toBe(true)
   })
 
-  it('açar silinir və qalan fayl parse olunur', () => {
-    const src = load('next-cv')
+  it('a key is deleted and the rest of the file still parses', () => {
+    const src = load('sample-c')
     const out = applyPatches(src, [{ path: 'auth.jwt_expiry', value: undefined }])
     expect(out.text).not.toContain('jwt_expiry')
     expect(out.text.split('\n').length).toBe(src.split('\n').length - 1)
@@ -148,12 +148,12 @@ describe('applyPatches — əlavə və silmə', () => {
   })
 })
 
-describe('validate qapısı', () => {
-  it('serializeValue sonsuz rəqəmi rədd edir', () => {
+describe('the validate gate', () => {
+  it('serializeValue rejects a non-finite number', () => {
     expect(() => serializeValue(Number.POSITIVE_INFINITY)).toThrow(TomlPatchError)
   })
 
-  it('dırnaq və tərs-slash qaçırılır', () => {
+  it('quotes and backslashes are escaped', () => {
     const out = applyPatches('[auth]\nsite_url = "x"\n', [
       { path: 'auth.site_url', value: 'a"b\\c' }
     ])

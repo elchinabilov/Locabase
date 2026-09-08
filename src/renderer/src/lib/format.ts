@@ -7,15 +7,20 @@ export function shortPath(path: string, keep = 2): string {
   return segs.length <= keep ? path : `…/${segs.slice(-keep).join('/')}`
 }
 
-export function timeAgo(iso: string): string {
+/**
+ * Relative time, localized through `Intl` rather than a phrase in the
+ * dictionaries — the wording of "3 minutes ago" is grammar, not copy.
+ */
+export function timeAgo(iso: string, locale = 'en'): string {
   const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000))
-  if (s < 60) return `${s} san. əvvəl`
-  if (s < 3600) return `${Math.round(s / 60)} dəq. əvvəl`
-  if (s < 86400) return `${Math.round(s / 3600)} saat əvvəl`
-  return `${Math.round(s / 86400)} gün əvvəl`
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+  if (s < 60) return rtf.format(-s, 'second')
+  if (s < 3600) return rtf.format(-Math.round(s / 60), 'minute')
+  if (s < 86400) return rtf.format(-Math.round(s / 3600), 'hour')
+  return rtf.format(-Math.round(s / 86400), 'day')
 }
 
-export function clock(iso: string): string {
+export function clock(iso: string, locale = 'en'): string {
   const d = new Date(iso)
-  return d.toLocaleTimeString('az-AZ', { hour12: false })
+  return d.toLocaleTimeString(locale, { hour12: false })
 }

@@ -1,11 +1,29 @@
 {
 	"name": "locabase",
 	"version": "0.2.0",
-	"description": "Locabase — Supabase control room: local stack, config, auth, functions and local↔remote sync for managed and self-hosted projects",
+	"description": "Desktop control room for Supabase — run the local stack, edit config.toml from a UI, and diff/deploy against managed or self-hosted projects.",
 	"main": "./out/main/index.js",
 	"author": "Elchin Abilov",
-	"license": "UNLICENSED",
-	"private": true,
+	"license": "Apache-2.0",
+	"homepage": "https://github.com/elchinabilov/Locabase#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/elchinabilov/Locabase.git"
+	},
+	"bugs": {
+		"url": "https://github.com/elchinabilov/Locabase/issues"
+	},
+	"keywords": [
+		"supabase",
+		"electron",
+		"postgres",
+		"self-hosted",
+		"database-gui",
+		"devtools",
+		"sql-editor",
+		"migrations",
+		"edge-functions"
+	],
 	"type": "module",
 	"scripts": {
 		"dev": "electron-vite dev",
@@ -16,7 +34,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"dist:mac": "npm run build && electron-builder --mac --arm64",
-		"dist:win": "npm run build && electron-builder --win --x64"
+		"dist:win": "npm run build && electron-builder --win --x64",
+		"screenshots": "node scripts/capture-screenshots.mjs"
 	},
 	"dependencies": {
 		"@codemirror/autocomplete": "^6.20.3",

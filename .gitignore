@@ -1,6 +1,15 @@
 node_modules/
 out/
 dist/
+*.tsbuildinfo
+
+# Editors / OS
 .DS_Store
+**/.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs and caches
 *.log
 .vite/

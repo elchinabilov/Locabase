@@ -2,80 +2,80 @@ import { describe, expect, it } from 'vitest'
 import { inlineParams, qualify, quoteIdent, quoteLiteral } from '../src/main/core/sql/ident.js'
 
 describe('quoteIdent', () => {
-  it('adi adı dırnaqlayır', () => {
+  it('quotes an ordinary name', () => {
     expect(quoteIdent('users')).toBe('"users"')
   })
 
-  it('daxili dırnaqları ikiləndirir', () => {
+  it('doubles inner quotes', () => {
     expect(quoteIdent('my"col')).toBe('"my""col"')
   })
 
-  it('Azərbaycan hərflərini olduğu kimi saxlayır', () => {
+  it('keeps non-ASCII letters as they are', () => {
     expect(quoteIdent('ödəniş_tarixi')).toBe('"ödəniş_tarixi"')
   })
 
-  it('boş adı rədd edir', () => {
-    expect(() => quoteIdent('')).toThrow(/Boş identifikator/)
+  it('rejects an empty name', () => {
+    expect(() => quoteIdent('')).toThrow(/Empty identifier/)
   })
 
-  it('NUL baytını rədd edir', () => {
+  it('rejects a NUL byte', () => {
     expect(() => quoteIdent('a\0b')).toThrow(/NUL/)
   })
 
-  it('injection cəhdi tək bir identifikator olaraq qalır', () => {
+  it('an injection attempt stays a single identifier', () => {
     const out = quoteIdent('a"; drop table t; --')
     expect(out.startsWith('"')).toBe(true)
     expect(out.endsWith('"')).toBe(true)
-    // daxildə qoşalanmamış dırnaq qalmamalıdır
+    // no unpaired quote may remain inside
     expect(out.slice(1, -1).replaceAll('""', '')).not.toContain('"')
   })
 })
 
 describe('qualify', () => {
-  it('sxem və cədvəli birləşdirir', () => {
+  it('joins schema and table', () => {
     expect(qualify('public', 'users')).toBe('"public"."users"')
   })
 })
 
 describe('quoteLiteral', () => {
-  it('tək dırnağı ikiləndirir', () => {
+  it('doubles a single quote', () => {
     expect(quoteLiteral("O'Brien")).toBe("'O''Brien'")
   })
 
-  it('null-u SQL null-a çevirir', () => {
+  it('turns null into SQL null', () => {
     expect(quoteLiteral(null)).toBe('null')
   })
 
-  it('boş sətri boş literal edir (null deyil)', () => {
+  it('turns an empty string into an empty literal (not null)', () => {
     expect(quoteLiteral('')).toBe("''")
   })
 
-  it('tərs xətti olduğu kimi saxlayır', () => {
+  it('keeps a backslash as it is', () => {
     expect(quoteLiteral('a\\b')).toBe("'a\\b'")
   })
 
-  it('NUL baytını rədd edir', () => {
+  it('rejects a NUL byte', () => {
     expect(() => quoteLiteral('a\0b')).toThrow(/NUL/)
   })
 
-  it('injection cəhdi bağlı literal olaraq qalır', () => {
+  it('an injection attempt stays a closed literal', () => {
     expect(quoteLiteral("x'; drop table t; --")).toBe("'x''; drop table t; --'")
   })
 })
 
 describe('inlineParams', () => {
-  it('sıra ilə əvəzləyir', () => {
+  it('substitutes in order', () => {
     expect(inlineParams('where "a" = $1 and "b" = $2', ['1', null])).toBe(
       `where "a" = '1' and "b" = null`
     )
   })
 
-  it('$10-u düzgün oxuyur', () => {
+  it('reads $10 correctly', () => {
     const params = Array.from({ length: 10 }, (_, i) => String(i))
     expect(inlineParams('$10', params)).toBe("'9'")
   })
 
-  it('çatışmayan parametrdə xəta atır', () => {
+  it('throws on a missing parameter', () => {
     expect(() => inlineParams('$2', ['a'])).toThrow(/Parametr yoxdur/)
   })
 })

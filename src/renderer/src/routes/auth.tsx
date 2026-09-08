@@ -3,27 +3,39 @@ import type { ConfigField, ConfigPatch, FieldValue, PatchPreview, Project } from
 import { AUTH_PROVIDERS, callbackUrl, envVarName } from '@shared/providers'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
+import { useT, type TranslationKey } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Modal, SkeletonList, Toggle } from '../components/ui'
 import { DiffView } from '../components/diff-view'
 import { draftFrom, FieldEditor, sameDraft, toPatchValue, type Draft } from '../components/field-editor'
 
-const FIELD_LABEL: Record<string, string> = {
-  client_id: 'Client ID',
-  secret: 'Client secret',
-  url: 'Provider URL',
-  redirect_uri: 'Redirect URI (override)',
-  skip_nonce_check: 'Nonce yoxlamasını atla',
-  email_optional: 'E-poçt məcburi deyil'
+const FIELD_LABEL_KEY: Record<string, TranslationKey> = {
+  client_id: 'auth.fieldLabel.clientId',
+  secret: 'auth.fieldLabel.secret',
+  url: 'auth.fieldLabel.url',
+  redirect_uri: 'auth.fieldLabel.redirectUri',
+  skip_nonce_check: 'auth.fieldLabel.skipNonceCheck',
+  email_optional: 'auth.fieldLabel.emailOptional'
 }
 
-/** Provider sahəsindən `ConfigField` düzəldir — FieldEditor eyni komponentdir. */
-function fieldFor(providerId: string, name: string): ConfigField {
+/** `AUTH_PROVIDERS` carries no `hint` (so `shared/` stays free of i18n) — it is read here. */
+const PROVIDER_HINT_KEY: Record<string, TranslationKey> = {
+  apple: 'auth.providerHint.apple',
+  azure: 'auth.providerHint.azure',
+  github: 'auth.providerHint.github',
+  gitlab: 'auth.providerHint.gitlab',
+  google: 'auth.providerHint.google',
+  keycloak: 'auth.providerHint.keycloak',
+  linkedin_oidc: 'auth.providerHint.linkedinOidc'
+}
+
+/** Builds a `ConfigField` from a provider field — FieldEditor is the same component. */
+function fieldFor(providerId: string, name: string, t: (k: TranslationKey) => string): ConfigField {
   const isBool = name === 'skip_nonce_check' || name === 'email_optional'
   return {
     path: `auth.external.${providerId}.${name}`,
     type: isBool ? 'boolean' : 'string',
     group: 'Auth',
-    label: FIELD_LABEL[name] ?? name,
+    label: FIELD_LABEL_KEY[name] ? t(FIELD_LABEL_KEY[name]) : name,
     envAllowed: !isBool,
     secret: name === 'secret',
     restartRequired: true,
@@ -32,6 +44,7 @@ function fieldFor(providerId: string, name: string): ConfigField {
 }
 
 export function AuthRoute({ project }: { project: Project }): ReactNode {
+  const t = useT()
   const doc = useQuery('config:read', { id: project.id }, [project.id])
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [enabledOverride, setEnabledOverride] = useState<Record<string, boolean>>({})
@@ -68,13 +81,13 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
     }
     for (const [path, d] of Object.entries(drafts)) {
       const segs = path.split('.')
-      const field = fieldFor(segs[2]!, segs.slice(3).join('.'))
+      const field = fieldFor(segs[2]!, segs.slice(3).join('.'), t)
       if (!sameDraft(d, draftFrom(values[path], field))) {
         out.push({ path, value: toPatchValue(d) })
       }
     }
     return out
-  }, [drafts, enabledOverride, values])
+  }, [drafts, enabledOverride, values, t])
 
   const save = useCallback(async () => {
     setSaving(true)
@@ -97,18 +110,18 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <h1 className="text-[15px] font-medium">Auth providerlər</h1>
+        <h1 className="text-[15px] font-medium">{t('auth.title')}</h1>
         <div className="flex-1" />
         {patches.length > 0 && (
           <>
-            <Badge tone="ok">{patches.length} dəyişiklik</Badge>
+            <Badge tone="ok">{t('auth.changeCount', { count: patches.length })}</Badge>
             <Button
               onClick={() => {
                 setDrafts({})
                 setEnabledOverride({})
               }}
             >
-              Ləğv et
+              {t('common.cancel')}
             </Button>
             <Button
               variant="primary"
@@ -118,7 +131,7 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
                   .catch((e: Error) => setError(e.message))
               }
             >
-              Yadda saxla…
+              {t('auth.saveEllipsis')}
             </Button>
           </>
         )}
@@ -136,17 +149,13 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
                 setTimeout(() => setCopied(false), 1200)
               }}
             >
-              {copied ? 'kopyalandı ✓' : 'kopyala'}
+              {copied ? t('auth.copied') : t('dashboard.quickLinks.copy')}
             </Button>
           </div>
-          <p className="-mt-1 px-1 text-[11.5px] leading-relaxed text-muted">
-            Bu ünvan provider konsoluna yapışdırılır (Google Cloud Console → Credentials, GitHub →
-            OAuth Apps, LinkedIn → Auth). Lokal port dəyişəndə bu URL də dəyişir — provider tərəfdə
-            də yeniləməyi unutma.
-          </p>
+          <p className="-mt-1 px-1 text-[11.5px] leading-relaxed text-muted">{t('auth.callbackHint')}</p>
 
           {doc.loading && (
-            <Card title="Providerlər">
+            <Card title={t('auth.providers')}>
               <SkeletonList rows={5} avatar trailing />
             </Card>
           )}
@@ -155,8 +164,11 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
 
           {values && (
             <Card
-              title="Providerlər"
-              subtitle={`${AUTH_PROVIDERS.filter((p) => isEnabled(p.id)).length} aktiv / ${AUTH_PROVIDERS.length}`}
+              title={t('auth.providers')}
+              subtitle={t('auth.activeCount', {
+                active: AUTH_PROVIDERS.filter((p) => isEnabled(p.id)).length,
+                total: AUTH_PROVIDERS.length
+              })}
             >
               <ul className="divide-y divide-line-soft">
                 {AUTH_PROVIDERS.map((meta) => {
@@ -182,25 +194,25 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
                             {meta.label}
                           </span>
                           <code className="font-mono text-[10.5px] text-[#54677a]">{meta.id}</code>
-                          {on && !configured && <Badge tone="warn">açar yoxdur</Badge>}
+                          {on && !configured && <Badge tone="warn">{t('auth.noKey')}</Badge>}
                         </button>
                         <button
                           onClick={() => setOpen(expanded ? null : meta.id)}
                           className="text-[11px] text-muted hover:text-text"
                         >
-                          {expanded ? 'bağla' : 'ayarlar'}
+                          {expanded ? t('auth.collapse') : t('auth.settings')}
                         </button>
                       </div>
 
                       {expanded && (
                         <div className="border-t border-line-soft bg-[#0d141b] pb-2">
-                          {meta.hint && (
+                          {PROVIDER_HINT_KEY[meta.id] && (
                             <p className="px-3.5 pt-2.5 text-[11.5px] leading-relaxed text-muted">
-                              {meta.hint}
+                              {t(PROVIDER_HINT_KEY[meta.id]!)}
                             </p>
                           )}
                           {meta.fields.map((name) => {
-                            const field = fieldFor(meta.id, name)
+                            const field = fieldFor(meta.id, name, t)
                             const original: FieldValue | undefined = values[field.path]
                             return (
                               <div key={field.path} className="flex items-start">
@@ -216,7 +228,7 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
                                 </div>
                                 {field.envAllowed && (
                                   <button
-                                    title=".env dəyişəninə bağla (CLI-nin gözlədiyi adla)"
+                                    title={t('auth.bindEnvTitle')}
                                     onClick={() =>
                                       setDrafts((prev) => ({
                                         ...prev,
@@ -228,7 +240,7 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
                                     }
                                     className="mt-3 mr-3 shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] text-muted hover:text-accent"
                                   >
-                                    standart ad
+                                    {t('auth.defaultName')}
                                   </button>
                                 )}
                               </div>
@@ -248,21 +260,20 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
       {preview && (
         <Modal
           wide
-          title="Auth dəyişiklikləri"
+          title={t('auth.diffTitle')}
           onClose={() => setPreview(null)}
           footer={
             <>
-              <Button onClick={() => setPreview(null)}>Ləğv et</Button>
+              <Button onClick={() => setPreview(null)}>{t('common.cancel')}</Button>
               <Button variant="primary" onClick={() => void save()} loading={saving}>
-                Faylı yaz
+                {t('auth.writeFile')}
               </Button>
             </>
           }
         >
           <p className="mb-3 text-[12px] text-muted">
-            {preview.changedLines} sətir dəyişir. Provider açarları `env()`-ə bağlıdırsa dəyərləri
-            Secrets ekranından yaz.
-            {preview.restartRequired && <span className="text-warn"> Restart tələb olunur.</span>}
+            {t('auth.diffChangedLines', { count: preview.changedLines })}
+            {preview.restartRequired && <span className="text-warn"> {t('auth.restartRequired')}</span>}
           </p>
           <DiffView before={preview.before} after={preview.after} />
         </Modal>

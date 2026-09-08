@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { diffLines } from '../lib/diff'
 import { cx } from '../lib/format'
+import { useT } from '../i18n'
 
 export function DiffView({
   before,
@@ -11,10 +12,11 @@ export function DiffView({
   after: string
   context?: number
 }): ReactNode {
+  const t = useT()
   const lines = useMemo(() => diffLines(before, after, context), [before, after, context])
 
   if (lines.length === 0) {
-    return <p className="py-4 text-center text-[12px] text-muted">Fərq yoxdur.</p>
+    return <p className="py-4 text-center text-[12px] text-muted">{t('diffView.noDiff')}</p>
   }
 
   return (

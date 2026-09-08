@@ -1,14 +1,20 @@
 /**
- * `config.toml` sahələrinin metadata-sı — Config ekranındakı formalar bu
- * siyahıdan doğulur. Yeni açar əlavə etmək bir sətirdir, yeni UI kodu deyil.
+ * Metadata for the `config.toml` fields — the forms on the Config screen are
+ * generated from this list. Adding a new key is one line, not new UI code.
  *
- * `restartRequired` işarəsi vacibdir: Supabase CLI konfiqurasiyanı yalnız
- * `supabase start` anında konteynerlərə ötürür, ona görə demək olar hər sahə
- * restart tələb edir. İstisnalar açıq şəkildə `false`-dur.
+ * The `restartRequired` flag matters: the Supabase CLI only hands the
+ * configuration to the containers at `supabase start`, so almost every field
+ * needs a restart. The exceptions are explicitly `false`.
+ *
+ * The `label` and `help` strings below are the Azerbaijani source text. The
+ * renderer overlays translations on top of them through the
+ * `config.fields.<path>.label` / `.help` keys (see `renderer/src/i18n`), so this
+ * file — which the main process also imports — never depends on the UI's
+ * translation layer.
  */
 import type { ConfigField } from './types.js'
 
-const R = true // restart lazımdır
+const R = true // needs a restart
 
 export const CONFIG_FIELDS: ConfigField[] = [
   /* ------------------------------------------------------------ General */
@@ -247,7 +253,7 @@ export const CONFIG_GROUPS = [
 
 export const FIELD_BY_PATH = new Map(CONFIG_FIELDS.map((f) => [f.path, f]))
 
-/** Bu yolların hər hansı biri dəyişibsə stack restart tələb edir. */
+/** If any of these paths changed, the stack needs a restart. */
 export function needsRestart(paths: string[]): boolean {
   return paths.some((p) => FIELD_BY_PATH.get(p)?.restartRequired ?? true)
 }

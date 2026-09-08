@@ -1,6 +1,7 @@
 import type { ReactNode, InputHTMLAttributes, ButtonHTMLAttributes } from 'react'
 import { useEffect, useRef } from 'react'
 import { cx } from '../lib/format'
+import { useT } from '../i18n'
 
 /* ------------------------------------------------------------------ Button */
 
@@ -131,9 +132,9 @@ export function Input({
 }
 
 /**
- * `tone` keçidin **reallığını** ayırır: `accent` = açıq və işləyir,
- * `pending` = konfiqurasiyada açıqdır, amma konteyner qalxmayıb (restart
- * gözləyir). Belədə dayanmış servis yaşıl görünmür.
+ * `tone` separates what the toggle **actually means**: `accent` = on and running,
+ * `pending` = on in the configuration but the container isn't up yet (waiting for
+ * a restart). This way a stopped service never looks green.
  */
 export function Toggle({
   checked,
@@ -221,6 +222,7 @@ export function Modal({
   footer?: ReactNode
   wide?: boolean
 }): ReactNode {
+  const t = useT()
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -248,7 +250,7 @@ export function Modal({
       >
         <header className="flex items-center justify-between border-b border-line-soft px-4 py-3">
           <h2 className="text-[13px] font-medium">{title}</h2>
-          <button onClick={onClose} className="text-muted hover:text-text" aria-label="Bağla">
+          <button onClick={onClose} className="text-muted hover:text-text" aria-label={t('common.close')}>
             ✕
           </button>
         </header>
@@ -305,9 +307,9 @@ export function Row({
 /* ---------------------------------------------------------------- Skeleton */
 
 /**
- * Yüklənmə göstəricisinin əsas kərpici. Spinner əvəzinə gələcək məzmunun
- * *formasını* çəkir — beləcə səhifə tullanmır və gözləmə qısa görünür.
- * `delay` siyahılarda dalğa effekti üçündür (hər sətir bir az gec canlanır).
+ * The basic building block of the loading state. Instead of a spinner it draws
+ * the *shape* of the content to come — so the page doesn't jump and the wait
+ * feels shorter. `delay` gives lists a wave effect (each row wakes slightly later).
  */
 export function Skeleton({
   className,
@@ -317,7 +319,7 @@ export function Skeleton({
   round
 }: {
   className?: string
-  /** eni: rəqəm = px, sətir = CSS dəyəri (məs. '60%'). Verilməyibsə tam en. */
+  /** width: a number = px, a string = a CSS value (e.g. '60%'). Full width when omitted. */
   w?: number | string
   h?: number | string
   delay?: number
@@ -336,7 +338,7 @@ export function Skeleton({
   )
 }
 
-/** Bir neçə sətirlik mətn bloku; sonuncu sətir qısadır ki, abzas kimi görünsün. */
+/** A few lines of text; the last line is short so it reads like a paragraph. */
 export function SkeletonText({
   lines = 3,
   delay = 0,
@@ -346,8 +348,9 @@ export function SkeletonText({
   delay?: number
   className?: string
 }): ReactNode {
+  const t = useT()
   return (
-    <div className={cx('flex flex-col gap-2', className)} role="status" aria-label="yüklənir">
+    <div className={cx('flex flex-col gap-2', className)} role="status" aria-label={t('common.loading')}>
       {Array.from({ length: lines }, (_, i) => (
         <Skeleton
           key={i}
@@ -361,8 +364,8 @@ export function SkeletonText({
 }
 
 /**
- * `divide-y` siyahıların (Card içindəki `<ul>`) yüklənmə əvəzi. `avatar` sola
- * dairəvi nöqtə/toggle yeri qoyur, `trailing` sağdakı badge sütununu.
+ * The loading stand-in for `divide-y` lists (a `<ul>` inside a Card). `avatar`
+ * leaves room for a dot/toggle on the left, `trailing` for the badge column on the right.
  */
 export function SkeletonList({
   rows = 4,
@@ -377,11 +380,12 @@ export function SkeletonList({
   compact?: boolean
   className?: string
 }): ReactNode {
+  const t = useT()
   return (
     <ul
       className={cx('divide-y divide-line-soft', className)}
       role="status"
-      aria-label="yüklənir"
+      aria-label={t('common.loading')}
     >
       {Array.from({ length: rows }, (_, i) => (
         <li
@@ -400,7 +404,7 @@ export function SkeletonList({
   )
 }
 
-/** Sidebar/panel siyahıları üçün — kartsız, sətirlər arasında ayırıcı yoxdur. */
+/** For sidebar/panel lists — no card, no separators between rows. */
 export function SkeletonRows({
   rows = 5,
   className
@@ -408,8 +412,9 @@ export function SkeletonRows({
   rows?: number
   className?: string
 }): ReactNode {
+  const t = useT()
   return (
-    <div className={cx('flex flex-col gap-0.5', className)} role="status" aria-label="yüklənir">
+    <div className={cx('flex flex-col gap-0.5', className)} role="status" aria-label={t('common.loading')}>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-2 rounded-md px-2.5 py-2">
           <Skeleton w={6} h={6} round delay={i * 80} />
@@ -420,7 +425,7 @@ export function SkeletonRows({
   )
 }
 
-/** Cədvəl formalı yüklənmə — sütun sayı və eni gerçək başlıqlara uyğunlaşır. */
+/** Table-shaped loading — the column count and widths follow the real headers. */
 export function SkeletonTable({
   rows = 6,
   cols = 4,
@@ -432,8 +437,9 @@ export function SkeletonTable({
   widths?: Array<number | string>
   className?: string
 }): ReactNode {
+  const t = useT()
   return (
-    <div className={cx('flex flex-col', className)} role="status" aria-label="yüklənir">
+    <div className={cx('flex flex-col', className)} role="status" aria-label={t('common.loading')}>
       {Array.from({ length: rows }, (_, r) => (
         <div
           key={r}

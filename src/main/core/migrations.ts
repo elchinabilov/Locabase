@@ -1,9 +1,9 @@
 /**
- * Miqrasiya hesabatı: **fayllar · lokal ledger · remote ledger** yan-yana.
+ * The migration report: **files · local ledger · remote ledger**, side by side.
  *
- * Drift bu layihələrin ən bahalı problemi olub (bax `alocar/supabase/
- * MIGRATION_HISTORY.md`), ona görə üç mənbə də ayrıca oxunur və heç biri
- * digərindən nəticə çıxarmır.
+ * Drift has historically been the most expensive problem in these projects, so
+ * all three sources are read separately and none of them is inferred from
+ * another.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -62,7 +62,7 @@ export async function report(id: string, envId: string | null): Promise<Migratio
       const rows = await adapter.listAppliedMigrations()
       remoteVersions = new Set(rows.map((r) => r.version))
     } catch (err) {
-      error = `Remote ledger oxunmadı: ${(err as Error).message}`
+      error = `Could not read the remote ledger: ${(err as Error).message}`
     }
   }
 
@@ -121,7 +121,7 @@ const NAME_RE = /^[a-z0-9_]+$/
 
 export async function create(id: string, name: string): Promise<{ file: string }> {
   if (!NAME_RE.test(name)) {
-    throw new Error('Ad yalnız kiçik hərf, rəqəm və alt xəttdən ibarət ola bilər.')
+    throw new Error('The name may only contain lowercase letters, digits and underscores.')
   }
   const project = getProject(id)
   const before = new Set(listFiles(project.path).map((f) => f.file))
@@ -131,14 +131,14 @@ export async function create(id: string, name: string): Promise<{ file: string }
   })
   if (!res.ok) throw new Error(res.error ?? res.output)
   const created = listFiles(project.path).find((f) => !before.has(f.file))
-  if (!created) throw new Error('Yeni miqrasiya faylı tapılmadı')
+  if (!created) throw new Error('The new migration file was not found')
   return { file: created.file }
 }
 
 /**
- * SQL redaktorundakı mətni yeni timestamped miqrasiya faylına yazır.
- * `create()` CLI ilə boş fayl yaradır — ad yoxlaması və «yeni yaranan faylı
- * tap» məntiqi olduğu kimi təkrar istifadə olunur.
+ * Writes the text from the SQL editor into a new timestamped migration file.
+ * `create()` makes an empty file through the CLI — the name validation and the
+ * "find the newly created file" logic are reused as they are.
  */
 export async function createWithBody(
   id: string,

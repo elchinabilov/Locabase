@@ -1,13 +1,14 @@
 /**
- * Cədvəl redaktoru — sxem/cədvəl siyahısı, sətirlərə baxış və sətir CRUD-u.
+ * The table editor — schema/table list, row browsing and row CRUD.
  *
- * DDL burada QƏSDƏN yoxdur: cədvəl/sütun dəyişikliyi miqrasiya faylı ilə
- * getməlidir, əks halda ledger ilə baza arasında drift yaranır.
+ * DDL is DELIBERATELY absent: a table/column change has to go through a migration
+ * file, otherwise the ledger and the database drift apart.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { DbCells, DbColumn, DbFilter, DbOp, DbRow, DbTable, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
+import { useI18n, useT, type TranslationKey } from '../i18n'
 import {
   Badge,
   Button,
@@ -26,29 +27,43 @@ import { EnvPicker, RemoteNote, envOf, useDbGate } from '../components/env-picke
 
 const PAGE_SIZES = [25, 50, 100, 500]
 
-const OP_LABELS: Array<{ value: DbOp; label: string }> = [
-  { value: 'eq', label: '=' },
-  { value: 'neq', label: '≠' },
-  { value: 'gt', label: '>' },
-  { value: 'gte', label: '≥' },
-  { value: 'lt', label: '<' },
-  { value: 'lte', label: '≤' },
-  { value: 'like', label: 'like' },
-  { value: 'ilike', label: 'ilike' },
-  { value: 'isnull', label: 'boşdur' },
-  { value: 'notnull', label: 'boş deyil' }
-]
+const OP_SYMBOLS: Record<DbOp, string> = {
+  eq: '=',
+  neq: '≠',
+  gt: '>',
+  gte: '≥',
+  lt: '<',
+  lte: '≤',
+  like: 'like',
+  ilike: 'ilike',
+  isnull: '',
+  notnull: ''
+}
 
-const KIND_LABEL: Record<string, string> = {
-  r: 'cədvəl',
-  p: 'partisiyalı',
-  v: 'görünüş',
-  m: 'materializə',
-  f: 'xarici'
+const OP_LABEL_KEY: Record<DbOp, TranslationKey | null> = {
+  eq: null,
+  neq: null,
+  gt: null,
+  gte: null,
+  lt: null,
+  lte: null,
+  like: null,
+  ilike: null,
+  isnull: 'tables.op.isnull',
+  notnull: 'tables.op.notnull'
+}
+
+const KIND_LABEL_KEY: Record<string, TranslationKey> = {
+  r: 'tables.kind.table',
+  p: 'tables.kind.partitioned',
+  v: 'tables.kind.view',
+  m: 'tables.kind.materialized',
+  f: 'tables.kind.foreign'
 }
 
 export function TablesRoute({ project }: { project: Project }): ReactNode {
-  // Default lokal — uzaq mühit yalnız açıq seçimlə
+  const t = useT()
+  // Local by default — a remote environment only on an explicit choice
   const [envId, setEnvId] = useState<string | null>(null)
   const { ready, blocked } = useDbGate(project.id, envId)
   const env = envOf(project, envId)
@@ -77,7 +92,7 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
     return q ? all.filter((t) => t.name.toLowerCase().includes(q)) : all
   }, [tables.data, filter])
 
-  // Sxem və ya mühit dəyişəndə seçim sıfırlanır
+  // The selection resets when the schema or the environment changes
   useEffect(() => setTable(null), [schema, envId])
 
   const active = useMemo(
@@ -101,14 +116,14 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
             onChange={setSchema}
             options={(schemas.data ?? []).map((s) => ({
               value: s.name,
-              label: s.system ? `${s.name} · sistem` : s.name
+              label: s.system ? t('tables.systemSchemaLabel', { name: s.name }) : s.name
             }))}
           />
           <div className="mt-2">
             <Input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="cədvəl axtar…"
+              placeholder={t('tables.searchTables')}
             />
           </div>
         </div>
@@ -117,20 +132,20 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
           {tables.loading && <SkeletonRows rows={7} />}
           {tables.error && <ErrorNote>{tables.error}</ErrorNote>}
           {!tables.loading && list.length === 0 && (
-            <p className="px-2 py-3 text-[11.5px] text-muted">Bu sxemdə cədvəl yoxdur.</p>
+            <p className="px-2 py-3 text-[11.5px] text-muted">{t('tables.noTablesInSchema')}</p>
           )}
-          {list.map((t) => (
+          {list.map((tb) => (
             <TableItem
-              key={t.name}
-              table={t}
-              active={t.name === table}
-              onClick={() => setTable(t.name)}
+              key={tb.name}
+              table={tb}
+              active={tb.name === table}
+              onClick={() => setTable(tb.name)}
             />
           ))}
         </div>
 
         <div className="flex items-center justify-between border-t border-line-soft px-3 py-2">
-          <span className="text-[11px] text-muted">sistem sxemləri</span>
+          <span className="text-[11px] text-muted">{t('tables.systemSchemas')}</span>
           <Toggle checked={includeSystem} onChange={setIncludeSystem} />
         </div>
       </aside>
@@ -139,7 +154,7 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
         {env && <RemoteNote env={env} />}
         {blocked}
         {ready && !active && (
-          <Empty title="Cədvəl seç" hint="Sol tərəfdən bir cədvəl və ya görünüş seç." />
+          <Empty title={t('tables.selectTable')} hint={t('tables.selectTableHint')} />
         )}
         {ready && active && (
           <>
@@ -148,21 +163,21 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
                 <span className="text-muted">{schema}.</span>
                 {active.name}
               </h1>
-              <Badge tone="muted">{KIND_LABEL[active.kind] ?? active.kind}</Badge>
+              <Badge tone="muted">{t(KIND_LABEL_KEY[active.kind] ?? 'tables.kind.table')}</Badge>
               {active.rls && <Badge tone="info">RLS</Badge>}
               {!active.editable && <Badge tone="warn">{active.editableReason}</Badge>}
               <div className="flex-1" />
               <div className="flex rounded-md border border-line p-0.5">
-                {(['rows', 'structure'] as const).map((t) => (
+                {(['rows', 'structure'] as const).map((tabId) => (
                   <button
-                    key={t}
-                    onClick={() => setTab(t)}
+                    key={tabId}
+                    onClick={() => setTab(tabId)}
                     className={cx(
                       'rounded px-2.5 py-1 text-[12px]',
-                      tab === t ? 'bg-panel-2 text-text' : 'text-muted hover:text-text'
+                      tab === tabId ? 'bg-panel-2 text-text' : 'text-muted hover:text-text'
                     )}
                   >
-                    {t === 'rows' ? 'Sətirlər' : 'Struktur'}
+                    {tabId === 'rows' ? t('tables.tabRows') : t('tables.tabStructure')}
                   </button>
                 ))}
               </div>
@@ -194,6 +209,7 @@ function TableItem({
   active: boolean
   onClick: () => void
 }): ReactNode {
+  const { locale } = useI18n()
   return (
     <button
       onClick={onClick}
@@ -205,13 +221,13 @@ function TableItem({
       <Dot tone={table.editable ? 'ok' : 'muted'} />
       <span className="min-w-0 flex-1 truncate text-[12.5px] text-text">{table.name}</span>
       <span className="shrink-0 text-[10.5px] text-muted">
-        {table.estimate < 0 ? '—' : `~${formatCount(table.estimate)}`}
+        {table.estimate < 0 ? '—' : `~${formatCount(table.estimate, locale)}`}
       </span>
     </button>
   )
 }
 
-/* ------------------------------------------------------------------ sətirlər */
+/* ---------------------------------------------------------------------- rows */
 
 function RowsPane({
   project,
@@ -222,6 +238,7 @@ function RowsPane({
   envId: string | null
   table: DbTable
 }): ReactNode {
+  const t = useT()
   const [pageSize, setPageSize] = useState(50)
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState<GridSort | null>(null)
@@ -247,7 +264,7 @@ function RowsPane({
     [project.id, envId, table.schema, table.name, pageSize, page, sort, filters]
   )
 
-  // Filtr/sıralama dəyişəndə birinci səhifəyə qayıt
+  // Go back to the first page when the filter/sort changes
   useEffect(() => {
     setPage(0)
     setSelected(new Set())
@@ -283,12 +300,12 @@ function RowsPane({
       <div className="flex flex-wrap items-center gap-2 border-b border-line-soft px-3 py-2">
         {editable && (
           <Button variant="primary" onClick={() => setAdding(true)}>
-            + sətir
+            {t('tables.addRow')}
           </Button>
         )}
         {editable && selected.size > 0 && (
           <Button variant="danger" onClick={() => setDeleting(true)}>
-            {selected.size} sətri sil
+            {t('tables.deleteRows', { count: selected.size })}
           </Button>
         )}
         <FilterBar columns={cols} filters={filters} onChange={setFilters} />
@@ -297,7 +314,7 @@ function RowsPane({
           <Select
             value={String(pageSize)}
             onChange={(v) => setPageSize(Number(v))}
-            options={PAGE_SIZES.map((n) => ({ value: String(n), label: `${n} sətir` }))}
+            options={PAGE_SIZES.map((n) => ({ value: String(n), label: t('sql.rowCount', { count: n }) }))}
           />
         </div>
         <Pager page={page} pageSize={pageSize} count={data.length} total={total} onPage={setPage} />
@@ -318,7 +335,7 @@ function RowsPane({
       )}
       {!editable && rows.data && (
         <p className="border-b border-line-soft bg-[#1c1708] px-3 py-1.5 text-[11.5px] text-warn">
-          {rows.data.editableReason} — sətirlər redaktə olunmur.
+          {t('tables.notEditable', { reason: rows.data.editableReason ?? '' })}
         </p>
       )}
 
@@ -338,7 +355,7 @@ function RowsPane({
                     onClick={() => setEditing(i)}
                     className="text-[11px] text-muted hover:text-accent"
                   >
-                    redaktə
+                    {t('tables.edit')}
                   </button>
                 )
               : undefined
@@ -348,7 +365,7 @@ function RowsPane({
 
       {adding && (
         <RowModal
-          title={`Yeni sətir — ${table.schema}.${table.name}`}
+          title={t('tables.newRowTitle', { schema: table.schema, table: table.name })}
           columns={cols}
           row={null}
           onClose={() => setAdding(false)}
@@ -369,7 +386,7 @@ function RowsPane({
 
       {editing !== null && data[editing] && (
         <RowModal
-          title={`Sətri redaktə et — ${table.schema}.${table.name}`}
+          title={t('tables.editRowTitle', { schema: table.schema, table: table.name })}
           columns={cols}
           row={data[editing] ?? null}
           onClose={() => setEditing(null)}
@@ -436,6 +453,7 @@ function Pager({
   total: number | null
   onPage: (p: number) => void
 }): ReactNode {
+  const { locale } = useI18n()
   const from = count === 0 ? 0 : page * pageSize + 1
   const to = page * pageSize + count
   const last = total !== null && to >= total
@@ -446,7 +464,7 @@ function Pager({
       </Button>
       <span className="tabular-nums">
         {from}–{to}
-        {total !== null && ` / ${formatCount(total)}`}
+        {total !== null && ` / ${formatCount(total, locale)}`}
       </span>
       <Button disabled={count < pageSize || last} onClick={() => onPage(page + 1)}>
         ›
@@ -464,9 +482,14 @@ function FilterBar({
   filters: DbFilter[]
   onChange: (f: DbFilter[]) => void
 }): ReactNode {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<DbFilter>({ column: '', op: 'eq', value: '' })
   const needsValue = draft.op !== 'isnull' && draft.op !== 'notnull'
+  const opLabel = (op: DbOp): string => {
+    const key = OP_LABEL_KEY[op]
+    return key ? t(key) : OP_SYMBOLS[op]
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -474,23 +497,23 @@ function FilterBar({
         <button
           key={`${f.column}-${f.op}-${i}`}
           onClick={() => onChange(filters.filter((_, j) => j !== i))}
-          title="Filtri sil"
+          title={t('tables.removeFilter')}
           className="rounded border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[10.5px] text-muted hover:text-danger"
         >
-          {f.column} {OP_LABELS.find((o) => o.value === f.op)?.label} {f.value ?? ''} ✕
+          {f.column} {opLabel(f.op)} {f.value ?? ''} ✕
         </button>
       ))}
       <Button onClick={() => setOpen(true)} disabled={columns.length === 0}>
-        + filtr
+        {t('tables.addFilter')}
       </Button>
 
       {open && (
         <Modal
-          title="Filtr əlavə et"
+          title={t('tables.addFilterTitle')}
           onClose={() => setOpen(false)}
           footer={
             <>
-              <Button onClick={() => setOpen(false)}>Ləğv et</Button>
+              <Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
               <Button
                 variant="primary"
                 disabled={!draft.column}
@@ -500,7 +523,7 @@ function FilterBar({
                   setOpen(false)
                 }}
               >
-                Əlavə et
+                {t('common.add')}
               </Button>
             </>
           }
@@ -510,20 +533,20 @@ function FilterBar({
               value={draft.column}
               onChange={(v) => setDraft((d) => ({ ...d, column: v }))}
               options={[
-                { value: '', label: 'sütun seç…' },
+                { value: '', label: t('tables.selectColumn') },
                 ...columns.map((c) => ({ value: c.name, label: `${c.name} · ${c.dataType}` }))
               ]}
             />
             <Select
               value={draft.op}
               onChange={(v) => setDraft((d) => ({ ...d, op: v as DbOp }))}
-              options={OP_LABELS.map((o) => ({ value: o.value, label: o.label }))}
+              options={(Object.keys(OP_SYMBOLS) as DbOp[]).map((op) => ({ value: op, label: opLabel(op) }))}
             />
             <Input
               value={draft.value ?? ''}
               disabled={!needsValue}
               onChange={(e) => setDraft((d) => ({ ...d, value: e.target.value }))}
-              placeholder={needsValue ? 'dəyər' : 'dəyər tələb olunmur'}
+              placeholder={needsValue ? t('tables.value') : t('tables.valueNotNeeded')}
               className="font-mono"
             />
           </div>
@@ -546,6 +569,7 @@ function StructurePane({
   table: DbTable
   onNavigate: (schema: string, table: string) => void
 }): ReactNode {
+  const t = useT()
   const cols = useQuery(
     'db:columns',
     { id: project.id, envId, schema: table.schema, table: table.name },
@@ -559,10 +583,10 @@ function StructurePane({
         <table className="w-full text-[12px]">
           <thead>
             <tr className="border-b border-line text-[10.5px] tracking-wide text-muted uppercase">
-              <th className="px-2 py-1.5 text-left font-medium">Sütun</th>
-              <th className="px-2 py-1.5 text-left font-medium">Tip</th>
-              <th className="px-2 py-1.5 text-left font-medium">Default</th>
-              <th className="px-2 py-1.5 text-right font-medium">Xüsusiyyət</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t('tables.col.column')}</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t('tables.col.type')}</th>
+              <th className="px-2 py-1.5 text-left font-medium">{t('tables.col.default')}</th>
+              <th className="px-2 py-1.5 text-right font-medium">{t('tables.col.attributes')}</th>
             </tr>
           </thead>
           <tbody>
@@ -600,10 +624,7 @@ function StructurePane({
             ))}
           </tbody>
         </table>
-        <p className="mt-4 text-[11.5px] leading-relaxed text-muted">
-          DDL burada yoxdur — cədvəl və sütun dəyişikliyi miqrasiya faylı ilə getməlidir, əks halda
-          ledger ilə baza arasında drift yaranır.
-        </p>
+        <p className="mt-4 text-[11.5px] leading-relaxed text-muted">{t('tables.ddlHint')}</p>
       </div>
     </div>
   )
@@ -626,11 +647,12 @@ function RowModal({
 }: {
   title: string
   columns: DbColumn[]
-  /** null = yeni sətir */
+  /** null = a new row */
   row: DbRow | null
   onClose: () => void
   onSubmit: (values: DbCells) => Promise<void>
 }): ReactNode {
+  const t = useT()
   const editable = useMemo(() => columns.filter((c) => !c.isGenerated), [columns])
   const [fields, setFields] = useState<Record<string, Field>>(() => initFields(columns, row))
   const [busy, setBusy] = useState(false)
@@ -646,7 +668,7 @@ function RowModal({
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Ləğv et</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
             loading={busy}
@@ -658,7 +680,7 @@ function RowModal({
                 .finally(() => setBusy(false))
             }}
           >
-            Yadda saxla
+            {t('common.save')}
           </Button>
         </>
       }
@@ -723,7 +745,7 @@ function RowModal({
                         }
                         className="accent-[#3ecf8e]"
                       />
-                      default {c.defaultExpr ? `(${c.defaultExpr})` : ''}
+                      {t('tables.default')} {c.defaultExpr ? `(${c.defaultExpr})` : ''}
                     </label>
                   )}
                 </div>
@@ -747,14 +769,15 @@ function DeleteModal({
   onClose: () => void
   onConfirm: () => Promise<void>
 }): ReactNode {
+  const t = useT()
   const [busy, setBusy] = useState(false)
   return (
     <Modal
-      title={`${rows.length} sətir silinsin?`}
+      title={t('tables.deleteConfirmTitle', { count: rows.length })}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Ləğv et</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="danger"
             loading={busy}
@@ -763,12 +786,12 @@ function DeleteModal({
               void onConfirm().finally(() => setBusy(false))
             }}
           >
-            Sil
+            {t('common.delete')}
           </Button>
         </>
       }
     >
-      <p className="mb-3 text-[12.5px] text-muted">Bu əməliyyat geri qaytarılmır.</p>
+      <p className="mb-3 text-[12.5px] text-muted">{t('tables.irreversible')}</p>
       <ul className="max-h-64 overflow-auto rounded-md border border-line bg-[#0d141b] p-2 font-mono text-[11.5px]">
         {rows.map((r, i) => (
           <li key={i} className="truncate py-0.5 text-muted">
@@ -780,7 +803,7 @@ function DeleteModal({
   )
 }
 
-/* ------------------------------------------------------------------ köməkçilər */
+/* ------------------------------------------------------------------- helpers */
 
 function initFields(columns: DbColumn[], row: DbRow | null): Record<string, Field> {
   const out: Record<string, Field> = {}
@@ -799,7 +822,7 @@ function initFields(columns: DbColumn[], row: DbRow | null): Record<string, Fiel
   return out
 }
 
-/** «default» rejimi açarı ÜMUMİYYƏTLƏ buraxmır — Postgres öz defaultunu qoyur. */
+/** The "default" mode omits the key ENTIRELY — Postgres applies its own default. */
 function collect(columns: DbColumn[], fields: Record<string, Field>): DbCells {
   const out: DbCells = {}
   for (const c of columns) {
@@ -834,6 +857,6 @@ function shortType(c: DbColumn): string {
   return `${pk}${c.dataType}`
 }
 
-function formatCount(n: number): string {
-  return n.toLocaleString('az-AZ')
+function formatCount(n: number, locale: 'az' | 'en'): string {
+  return n.toLocaleString(locale === 'az' ? 'az-AZ' : 'en-US')
 }

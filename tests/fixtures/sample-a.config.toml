@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "alocar"
+project_id = "sample-a"
 
 [api]
 enabled = true
@@ -325,7 +325,7 @@ max_frequency = "5s"
 # and for a native sign-in that audience is the bundle id.
 [auth.external.apple]
 enabled = true
-client_id = "com.elchinabilov.alocar"
+client_id = "com.example.samplea"
 # DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
 # (the ES256 client-secret JWT; it lives in the gitignored `.env` at the repo root)
 secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"

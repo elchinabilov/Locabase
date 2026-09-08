@@ -3,13 +3,13 @@ import type { IpcChannel, IpcContract, IpcEventName, IpcEvents } from '@shared/i
 
 export class IpcError extends Error {}
 
-/** Tipli çağırış. Main tərəfdəki istisna burada `IpcError` kimi qalxır. */
+/** A typed call. An exception on the main side surfaces here as `IpcError`. */
 export async function call<C extends IpcChannel>(
   channel: C,
   req?: IpcContract[C]['req']
 ): Promise<IpcContract[C]['res']> {
   const res = await window.api.invoke<IpcContract[C]['res']>(channel, req)
-  if (!res.ok) throw new IpcError(res.error ?? 'Naməlum xəta')
+  if (!res.ok) throw new IpcError(res.error ?? 'Unknown error')
   return res.data as IpcContract[C]['res']
 }
 
@@ -21,9 +21,9 @@ export interface QueryState<T> {
 }
 
 /**
- * Sadə sorğu hook-u: mount-da və `deps` dəyişəndə çağırır, `refresh()` ilə
- * yenidən yükləyir. TanStack Query-nin bütün gücü bu tətbiqə lazım deyil —
- * ekranların hamısı bir neçə sorğu ilə işləyir.
+ * A simple query hook: it calls on mount and whenever `deps` change, and reloads
+ * through `refresh()`. This app doesn't need all of TanStack Query — every screen
+ * works with a handful of queries.
  */
 export function useQuery<C extends IpcChannel>(
   channel: C,

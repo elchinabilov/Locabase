@@ -1,15 +1,15 @@
 /**
- * Postgres identifikatorları. Bütün sxem/cədvəl/sütun adları SQL mətninə
- * YALNIZ buradan keçir.
+ * Postgres identifiers. Every schema/table/column name that reaches SQL text
+ * goes through here and ONLY here.
  *
- * QAYDA: SQL mətninə yalnız introspeksiyadan gələn və sütun siyahısına qarşı
- * yoxlanmış adlar yapışdırılır. İSTİFADƏÇİ DƏYƏRLƏRİ HEÇ VAXT — onlar həmişə
+ * THE RULE: only names that came from introspection and were checked against the
+ * column list are pasted into SQL text. NEVER USER VALUES — those always travel
  * `$n` parametridir (bax: `build.ts`).
  */
 
 export function quoteIdent(name: string): string {
-  if (name.length === 0) throw new Error('Boş identifikator')
-  if (name.includes('\0')) throw new Error('Identifikatorda NUL baytı ola bilməz')
+  if (name.length === 0) throw new Error('Empty identifier')
+  if (name.includes('\0')) throw new Error('An identifier cannot contain a NUL byte')
   return `"${name.replaceAll('"', '""')}"`
 }
 
@@ -19,27 +19,27 @@ export function qualify(schema: string, table: string): string {
 }
 
 /**
- * SQL sətir literalı. Yalnız REMOTE nəqliyyat üçün: nə Management API-nin
- * `database/query` endpoint-i, nə də `psql` stdin `$n` parametri bağlaya bilmir
- * — ona görə orada dəyər SQL mətninə yapışdırılmalı olur.
+ * A SQL string literal. For the REMOTE transports only: neither the Management
+ * API's `database/query` endpoint nor `psql` over stdin can bind `$n` parameters
+ * — so there the value has to be pasted into the SQL text.
  *
- * Lokal yolda BU İSTİFADƏ EDİLMİR: orada həmişə `$n` parametri gedir.
+ * NOT USED on the local path: there a `$n` parameter is always sent instead.
  *
- * `standard_conforming_strings` (PG 9.1-dən default `on`) fərz olunur — tək
- * dırnaq ikiləndirilir, tərs xətt adi simvoldur.
+ * `standard_conforming_strings` (on by default since PG 9.1) is assumed — a
+ * single quote is doubled and a backslash is an ordinary character.
  */
 export function quoteLiteral(value: string | null): string {
   if (value === null) return 'null'
-  if (value.includes('\0')) throw new Error('Dəyərdə NUL baytı ola bilməz')
+  if (value.includes('\0')) throw new Error('A value cannot contain a NUL byte')
   return `'${value.replaceAll("'", "''")}'`
 }
 
 /**
- * `$1`, `$2`… yerinə literal qoy.
+ * Substitute literals for `$1`, `$2`, …
  *
- * Yalnız BİZİM qurduğumuz mətnlərə tətbiq olunur (`build.ts` fraqmentləri və
- * introspeksiya sorğuları) — istifadəçinin yazdığı SQL heç vaxt buradan
- * keçmir, ona görə mətn içindəki `$1`-in təsadüfən əvəzlənməsi mümkün deyil.
+ * Applied ONLY to text we build ourselves (`build.ts` fragments and introspection
+ * queries) — SQL written by the user never passes through here, so a `$1` inside
+ * a string can never be replaced by accident.
  */
 export function inlineParams(text: string, params: Array<string | null>): string {
   return text.replace(/\$(\d+)/g, (_m, n: string) => {

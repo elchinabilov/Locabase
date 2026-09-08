@@ -2,10 +2,11 @@ import { useState, type ReactNode } from 'react'
 import type { ConfigField, ConfigValue, FieldValue } from '@shared/types'
 import { Input, Select, Toggle } from './ui'
 import { cx } from '../lib/format'
+import { useT } from '../i18n'
 
 export type PatchInput = ConfigValue | { env: string } | undefined
 
-/** Sahənin hazırkı redaktə dəyəri: ya literal, ya `env(VAR)`. */
+/** The field's current editing value: either a literal or `env(VAR)`. */
 export interface Draft {
   kind: 'literal' | 'env'
   value: ConfigValue
@@ -57,6 +58,7 @@ export function FieldEditor({
   original: FieldValue | undefined
   onChange: (d: Draft) => void
 }): ReactNode {
+  const t = useT()
   const [revealed, setRevealed] = useState(false)
   const dirty = !sameDraft(draft, draftFrom(original, field))
   const absent = original?.present !== true
@@ -70,7 +72,7 @@ export function FieldEditor({
             value={String(draft.value)}
             onChange={(e) => onChange({ kind: 'env', value: e.target.value })}
             className="font-mono"
-            placeholder="DƏYİŞƏN_ADI"
+            placeholder={t('fieldEditor.varNamePlaceholder')}
           />
           <span className="font-mono text-[11.5px] text-muted">)</span>
         </div>
@@ -97,7 +99,10 @@ export function FieldEditor({
         return (
           <Select
             value={String(draft.value)}
-            options={(field.options ?? []).map((o) => ({ value: o, label: o === '' ? '(yoxdur)' : o }))}
+            options={(field.options ?? []).map((o) => ({
+              value: o,
+              label: o === '' ? t('fieldEditor.none') : o
+            }))}
             onChange={(v) => onChange({ kind: 'literal', value: v })}
             className="max-w-[320px]"
           />
@@ -115,7 +120,7 @@ export function FieldEditor({
                   .filter(Boolean)
               })
             }
-            placeholder="vergüllə ayır"
+            placeholder={t('fieldEditor.commaSeparated')}
             className="font-mono"
           />
         )
@@ -141,10 +146,12 @@ export function FieldEditor({
       <div className="pt-1">
         <div className="flex items-center gap-1.5">
           <span className="text-[12.5px] text-text">{field.label}</span>
-          {dirty && <span className="size-1.5 rounded-full bg-accent" title="dəyişib" />}
+          {dirty && (
+            <span className="size-1.5 rounded-full bg-accent" title={t('fieldEditor.changed')} />
+          )}
           {absent && !dirty && (
-            <span className="text-[10px] text-[#54677a]" title="faylda yoxdur — default işləyir">
-              default
+            <span className="text-[10px] text-[#54677a]" title={t('fieldEditor.defaultTitle')}>
+              {t('fieldEditor.default')}
             </span>
           )}
         </div>
@@ -160,7 +167,7 @@ export function FieldEditor({
               onClick={() => setRevealed((v) => !v)}
               className="mt-1.5 text-[10.5px] text-muted hover:text-text"
             >
-              {revealed ? 'gizlət' : 'göstər'}
+              {revealed ? t('fieldEditor.hide') : t('fieldEditor.reveal')}
             </button>
           )}
           {field.envAllowed && (
@@ -178,7 +185,7 @@ export function FieldEditor({
                   ? 'border-accent-dim bg-[#0f2a20] text-accent'
                   : 'border-line text-muted hover:text-text'
               )}
-              title=".env faylındakı dəyişənə bağla"
+              title={t('fieldEditor.bindEnvTitle')}
             >
               env()
             </button>
@@ -186,9 +193,9 @@ export function FieldEditor({
         </div>
         {draft.kind === 'env' && original?.kind === 'env' && (
           <p className="mt-1 font-mono text-[10.5px] text-muted">
-            hazırkı dəyər:{' '}
+            {t('fieldEditor.currentValue')}{' '}
             {original.envValue === null ? (
-              <span className="text-warn">.env-də yoxdur</span>
+              <span className="text-warn">{t('fieldEditor.missingInEnv')}</span>
             ) : (
               original.envValue
             )}

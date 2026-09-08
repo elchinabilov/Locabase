@@ -1,19 +1,19 @@
 /**
- * macOS-da Finder/.dmg vasitəsilə açılan tətbiq login shell-in PATH-ini **miras
- * almır** — GUI prosesi yalnız `/usr/bin:/bin:/usr/sbin:/sbin` görür. Nəticədə
- * Homebrew-la quraşdırılmış `supabase` (`/opt/homebrew/bin`) tapılmır, halbuki
- * terminalda hər şey işləyir.
+ * On macOS an app launched from Finder or a .dmg does **not** inherit the login
+ * shell's PATH — the GUI process only sees `/usr/bin:/bin:/usr/sbin:/sbin`. As a
+ * result a Homebrew-installed `supabase` (`/opt/homebrew/bin`) is not found, even
+ * though everything works in a terminal.
  *
- * Burada bir dəfə login shell-dən real PATH soruşulur, üstünə məlum qovluqlar
- * əlavə olunur və `process.env.PATH` düzəldilir. Nəticə keşlənir — hər əmr üçün
- * shell açmırıq.
+ * Here the real PATH is asked from the login shell once, the well-known folders
+ * are appended, and `process.env.PATH` is fixed up. The result is cached — we
+ * don't open a shell for every command.
  */
 import { spawnSync } from 'node:child_process'
 import { accessSync, constants, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, isAbsolute, join } from 'node:path'
 
-/** Paket menecerlərinin adətən istifadə etdiyi qovluqlar. */
+/** Folders package managers usually install into. */
 function commonDirs(): string[] {
   const home = homedir()
   return [
@@ -30,7 +30,7 @@ function commonDirs(): string[] {
     join(home, '.npm-global', 'bin'),
     join(home, '.bun', 'bin'),
     join(home, 'go', 'bin'),
-    // Docker Desktop öz CLI-lərini bura qoyur
+    // Docker Desktop puts its own CLIs here
     join(home, '.docker', 'bin'),
     '/Applications/Docker.app/Contents/Resources/bin'
   ]
@@ -40,8 +40,8 @@ const MARK_START = '__LB_PATH_START__'
 const MARK_END = '__LB_PATH_END__'
 
 /**
- * Login + interactive shell işə salıb onun PATH-ini oxuyur. `.zshrc`/`.profile`
- * içindəki `export PATH=...` sətirləri məhz belə görünür.
+ * Runs a login + interactive shell and reads its PATH. `export PATH=...` lines
+ * inside `.zshrc`/`.profile` are exactly what this picks up.
  */
 function loginShellPath(): string[] {
   if (process.platform === 'win32') return []
@@ -53,7 +53,7 @@ function loginShellPath(): string[] {
       {
         encoding: 'utf8',
         timeout: 5000,
-        // interaktiv shell-lərin başlanğıc səs-küyünü azaldır
+        // quietens the startup noise of interactive shells
         env: { ...process.env, DISABLE_AUTO_UPDATE: 'true', TERM: 'dumb' }
       }
     )
@@ -68,7 +68,7 @@ function loginShellPath(): string[] {
 
 let cached: string | null = null
 
-/** Mövcud PATH + login shell PATH + məlum qovluqlar (təkrarsız, sıra qorunur). */
+/** Current PATH + login shell PATH + known folders (deduped, order preserved). */
 export function resolvedPath(): string {
   if (cached !== null) return cached
   const current = (process.env['PATH'] ?? '').split(delimiter).filter(Boolean)
@@ -83,14 +83,14 @@ export function resolvedPath(): string {
   return cached
 }
 
-/** `process.env.PATH`-i düzəldir; tətbiq açılışında bir dəfə çağırılır. */
+/** Fixes up `process.env.PATH`; called once at app startup. */
 export function fixPath(): string {
   const p = resolvedPath()
   process.env['PATH'] = p
   return p
 }
 
-/** Əmrin tam yolunu tapır — tapılmasa `null`. */
+/** Resolves a command's full path — `null` if not found. */
 export function whichBin(cmd: string): string | null {
   if (isAbsolute(cmd) || cmd.includes('/')) return existsSync(cmd) ? cmd : null
   for (const dir of resolvedPath().split(delimiter)) {
@@ -99,13 +99,13 @@ export function whichBin(cmd: string): string | null {
       accessSync(full, constants.X_OK)
       return full
     } catch {
-      // növbəti qovluq
+      // next folder
     }
   }
   return null
 }
 
-/** Diaqnostika üçün: harada axtardıq. */
+/** For diagnostics: where we looked. */
 export function searchedDirs(): string[] {
   return resolvedPath().split(delimiter)
 }

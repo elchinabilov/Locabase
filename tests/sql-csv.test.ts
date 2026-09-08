@@ -2,32 +2,32 @@ import { describe, expect, it } from 'vitest'
 import { parseCsv, parsePsqlCsv, parsePsqlError } from '../src/main/core/sql/csv.js'
 
 describe('parseCsv', () => {
-  it('sadə cədvəl', () => {
+  it('a simple table', () => {
     expect(parseCsv('a,b\n1,2\n')).toEqual([
       ['a', 'b'],
       ['1', '2']
     ])
   })
 
-  it('dırnaqlı sahədə vergül və sətir keçidi', () => {
-    expect(parseCsv('a,b\n"x,y","iki\nsətir"\n')).toEqual([
+  it('a comma and a line break inside a quoted field', () => {
+    expect(parseCsv('a,b\n"x,y","two\nlines"\n')).toEqual([
       ['a', 'b'],
-      ['x,y', 'iki\nsətir']
+      ['x,y', 'two\nlines']
     ])
   })
 
-  it('ikiləndirilmiş dırnaq', () => {
-    expect(parseCsv('a\n"de""mə"\n')).toEqual([['a'], ['de"mə']])
+  it('a doubled quote', () => {
+    expect(parseCsv('a\n"do""nt"\n')).toEqual([['a'], ['do"nt']])
   })
 
-  it('boş sahələr qorunur', () => {
+  it('empty fields are preserved', () => {
     expect(parseCsv('a,b,c\n,,\n')).toEqual([
       ['a', 'b', 'c'],
       ['', '', '']
     ])
   })
 
-  it('sonda sətir keçidi olmadan', () => {
+  it('without a trailing newline', () => {
     expect(parseCsv('a\n1')).toEqual([['a'], ['1']])
   })
 
@@ -38,11 +38,11 @@ describe('parseCsv', () => {
     ])
   })
 
-  it('boş çıxış boş massiv verir', () => {
+  it('empty output gives an empty array', () => {
     expect(parseCsv('')).toEqual([])
   })
 
-  it('JSON blobu bütöv qalır', () => {
+  it('a JSON blob stays intact', () => {
     const json = '{"a": 1, "b": "x,y"}'
     const csv = `data\n"${json.replaceAll('"', '""')}"\n`
     expect(parseCsv(csv)[1]?.[0]).toBe(json)
@@ -52,7 +52,7 @@ describe('parseCsv', () => {
 describe('parsePsqlCsv', () => {
   const TOKEN = 'lb-null-7f3a'
 
-  it('NULL ilə boş sətri ayırır', () => {
+  it('tells NULL apart from an empty string', () => {
     const out = `a,b\n${TOKEN},\n`
     expect(parsePsqlCsv(out, TOKEN)).toEqual({
       columns: ['a', 'b'],
@@ -60,30 +60,30 @@ describe('parsePsqlCsv', () => {
     })
   })
 
-  it('nəticəsiz ifadə boş sütun siyahısı verir', () => {
+  it('a statement with no result gives an empty column list', () => {
     expect(parsePsqlCsv('', TOKEN)).toEqual({ columns: [], rows: [] })
   })
 
-  it('sentinel dəyər kimi görünsə də yalnız tam uyğunluq null olur', () => {
+  it('only an exact match becomes null, even when the value looks like the sentinel', () => {
     const out = `a\n${TOKEN}x\n`
     expect(parsePsqlCsv(out, TOKEN).rows[0]?.[0]).toBe(`${TOKEN}x`)
   })
 })
 
 describe('parsePsqlError', () => {
-  it('ERROR/DETAIL/HINT ayırır', () => {
+  it('separates ERROR/DETAIL/HINT', () => {
     const out = [
-      'psql:<stdin>:2: ERROR:  null value in column "adı" violates not-null constraint',
+      'psql:<stdin>:2: ERROR:  null value in column "name" violates not-null constraint',
       'DETAIL:  Failing row contains (1, null).',
-      'HINT:  Bir dəyər ver.'
+      'HINT:  Provide a value.'
     ].join('\n')
     const e = parsePsqlError(out)
     expect(e.message).toContain('violates not-null constraint')
     expect(e.detail).toContain('Failing row')
-    expect(e.hint).toBe('Bir dəyər ver.')
+    expect(e.hint).toBe('Provide a value.')
   })
 
-  it('DETAIL yoxdursa LINE kontekstini götürür', () => {
+  it('falls back to the LINE context when there is no DETAIL', () => {
     const out = [
       'psql:<stdin>:1: ERROR:  syntax error at or near "selct"',
       'LINE 1: selct 1',
@@ -94,7 +94,7 @@ describe('parsePsqlError', () => {
     expect(e.detail).toContain('LINE 1: selct 1')
   })
 
-  it('tanınmayan çıxışda ilk sətri qaytarır', () => {
+  it('returns the first line of unrecognized output', () => {
     expect(parsePsqlError('ssh: connect to host x port 22: refused').message).toContain('ssh')
   })
 })

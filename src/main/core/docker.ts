@@ -1,6 +1,6 @@
 /**
- * Docker ilə əlaqə. Supabase CLI konteynerləri `supabase_<servis>_<project_id>`
- * adlanır — layihəyə aid olanları məhz bu şəkilçi ilə ayırırıq.
+ * Talking to Docker. Supabase CLI containers are named
+ * `supabase_<service>_<project_id>` — that suffix is how we pick out a project's own.
  */
 import Docker from 'dockerode'
 import type { Duplex } from 'node:stream'
@@ -31,9 +31,9 @@ function parseHealth(status: string): string | null {
 }
 
 /**
- * Bir konteynerin yaddaş istifadəsi. Docker CLI-nin `MEM USAGE` sütunu ilə eyni
- * hesablama: xam `usage`-dan səhifə keşi (`inactive_file`) çıxılır — əks halda
- * rəqəm real istifadədən qat-qat böyük görünür.
+ * Memory usage of a single container. Same arithmetic as the Docker CLI's
+ * `MEM USAGE` column: page cache (`inactive_file`) is subtracted from the raw
+ * `usage` — otherwise the number looks far larger than real usage.
  */
 async function memoryOf(
   name: string
@@ -77,7 +77,7 @@ export async function servicesFor(
   }
 
   if (withStats) {
-    // Yalnız işləyən konteynerlər — dayanmış konteynerin stats-ı sonsuz gözləyir.
+    // Running containers only — stats for a stopped container block forever.
     const running = out.filter((s) => s.state === 'running')
     const stats = await Promise.all(running.map((s) => memoryOf(s.container)))
     running.forEach((svc, i) => {
@@ -111,7 +111,7 @@ export async function tailLogs(container: string, stream: string, on: boolean): 
 
   tails.set(container, s)
   s.on('data', (buf: Buffer) => {
-    // docker multiplexed frame: ilk 8 bayt başlıqdır
+    // docker multiplexed frame: the first 8 bytes are the header
     const text = buf.length > 8 && buf[0]! <= 2 ? buf.subarray(8).toString() : buf.toString()
     logBus.push(stream, 'stdout', text)
   })

@@ -1,12 +1,12 @@
 /**
- * Saf SQL qurucuları və nəticə normalizasiyası. Burada nə `pg`, nə Electron
- * importu var — buna görə DB olmadan test olunur.
+ * Pure SQL builders and result normalization. Nothing here imports `pg` or
+ * Electron — which is why it can be tested without a database.
  *
- * İki qat injection qaydası:
- *  1. DƏYƏRLƏR həmişə `$n` parametridir. Bu faylda dəyəri SQL mətninə
- *     yapışdıran heç bir yol yoxdur.
- *  2. İDENTİFİKATORLAR həmişə `quoteIdent`-dən keçir VƏ əvvəlcə introspeksiya
- *     nəticəsindəki sütun siyahısında olmalıdır (`requireColumn`).
+ * Two layers of injection defence:
+ *  1. VALUES are always `$n` parameters. There is no path in this file that
+ *     pastes a value into SQL text.
+ *  2. IDENTIFIERS always go through `quoteIdent` AND must first appear in the
+ *     column list returned by introspection (`requireColumn`).
  */
 import { quoteIdent, qualify } from './ident.js'
 import type {
@@ -24,13 +24,13 @@ import type {
 /* ------------------------------------------------------------ normalizasiya */
 
 /**
- * Hər sütun mətn kimi oxunur: Date, Buffer, bigint və JSON obyektləri heç vaxt
- * IPC sərhədini keçmir (structured clone Buffer-i pozar, bigint-i atardı).
- * IPC-dən keçən yeganə tiplər: `string | null`.
+ * Every column is read as text: Date, Buffer, bigint and JSON objects never cross
+ * the IPC boundary (structured clone would mangle a Buffer and drop a bigint).
+ * The only types that cross IPC are `string | null`.
  */
 export const TEXT_TYPES = { getTypeParser: () => (v: string) => v }
 
-/** `pg`-nin QueryResult-undan bizə lazım olan hissə. */
+/** The part of `pg`'s QueryResult we actually need. */
 export interface RawResult {
   command?: string | null
   rowCount?: number | null
@@ -60,14 +60,14 @@ export function toResult(
 }
 
 /**
- * pg xətası → serializasiya oluna bilən obyekt. Router yalnız `string`
- * qaytardığına görə bu obyekt uğurlu cavabın içində gedir.
+ * A pg error → a serializable object. Since the router only returns `string`,
+ * this object travels inside a successful response.
  */
 export function toSqlError(err: unknown): SqlErrorInfo {
   const e = (err ?? {}) as Record<string, unknown>
   const str = (k: string): string | null => (typeof e[k] === 'string' ? (e[k] as string) : null)
   const rawPos = e.position
-  // pg `position` 1-əsaslı simvol ofsetidir; CodeMirror 0-əsaslı işləyir
+  // pg's `position` is a 1-based character offset; CodeMirror is 0-based
   const pos = typeof rawPos === 'string' || typeof rawPos === 'number' ? Number(rawPos) : NaN
   return {
     message: str('message') ?? String(err),
@@ -83,15 +83,15 @@ export function toSqlError(err: unknown): SqlErrorInfo {
   }
 }
 
-/* ------------------------------------------------------------ sütun köməkçiləri */
+/* ---------------------------------------------------------- column helpers */
 
 export function requireColumn(cols: DbColumn[], name: string): DbColumn {
   const hit = cols.find((c) => c.name === name)
-  if (!hit) throw new Error(`Bu cədvəldə belə sütun yoxdur: ${name}`)
+  if (!hit) throw new Error(`No such column on this table: ${name}`)
   return hit
 }
 
-/** PK sütunları, PK-dakı sırası ilə. Boş massiv = PK yoxdur. */
+/** PK columns, in PK order. An empty array means there is no PK. */
 export function pkColumns(cols: DbColumn[]): DbColumn[] {
   return cols
     .filter((c) => c.pkOrd !== null)
@@ -119,9 +119,9 @@ export interface Fragment {
 }
 
 /**
- * `where` fraqmenti. `start` — ilk placeholder nömrəsi (1-əsaslı).
- * `isnull`/`notnull` placeholder BURAXMIR — nömrələnmə buna görə
- * `params.length` üzərindən aparılır.
+ * The `where` fragment. `start` is the first placeholder number (1-based).
+ * `isnull`/`notnull` EMIT NO placeholder — which is why numbering is driven by
+ * `params.length`.
  */
 export function buildWhere(cols: DbColumn[], filters: DbFilter[], start = 1): Fragment {
   if (filters.length === 0) return { text: '', params: [] }
@@ -130,7 +130,7 @@ export function buildWhere(cols: DbColumn[], filters: DbFilter[], start = 1): Fr
   for (const f of filters) {
     const col = requireColumn(cols, f.column)
     const op = OPS[f.op]
-    if (!op) throw new Error(`Naməlum operator: ${String(f.op)}`)
+    if (!op) throw new Error(`Unknown operator: ${String(f.op)}`)
     if (op.param) {
       params.push(f.value)
       parts.push(`${quoteIdent(col.name)} ${op.sql} $${start + params.length - 1}`)
@@ -145,7 +145,7 @@ export function buildOrder(cols: DbColumn[], order: DbOrder | null): string {
   if (!order) return ''
   const col = requireColumn(cols, order.column)
   if (order.dir !== 'asc' && order.dir !== 'desc') {
-    throw new Error(`Naməlum sıralama istiqaməti: ${String(order.dir)}`)
+    throw new Error(`Unknown sort direction: ${String(order.dir)}`)
   }
   return `order by ${quoteIdent(col.name)} ${order.dir}`
 }
@@ -162,9 +162,9 @@ export function buildSelect(
     limit: number
     offset: number
     /**
-     * Hər sütunu `::text`-ə çevir. Uzaq mühitdə nəticə `json_agg` ilə gəlir və
-     * tiplər JSON tiplərinə düşərdi (jsonb → obyekt, int → ədəd); mətnə
-     * çevirmək lokaldakı `TEXT_TYPES` ilə eyni nəticəni verir.
+     * Cast every column to `::text`. On a remote environment the result arrives
+     * through `json_agg` and types would collapse into JSON types (jsonb → object,
+     * int → number); casting to text gives the same result as local `TEXT_TYPES`.
      */
     castText?: boolean
   }
@@ -204,7 +204,7 @@ export function buildCount(
 
 /* ------------------------------------------------------------ insert / update / delete */
 
-/** `values`-dakı açar = açıq təyin; açar yoxdursa sütun «default» qalır. */
+/** A key present in `values` means an explicit assignment; a missing key leaves the column at its default. */
 export function buildInsert(
   schema: string,
   table: string,
@@ -216,7 +216,7 @@ export function buildInsert(
   const idents: string[] = []
   for (const name of names) {
     const col = requireColumn(cols, name)
-    if (col.isGenerated) throw new Error(`Hesablanan sütuna yazmaq olmaz: ${col.name}`)
+    if (col.isGenerated) throw new Error(`A generated column cannot be written: ${col.name}`)
     idents.push(quoteIdent(col.name))
     params.push(values[name] ?? null)
   }
@@ -238,22 +238,22 @@ export function buildUpdate(
   patch: DbCells
 ): Fragment {
   const keys = pkColumns(cols)
-  if (keys.length === 0) throw new Error('PK yoxdur — sətir redaktə oluna bilməz')
+  if (keys.length === 0) throw new Error('No PK — this row cannot be edited')
   const names = Object.keys(patch)
-  if (names.length === 0) throw new Error('Dəyişiklik yoxdur')
+  if (names.length === 0) throw new Error('Nothing changed')
 
   const params: Array<string | null> = []
   const sets: string[] = []
   for (const name of names) {
     const col = requireColumn(cols, name)
-    if (col.isGenerated) throw new Error(`Hesablanan sütuna yazmaq olmaz: ${col.name}`)
+    if (col.isGenerated) throw new Error(`A generated column cannot be written: ${col.name}`)
     params.push(patch[name] ?? null)
     sets.push(`${quoteIdent(col.name)} = $${params.length}`)
   }
 
   const where: string[] = []
   for (const col of keys) {
-    if (!(col.name in pk)) throw new Error(`PK dəyəri çatışmır: ${col.name}`)
+    if (!(col.name in pk)) throw new Error(`Missing PK value: ${col.name}`)
     params.push(pk[col.name] ?? null)
     where.push(`${quoteIdent(col.name)} = $${params.length}`)
   }
@@ -264,7 +264,7 @@ export function buildUpdate(
   }
 }
 
-/** Kompozit PK üçün sətir konstruktoru: `where ("a","b") in (($1,$2),($3,$4))` */
+/** Row constructor for a composite PK: `where ("a","b") in (($1,$2),($3,$4))` */
 export function buildDelete(
   schema: string,
   table: string,
@@ -272,16 +272,16 @@ export function buildDelete(
   pks: DbCells[]
 ): Fragment {
   const keys = pkColumns(cols)
-  if (keys.length === 0) throw new Error('PK yoxdur — sətir silinə bilməz')
-  if (pks.length === 0) throw new Error('Silinəcək sətir seçilməyib')
-  if (pks.length > 500) throw new Error('Bir dəfəyə ən çox 500 sətir silinə bilər')
+  if (keys.length === 0) throw new Error('No PK — this row cannot be deleted')
+  if (pks.length === 0) throw new Error('No rows selected for deletion')
+  if (pks.length > 500) throw new Error('At most 500 rows can be deleted at once')
 
   const params: Array<string | null> = []
   const tuples: string[] = []
   for (const row of pks) {
     const holes: string[] = []
     for (const col of keys) {
-      if (!(col.name in row)) throw new Error(`PK dəyəri çatışmır: ${col.name}`)
+      if (!(col.name in row)) throw new Error(`Missing PK value: ${col.name}`)
       params.push(row[col.name] ?? null)
       holes.push(`$${params.length}`)
     }

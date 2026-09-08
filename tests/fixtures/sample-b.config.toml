@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "e-tehsil"
+project_id = "sample-b"
 
 [api]
 enabled = true
@@ -156,11 +156,11 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "scorecalculator://"
+site_url = "sampleapp://"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
-external_url = "https://apidev.e-tehsil.app/auth/v1"
+external_url = "https://api.example.com/auth/v1"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["scorecalculator://**", "exp://**", "https://apidev.e-tehsil.app/**"]
+additional_redirect_urls = ["sampleapp://**", "exp://**", "https://api.example.com/**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -319,9 +319,9 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
-# Tətbiq brauzer (web) OAuth axını işlədir — `signInWithOAuth` + `WebBrowser`.
-# Yəni Apple tərəfdə Service ID və ondan yaradılan ES256 client-secret JWT lazımdır;
-# native id-token axını burada istifadə olunmur.
+# The app uses the browser (web) OAuth flow — `signInWithOAuth` + `WebBrowser`.
+# That means Apple needs a Service ID and an ES256 client-secret JWT derived from it;
+# the native id-token flow is not used here.
 [auth.external.apple]
 enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_APPLE_CLIENT_ID)"
@@ -338,7 +338,7 @@ skip_nonce_check = false
 email_optional = false
 
 # Google: web OAuth client (Authorized redirect URI:
-# http://127.0.0.1:55321/auth/v1/callback lokal üçün).
+# http://127.0.0.1:55321/auth/v1/callback locally).
 [auth.external.google]
 enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
@@ -385,9 +385,9 @@ authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
 
-# Funksiyaların lokalda gördüyü secret-lər kök `.env` faylından oxunur (gitignored) —
-# ikinci `supabase/functions/.env` qəsdən yoxdur: bir fayl, bir restart.
-# Produksiyada eyni adlar `supabase secrets set` ilə qoyulur.
+# Secrets the functions see locally are read from the root `.env` (gitignored) —
+# there is deliberately no second `supabase/functions/.env`: one file, one restart.
+# In production the same names are set with `supabase secrets set`.
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

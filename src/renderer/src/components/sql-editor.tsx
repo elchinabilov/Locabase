@@ -1,9 +1,9 @@
 /**
- * CodeMirror 6 sarğısı — wrapper kitabxanası olmadan.
+ * A CodeMirror 6 wrapper — without a wrapper library.
  *
- * View YALNIZ bir dəfə qurulur; dəyişən şeylər (⌘↵ callback-i, sxem ipucları,
- * xəta işarəsi) ref və `Compartment` vasitəsilə yenilənir — belədə kursor
- * yerində qalır və mətn atmır.
+ * The view is built ONLY once; the things that change (the ⌘↵ callback, schema
+ * hints, the error marker) are updated through refs and a `Compartment` — that
+ * way the cursor stays put and the text doesn't jump.
  */
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Compartment, EditorState, StateEffect, StateField } from '@codemirror/state'
@@ -17,9 +17,9 @@ import { tags as t } from '@lezer/highlight'
 import type { DbCompletion } from '@shared/types'
 
 /**
- * Tema `@codemirror/theme-one-dark`-dan DEYİL: o, öz sabit palitrasını gətirir
- * və `index.css`-dəki `@theme` tokenləri ilə toqquşur. CSS dəyişənləri birbaşa
- * oxunur ki, tema avtomatik sinxron qalsın.
+ * The theme is NOT from `@codemirror/theme-one-dark`: that brings its own fixed
+ * palette and clashes with the `@theme` tokens in `index.css`. The CSS variables
+ * are read directly so the theme stays in sync automatically.
  */
 const theme = EditorView.theme(
   {
@@ -68,7 +68,7 @@ const highlight = syntaxHighlighting(
   ])
 )
 
-/* -------------------------------------------------------------- xəta işarəsi */
+/* ---------------------------------------------------------- error marker */
 
 const setError = StateEffect.define<number | null>()
 
@@ -77,7 +77,7 @@ const errorMark = Decoration.mark({ class: 'lb-sql-error' })
 const errorField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(deco, tr) {
-    // Mətn dəyişən kimi köhnə işarə silinir
+    // the old marker is cleared as soon as the text changes
     if (tr.docChanged) deco = Decoration.none
     for (const e of tr.effects) {
       if (!e.is(setError)) continue
@@ -86,7 +86,7 @@ const errorField = StateField.define<DecorationSet>({
         deco = Decoration.none
         continue
       }
-      // İşarə cari sözün sonuna qədər uzanır
+      // the marker extends to the end of the current word
       const line = tr.state.doc.lineAt(pos)
       const text = line.text.slice(pos - line.from)
       const wordLen = /^[\w".$]+/.exec(text)?.[0].length ?? 1
@@ -100,7 +100,7 @@ const errorField = StateField.define<DecorationSet>({
 /* -------------------------------------------------------------- komponent */
 
 export interface SqlEditorHandle {
-  /** Cari mətn — React state-i yox, redaktorun özü həqiqi mənbədir. */
+  /** The current text — not React state; the editor itself is the source of truth. */
   read: () => string
   focusPosition: (pos: number) => void
 }
@@ -117,7 +117,7 @@ export function SqlEditor({
   onRun: () => void
   onChange?: (doc: string) => void
   completion?: DbCompletion | null
-  /** 0-əsaslı ofset; `null` = işarə yoxdur */
+  /** 0-based offset; `null` = no marker */
   errorPosition?: number | null
   handleRef?: (h: SqlEditorHandle | null) => void
 }): ReactNode {
@@ -125,7 +125,7 @@ export function SqlEditor({
   const view = useRef<EditorView | null>(null)
   const schemaComp = useRef(new Compartment()).current
 
-  // Callback-lər ref-dədir ki, view yenidən qurulmasın
+  // Callbacks live in refs so the view is never rebuilt
   const runRef = useRef(onRun)
   runRef.current = onRun
   const changeRef = useRef(onChange)
@@ -180,17 +180,17 @@ export function SqlEditor({
       v.destroy()
       view.current = null
     }
-    // Qəsdən bir dəfəlik: sonrakı dəyişikliklər compartment/ref ilə gedir
+    // Deliberately once: later changes go through the compartment/refs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sxem ipucları sonra gəlir — yenidən qurmaq yox, rekonfiqurasiya
+  // Schema hints arrive later — reconfigure rather than rebuild
   useEffect(() => {
     if (!view.current || !completion) return
     const schema: Record<string, string[]> = {}
     for (const t of completion.tables) {
       schema[`${t.schema}.${t.table}`] = t.columns
-      // `public` üçün qısa ad da tamamlansın
+      // complete the short name for `public` too
       if (t.schema === 'public') schema[t.table] = t.columns
     }
     view.current.dispatch({

@@ -1,10 +1,9 @@
 /**
- * Self-hosted mühit — Coolify/Contabo üzərində qalxmış Supabase.
- *
- * `next-cv/self-hosted/prod.sh`-in məntiqi burada TypeScript-dədir. Bağlantı
- * üçün sistemin `ssh` binarı işlədilir (ssh2 kitabxanası yox): belədə
- * `~/.ssh/config`-dəki Host alias-ları, ssh-agent və `known_hosts` olduğu kimi
- * işləyir — istifadəçinin terminalda gördüyü davranışın eynisi.
+ * The self-hosted environment — a Supabase stack running on your own server
+ * (Coolify, a plain VPS, …). The connection uses the system `ssh` binary rather
+ * than the ssh2 library: that way `~/.ssh/config` host aliases, ssh-agent and
+ * `known_hosts` all work exactly as they do in the user's terminal, with no
+ * second configuration to keep in sync.
  */
 import { basename } from 'node:path'
 import { run } from '../cli.js'
@@ -29,7 +28,7 @@ import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 import { parsePsqlCsv, parsePsqlError } from '../sql/csv.js'
 import { randomUUID } from 'node:crypto'
 
-/** Uzaq shell üçün təhlükəsiz sətir. */
+/** A string that is safe to paste into a remote shell. */
 function sq(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
@@ -48,11 +47,11 @@ function parseHealth(status: string): string | null {
 }
 
 /**
- * Uzaq `.env`-i stdin-dən gələn `KEY=value` sətirləri ilə birləşdirən bash
- * skripti: eyniadlı açar əvəzlənir, qalanı olduğu kimi qalır, nəticə 0600
- * hüquqla atomik köçürülür.
+ * A bash script that merges the remote `.env` with `KEY=value` lines coming from
+ * stdin: a key that already exists is replaced, everything else stays as it is,
+ * and the result is moved into place atomically with 0600 permissions.
  *
- * Sətirlər `\n` ilə birləşir — `;` ilə `while … do;` sintaksis xətası verir.
+ * Lines are joined with `\n` — joining with `;` would make `while … do;` a syntax error.
  */
 export function envMergeScript(file: string): string {
   return [
@@ -77,14 +76,14 @@ export function envMergeScript(file: string): string {
 }
 
 /**
- * Qovluğun bütün fayllarını `<token><yol>` başlığı + base64 məzmun kimi
- * axıdan bash skripti. Böyük fayl üçün məzmun əvəzinə `<token>!` markeri
- * gedir — fayl siyahıdan düşməsin ki, «yalnız lokalda var» kimi görünməsin.
+ * A bash script that streams every file in a folder as a `<token><path>` header
+ * plus base64 content. For a large file a `<token>!` marker is sent instead of the
+ * content — so the file stays in the listing and isn't reported as "local only".
  */
 export function dumpScript(dir: string, token: string): string {
   return [
     `cd ${sq(dir)}`,
-    // nöqtə ilə başlayan fayllar atılır — lokal ağac da onları saymır
+    // dot-prefixed files are skipped — the local tree ignores them too
     `find . -type f -not -path '*/.*' | sort | while IFS= read -r f; do`,
     `  printf '%s%s\\n' ${sq(token)} "\${f#./}"`,
     `  if [ "$(wc -c < "$f")" -le ${MAX_FILE_BYTES} ]; then`,
@@ -96,7 +95,7 @@ export function dumpScript(dir: string, token: string): string {
   ].join('\n')
 }
 
-/** `<token><yol>` başlığı + base64 sətirləri (və ya `<token>!` markeri) → fayllar. */
+/** `<token><path>` headers + base64 lines (or a `<token>!` marker) → files. */
 export function decodeDump(out: string, token: string): RemoteFile[] {
   const files: RemoteFile[] = []
   let path: string | null = null
@@ -154,7 +153,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
     return args
   }
 
-  /** Uzaqda əmr icra et. `input` varsa stdin-ə ötürülür. */
+  /** Run a command remotely. `input`, when given, is piped to stdin. */
   private async ssh(
     command: string,
     opts: {
@@ -171,11 +170,11 @@ export class SelfHostedAdapter implements RemoteAdapter {
       quiet: opts.quiet,
       maxOutputLines: opts.maxOutputLines
     })
-    if (!res.ok) throw new Error(res.error ?? (res.output.trim() || 'ssh əmri uğursuz oldu'))
+    if (!res.ok) throw new Error(res.error ?? (res.output.trim() || 'the ssh command failed'))
     return res.output
   }
 
-  /** `docker exec -i <db> psql ...` — prod.sh-dəki `psql_remote` funksiyası. */
+  /** `docker exec -i <db> psql ...` — the remote equivalent of a local psql session. */
   private psql(
     sql: string,
     flags: string[] = [],
@@ -233,8 +232,8 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   /**
-   * Hər miqrasiya **öz tranzaksiyasında**, ledger sətri ilə birlikdə tətbiq
-   * olunur — yarımçıq tətbiq qalmır (prod.sh-dəki eyni yanaşma).
+   * Every migration is applied **in its own transaction**, together with its ledger
+   * row — so a half-applied migration can't be left behind.
    */
   async applyMigrations(files: MigrationFile[], log: LogFn): Promise<void> {
     for (const file of files) {
@@ -263,7 +262,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
       'ls -lh "$F"',
       `find ${sq(dir)} -name ${sq(`${prefix}-*.dump`)} -mtime +${this.env.backupRetentionDays || 14} -delete`
     ].join('\n')
-    log('Yedək alınır…')
+    log('Taking a backup…')
     const out = await this.ssh(`bash -s`, { input: script, timeoutMs: 30 * 60 * 1000 })
     const line = out.trim().split('\n').filter(Boolean).pop() ?? ''
     const parts = line.split(/\s+/)
@@ -274,7 +273,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
     }
   }
 
-  /** Uzaq `.env` faylının açar adları — dəyərlər gətirilmir. */
+  /** The key names in the remote `.env` — values are not fetched. */
   async listSecretNames(): Promise<string[]> {
     const file = `${this.env.remoteDir}/.env`
     const out = await this.ssh(
@@ -288,21 +287,21 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   /**
-   * Uzaq `.env`-i yenilə. Dəyərlər **stdin ilə** gedir — `ps` siyahısında və
-   * shell tarixçəsində görünmür.
+   * Update the remote `.env`. Values travel **over stdin** — they never appear in
+   * `ps` output or in shell history.
    */
   async setSecrets(kv: Record<string, string>, log: LogFn): Promise<void> {
     const entries = Object.entries(kv)
     if (entries.length === 0) return
     for (const [k, v] of entries) {
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) throw new Error(`yararsız dəyişən adı: ${k}`)
-      if (v.includes('\n')) throw new Error(`${k}: çoxsətirli dəyər dəstəklənmir`)
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) throw new Error(`invalid variable name: ${k}`)
+      if (v.includes('\n')) throw new Error(`${k}: multi-line values are not supported`)
     }
     const file = `${this.env.remoteDir}/.env`
-    log(`${entries.length} dəyişən yenilənir: ${entries.map(([k]) => k).join(', ')}`)
+    log(`Updating ${entries.length} variable(s): ${entries.map(([k]) => k).join(', ')}`)
 
-    // Skript uzaq əmrin özündədir, stdin isə **dəyərlərdir** — belədə heç bir
-    // secret nə arqumentə, nə də shell tarixçəsinə düşür.
+    // The script lives in the remote command itself while stdin carries the **values** —
+    // that way no secret ends up in an argument or in shell history.
     const script = envMergeScript(file)
 
     const payload = `${entries.map(([k, v]) => `${k}=${v}`).join('\n')}\n`
@@ -321,8 +320,8 @@ export class SelfHostedAdapter implements RemoteAdapter {
       .map((l) => l.trim())
       .filter(Boolean)
 
-    // Bütün funksiyaların fayl md5-ləri **bir** ssh çağırışı ilə gəlir —
-    // fərqi göstərmək üçün faylları çəkmək lazım deyil.
+    // The file md5s of every function arrive in **one** ssh call —
+    // showing the difference doesn't require pulling the files.
     const checksums = await this.functionChecksums(dir)
     return names.map((name) => ({
       name,
@@ -334,7 +333,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
     }))
   }
 
-  /** `<funksiya adı> → [{path, md5}]`; md5sum yoxdursa null. */
+  /** `<function name> → [{path, md5}]`; null when md5sum is unavailable. */
   private async functionChecksums(dir: string): Promise<Map<string, RemoteFileChecksum[]> | null> {
     let out: string
     try {
@@ -362,9 +361,9 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   async readFunction(name: string): Promise<RemoteFile[]> {
-    if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error(`yararsız funksiya adı: ${name}`)
+    if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error(`invalid function name: ${name}`)
     const dir = `${this.env.remoteDir}/volumes/functions/${name}`
-    // Ayırıcı hər çağırışda təsadüfidir — fayl məzmunu onunla üst-üstə düşə bilməsin
+    // The separator is random per call — file content must never collide with it
     const token = `__LOCABASE_${randomUUID().replace(/-/g, '')}__`
     const out = await this.ssh(`bash -c ${sq(dumpScript(dir, token))}`, {
       quiet: true,
@@ -375,13 +374,13 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   /**
-   * Self-hosted-də `supabase functions deploy` yoxdur: qovluq rsync olunur və
-   * edge runtime konteyneri yenidən başladılır.
+   * There is no `supabase functions deploy` for self-hosted: the folder is rsynced
+   * and the edge runtime container is restarted.
    */
   async deployFunctions(names: string[], log: LogFn): Promise<void> {
     if (names.length === 0) return
     if (!this.env.functionsContainer) {
-      throw new Error('Edge runtime konteyneri təyin edilməyib — funksiya deploy-u mümkün deyil.')
+      throw new Error('No edge runtime container is configured — functions cannot be deployed.')
     }
     const localDir = paths.functionsDir(this.project)
     const remoteDir = `${this.env.remoteDir}/volumes/functions`
@@ -404,7 +403,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
       if (!res.ok) throw new Error(`${name}: ${res.error ?? res.output}`)
     }
 
-    // `_shared` qovluğu varsa o da lazımdır
+    // the `_shared` folder is needed too, when present
     const sharedLocal = `${localDir}/_shared`
     const shared = await run('test', ['-d', sharedLocal], { quiet: true })
     if (shared.ok) {
@@ -421,8 +420,8 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   /**
-   * Ledger sətrini əl ilə düzəlt. `applied` sətri əlavə edir (obyektlər həqiqətən
-   * bazadadırsa), `reverted` isə silir. SQL-in özü heç nə tətbiq etmir.
+   * Repair a ledger row by hand. `applied` inserts the row (when the objects really
+   * are in the database), `reverted` removes it. The SQL itself applies nothing.
    */
   async repairLedger(version: string, status: 'applied' | 'reverted', log: LogFn): Promise<void> {
     const v = version.replace(/'/g, "''")
@@ -430,20 +429,20 @@ export class SelfHostedAdapter implements RemoteAdapter {
       status === 'applied'
         ? `insert into supabase_migrations.schema_migrations (version) values ('${v}') on conflict (version) do nothing;`
         : `delete from supabase_migrations.schema_migrations where version = '${v}';`
-    log(`ledger təmiri: ${version} → ${status}`)
+    log(`ledger repair: ${version} → ${status}`)
     await this.psql(sql)
   }
 
   /**
-   * Stack-in konteynerləri. Coolify adları `supabase-<servis>-<id>` şəklində
-   * verir, ona görə Postgres konteynerinin şəkilçisi bütün stack-i tapmaq üçün
-   * açardır — `prod.sh`-dəki `DB_CONTAINER` ilə eyni məntiq.
+   * The stack's containers. Coolify names them `supabase-<service>-<id>`, so the
+   * suffix of the Postgres container is the key to finding the whole stack — the
+   * same trick a hand-written deploy script uses.
    */
   async listServices(): Promise<RemoteService[]> {
     const suffix = this.env.dbContainer.slice(this.env.dbContainer.lastIndexOf('-') + 1)
     if (suffix.length < 4) {
       throw new Error(
-        `Postgres konteynerinin adından stack şəkilçisi çıxarılmadı: ${this.env.dbContainer}`
+        `Could not derive the stack suffix from the Postgres container name: ${this.env.dbContainer}`
       )
     }
 
@@ -488,16 +487,16 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   /**
-   * Konteyneri dayandır / başlat. Diqqət: Coolify növbəti deploy-da onu yenidən
-   * qaldıra bilər — davamlı söndürmək üçün compose faylından çıxarmaq lazımdır.
+   * Stop / start a container. Note: Coolify may bring it back up on the next
+   * deploy — to disable it for good, remove it from the compose file.
    */
   async setServiceState(container: string, on: boolean, log: LogFn): Promise<void> {
     const suffix = this.env.dbContainer.slice(this.env.dbContainer.lastIndexOf('-') + 1)
     if (!container.endsWith(`-${suffix}`)) {
-      throw new Error(`Konteyner bu stack-ə aid deyil: ${container}`)
+      throw new Error(`This container does not belong to the stack: ${container}`)
     }
     if (!on && container === this.env.dbContainer) {
-      throw new Error('Postgres konteyneri dayandırıla bilməz.')
+      throw new Error('The Postgres container cannot be stopped.')
     }
     log(`docker ${on ? 'start' : 'stop'} ${container}`)
     await this.ssh(`docker ${on ? 'start' : 'stop'} ${sq(container)}`, { timeoutMs: 180_000 })
@@ -509,7 +508,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
       ['REST', `${this.env.apiUrl.replace(/\/+$/, '')}/rest/v1/`],
       ['Auth', `${this.env.apiUrl.replace(/\/+$/, '')}/auth/v1/health`]
     ]
-    if (this.env.siteUrl) targets.push(['Tətbiq', this.env.siteUrl])
+    if (this.env.siteUrl) targets.push(['App', this.env.siteUrl])
 
     for (const [label, url] of targets) {
       try {
@@ -525,21 +524,21 @@ export class SelfHostedAdapter implements RemoteAdapter {
   /* ------------------------------------------------------------ SQL */
 
   /**
-   * Sərbəst SQL — `psql -q --csv` ilə. CSV seçilib, çünki dəyərin içindəki
-   * vergül, sətir keçidi və dırnaq itmir; `-P null=<uuid>` isə NULL ilə boş
-   * sətri ayırır (CSV-də ikisi də boş sahədir).
+   * Free-form SQL — through `psql -q --csv`. CSV is chosen because commas, line
+   * breaks and quotes inside a value survive it; `-P null=<uuid>` separates NULL
+   * from an empty string (CSV renders both as an empty field).
    *
-   * `-q` command tag-ları söndürür, ona görə çıxış tək bir nəticə blokudur:
-   * ÇOXİFADƏLİ SKRİPTDƏ yalnız birinci bloka baxmaq düzgün olmazdı, ona görə
-   * uzaq mühitdə bir nəticə göstərilir və UI bunu qeyd edir.
+   * `-q` turns off command tags, so the output is a single result block: for a
+   * MULTI-STATEMENT SCRIPT it would be wrong to show only the first block, so the
+   * remote environment shows one result and the UI says so.
    */
   async runSql(sql: string, opts: RemoteSqlOpts): Promise<SqlRun> {
     const started = Date.now()
     const nullToken = `lbnull-${randomUUID()}`
     const timeout = Math.max(1000, Math.min(600_000, Math.trunc(opts.timeoutMs)))
-    // Yalnız-oxu SERVER tərəfdə tətbiq olunur — SQL-i regex ilə yoxlamaq
-    // etibarsızdır. psql stdin bitəndə bağlantı qapanır və tranzaksiya geri
-    // qayıdır, ona görə `rollback` yazmağa ehtiyac yoxdur.
+    // Read-only is enforced SERVER-side — checking SQL with a regex is not
+    // trustworthy. When psql's stdin ends the connection closes and the
+    // transaction rolls back, so there is no need to write `rollback`.
     const prelude = opts.readOnly
       ? `begin read only;\nset local statement_timeout = ${timeout};\n`
       : `set statement_timeout = ${timeout};\n`
@@ -547,7 +546,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
       const out = await this.psql(
         `${prelude}${sql}`,
         ['-q', '--csv', '-P', `null=${nullToken}`],
-        // nəticə kəsilməməlidir: default 200 sətirlik log limiti datanı korlayardı
+        // the result must not be truncated: the default 200-line log limit would corrupt data
         { maxOutputLines: 200_000, timeoutMs: timeout + 30_000 }
       )
       const parsed = parsePsqlCsv(out, nullToken)
@@ -580,7 +579,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
           severity: null,
           detail: parsed.detail,
           hint: parsed.hint,
-          // psql `position` vermir — dalğalı işarə yalnız lokalda görünür
+          // psql gives no `position` — the caret marker only shows up locally
           position: null,
           where: null,
           table: null,
@@ -592,11 +591,11 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   /**
-   * Daxili sorğu. `json_agg` ilə bütün nəticə bir xanaya yığılır: belədə
-   * tiplər (bool, ədəd, null) CSV-nin mətn dünyasından keçmədən qorunur.
+   * An internal query. `json_agg` collects the whole result into one cell: that
+   * preserves types (bool, number, null) without passing through CSV's text world.
    */
   async queryJson<T>(sql: string): Promise<T[]> {
-    // Alias qəsdən nadir addır: sarınan sorğunun öz CTE adları ilə toqquşmasın
+    // The alias is deliberately an odd name: it must not collide with the wrapped query's own CTE names
     const wrapped = `select coalesce(json_agg(__lbq), '[]'::json)::text from (${sql}) __lbq;`
     const out = await this.psql(wrapped, ['-q', '-A', '-t'], { maxOutputLines: 200_000 })
     const text = out.trim()
@@ -604,7 +603,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
     try {
       return JSON.parse(text) as T[]
     } catch {
-      throw new Error(`Nəticə JSON kimi oxunmadı: ${text.slice(0, 200)}`)
+      throw new Error(`The result did not parse as JSON: ${text.slice(0, 200)}`)
     }
   }
 }

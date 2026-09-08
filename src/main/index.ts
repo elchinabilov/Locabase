@@ -9,12 +9,12 @@ import { migrateUserData } from './core/userdata.js'
 import { fixPath } from './core/env-path.js'
 import { logBus } from './core/log.js'
 
-// Dev-də paket adı, produksiyada `productName` işlənir — ikisi eyni qovluğa
-// baxsın deyə adı burada, hər şeydən əvvəl sabitləyirik.
+// In dev the package name is used, in production `productName` — the name is
+// pinned here, before anything else, so both point at the same folder.
 app.setName('Locabase')
 
-// Finder/.dmg-dən açılanda GUI prosesi login shell PATH-ini almır — `supabase`
-// və digər CLI-lər tapılmır. Hər şeydən əvvəl PATH-i bərpa edirik.
+// Launched from Finder or a .dmg, the GUI process does not inherit the login
+// shell's PATH — `supabase` and other CLIs go missing. Restore PATH first.
 fixPath()
 
 function createWindow(): BrowserWindow {
@@ -36,25 +36,32 @@ function createWindow(): BrowserWindow {
 
   win.on('ready-to-show', () => {
     win.show()
-    // Dev-only: GUI-nin görüntüsünü fayla yazır. Başsız yoxlama üçün —
-    // `SUPAGUI_SHOT=/yol/shot.png npm run dev`.
-    const shot = process.env['SUPAGUI_SHOT']
+    // Dev-only: writes a picture of the GUI to a file. For headless checks and
+    // for the README screenshots — `LOCABASE_SHOT=/path/shot.png npm run dev`.
+    // `LOCABASE_SHOT_JS` is JavaScript evaluated in the page first (to open a
+    // route), `LOCABASE_SHOT_DELAY` is how long to wait before capturing, and
+    // `LOCABASE_SHOT_WIDTH` downscales the (Retina-sized) capture before writing.
+    const shot = process.env['LOCABASE_SHOT']
     if (is.dev && shot) {
-      const js = process.env['SUPAGUI_SHOT_JS']
+      const js = process.env['LOCABASE_SHOT_JS']
       setTimeout(
         () => {
           void (js ? win.webContents.executeJavaScript(js) : Promise.resolve())
-            .then(() => new Promise((r) => setTimeout(r, js ? 2500 : 0)))
+            .then(() => new Promise((r) => setTimeout(r, js ? Number(process.env['LOCABASE_SHOT_WAIT'] ?? 2500) : 0)))
             .then(() => win.webContents.capturePage())
-            .then((img) => writeFileSync(shot, img.toPNG()))
+            .then((img) => {
+              const width = Number(process.env['LOCABASE_SHOT_WIDTH'] ?? 0)
+              const out = width > 0 ? img.resize({ width, quality: 'best' }) : img
+              writeFileSync(shot, out.toPNG())
+            })
             .catch(() => undefined)
         },
-        Number(process.env['SUPAGUI_SHOT_DELAY'] ?? 4000)
+        Number(process.env['LOCABASE_SHOT_DELAY'] ?? 4000)
       )
     }
   })
 
-  // Xarici linklər sistem brauzerində açılır — pəncərənin içində yox.
+  // External links open in the system browser — never inside the window.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
@@ -72,7 +79,7 @@ void app.whenReady().then(() => {
   electronApp.setAppUserModelId('app.locabase')
 
   const migrated = migrateUserData()
-  if (migrated) logBus.push('app', 'info', `Köhnə ayarlar köçürüldü: ${migrated}`)
+  if (migrated) logBus.push('app', 'info', `Old settings migrated: ${migrated}`)
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
 
   registerIpc()

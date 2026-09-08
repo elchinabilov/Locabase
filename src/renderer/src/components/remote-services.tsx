@@ -2,11 +2,12 @@ import { useCallback, useState, type ReactNode } from 'react'
 import type { Project, RemoteEnv } from '@shared/types'
 import { formatBytes } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
+import { useT } from '../i18n'
 import { Badge, Button, Card, Dot, ErrorNote, Skeleton, Toggle } from '../components/ui'
 
 /**
- * Uzaq serverdəki konteynerlər. Managed layihədə belə bir idarəetmə yoxdur —
- * kart bunu açıq deyir və heç nə göstərmir.
+ * Containers on the remote server. A managed project has no such control —
+ * the card says so plainly and shows nothing.
  */
 export function RemoteServices({
   project,
@@ -15,6 +16,7 @@ export function RemoteServices({
   project: Project
   env: RemoteEnv
 }): ReactNode {
+  const t = useT()
   const services = useQuery(
     'remote:services',
     { id: project.id, envId: env.id },
@@ -35,7 +37,7 @@ export function RemoteServices({
           container,
           on
         })
-        if (!res.ok) setError(res.error ?? 'Uğursuz oldu')
+        if (!res.ok) setError(res.error ?? t('dashboard.reset.genericError'))
       } catch (err) {
         setError((err as Error).message)
       } finally {
@@ -43,15 +45,14 @@ export function RemoteServices({
         services.refresh()
       }
     },
-    [project.id, env.id, services]
+    [project.id, env.id, services, t]
   )
 
   if (env.kind === 'managed') {
     return (
-      <Card title="Remote servislər">
+      <Card title={t('remoteServices.title')}>
         <p className="px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
-          Managed layihədə ayrı-ayrı servisləri söndürmək mümkün deyil — supabase.com onları özü
-          idarə edir və belə bir API yoxdur. RAM idarəsi yalnız self-hosted mühitlərdə var.
+          {t('remoteServices.managedHint')}
         </p>
       </Card>
     )
@@ -63,20 +64,21 @@ export function RemoteServices({
 
   return (
     <Card
-      title="Remote servislər"
+      title={t('remoteServices.title')}
       subtitle={
         items.length > 0
-          ? `${running} / ${items.length} işləyir${total > 0 ? ` · ${formatBytes(total)} RAM` : ''}`
+          ? t('dashboard.services.subtitle', { running, total: items.length }) +
+            (total > 0 ? t('dashboard.services.ramSuffix', { size: formatBytes(total) }) : '')
           : env.sshHost
       }
       actions={
         <Button onClick={services.refresh} loading={services.loading}>
-          yenilə
+          {t('remoteServices.refresh')}
         </Button>
       }
     >
       {services.loading && items.length === 0 && (
-        <ul className="divide-y divide-line-soft" role="status" aria-label="serverə baxılır">
+        <ul className="divide-y divide-line-soft" role="status" aria-label={t('remoteServices.checkingServer')}>
           {[0, 1, 2, 3].map((i) => (
             <li key={i} className="flex items-center gap-2.5 px-3.5 py-2">
               <Skeleton w={32} h={18} delay={i * 90} className="shrink-0 rounded-full" />
@@ -115,7 +117,7 @@ export function RemoteServices({
                 {svc.key}
                 {isDb && (
                   <span className="ml-1.5">
-                    <Badge tone="muted">məcburi</Badge>
+                    <Badge tone="muted">{t('remoteServices.required')}</Badge>
                   </span>
                 )}
               </span>
@@ -132,8 +134,7 @@ export function RemoteServices({
 
       {items.length > 0 && (
         <p className="border-t border-line-soft px-3.5 py-2 text-[11px] leading-relaxed text-muted">
-          Burada söndürmək `docker stop`-dur. Coolify növbəti deploy-da konteyneri yenidən qaldıra
-          bilər — davamlı söndürmək üçün servisin compose faylından çıxar.
+          {t('remoteServices.stopHint')}
         </p>
       )}
     </Card>

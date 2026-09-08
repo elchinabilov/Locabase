@@ -1,6 +1,6 @@
 /**
- * Log avtobusu. Main-də baş verən hər şey (CLI çıxışı, docker logu, deploy
- * addımları) bura düşür, oradan da renderer-ə `log:line` hadisəsi kimi gedir.
+ * The log bus. Everything that happens in main (CLI output, docker logs, deploy
+ * steps) lands here and goes on to the renderer as a `log:line` event.
  */
 import { EventEmitter } from 'node:events'
 import type { LogLine, LogLevel } from '@shared/types.js'
@@ -27,12 +27,12 @@ class LogBus extends EventEmitter {
 }
 
 /**
- * Sirləri loga buraxmırıq. Tam təhlükəsizlik zəmanəti deyil — müdafiənin
- * birinci qatıdır; ikinci qat odur ki, secret dəyərləri heç vaxt CLI arqumenti
- * kimi ötürülmür (bax `cli.ts` və `remote/*`).
+ * Secrets don't reach the log. This is not a full guarantee — it is the first
+ * layer of defence; the second is that secret values are never passed as CLI
+ * arguments (see `cli.ts` and `remote/*`).
  */
 
-/** Bütöv uyğunluq gizlədilir. */
+/** The whole match is hidden. */
 const SECRET_VALUES: RegExp[] = [
   /sb_secret_[A-Za-z0-9_-]+/g,
   /sbp_[A-Za-z0-9]{20,}/g,
@@ -40,14 +40,14 @@ const SECRET_VALUES: RegExp[] = [
   /postgres(?:ql)?:\/\/[^:\s]+:[^@\s]+@/g
 ]
 
-/** `KEY=dəyər` formasında yalnız **dəyər** gizlədilir, açar adı qalır. */
+/** In `KEY=value` form only the **value** is hidden, the key name stays. */
 const SECRET_ASSIGNMENTS =
   /((?:secret|token|password|passwd|api[_-]?key|access[_-]?key|auth)[A-Za-z_]*\s*[=:]\s*)("[^"]*"|'[^']*'|\S+)/gi
 
 export function redact(text: string): string {
   let out = text
-  for (const re of SECRET_VALUES) out = out.replace(re, '«gizlədilib»')
-  out = out.replace(SECRET_ASSIGNMENTS, (_m, prefix: string) => `${prefix}«gizlədilib»`)
+  for (const re of SECRET_VALUES) out = out.replace(re, '«redacted»')
+  out = out.replace(SECRET_ASSIGNMENTS, (_m, prefix: string) => `${prefix}«redacted»`)
   return out
 }
 

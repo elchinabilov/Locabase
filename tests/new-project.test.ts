@@ -12,8 +12,8 @@ const load = (n: string): string =>
 describe('sanitizeProjectId', () => {
   it.each([
     ['My App', 'my-app'],
-    ['  Next CV  ', 'next-cv'],
-    ['e-təhsil 2025', 'e-t-hsil-2025'],
+    ['  Sample App  ', 'sample-app'],
+    ['Ünvan 2025', 'nvan-2025'],
     ['__api__', 'api'],
     ['a//b', 'a-b'],
     ['-- --', '']
@@ -23,12 +23,12 @@ describe('sanitizeProjectId', () => {
 })
 
 describe('remapPatches', () => {
-  it('standart bazada heç nə dəyişmir', () => {
-    expect(remapPatches(parseToml(load('alocar')), 543)).toEqual([])
+  it('changes nothing on the default base', () => {
+    expect(remapPatches(parseToml(load('sample-a')), 543)).toEqual([])
   })
 
-  it('543xx portları yeni bloka köçür, mövcud olmayan açara toxunmur', () => {
-    const src = load('alocar')
+  it('moves the 543xx ports into a new block and leaves absent keys alone', () => {
+    const src = load('sample-a')
     const parsed = parseToml(src) as Record<string, unknown>
     const patches = remapPatches(parsed, 557)
     expect(patches.length).toBeGreaterThan(0)
@@ -47,13 +47,13 @@ describe('remapPatches', () => {
       expect(Math.floor(value / 100)).toBe(557)
       if (path !== 'edge_runtime.inspector_port') expect(value % 100).toBe(before % 100)
     }
-    // yamaq yalnız faylda olan açarları hədəfləyir
+    // the patch only targets keys that exist in the file
     for (const { path } of patches) expect(port(parsed, path)).toBeTypeOf('number')
     expect(patches.map((p) => p.path)).toContain('api.port')
     expect(port(after, 'api.port')).toBe(55721)
   })
 
-  it('inspector portu da layihənin öz blokuna düşür', () => {
+  it('moves the inspector port into the project\u2019s own block too', () => {
     const parsed = parseToml('[edge_runtime]\ninspector_port = 8083\n')
     expect(remapPatches(parsed, 561)).toEqual([
       { path: 'edge_runtime.inspector_port', value: 56183 }

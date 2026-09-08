@@ -1,9 +1,9 @@
 /**
- * Saxlanmış SQL sorğuları — `supabase/.locabase/queries/<ad>.sql`.
+ * Saved SQL queries — `supabase/.locabase/queries/<name>.sql`.
  *
- * Repo-nun içində saxlanır ki, komanda ilə git vasitəsilə paylaşılsın və adi
- * fayl kimi redaktə oluna bilsin. `.gitignore`-a heç nə əlavə edilmir —
- * istəyən `supabase/.locabase/` sətrini özü yaza bilər.
+ * They live inside the repo so a team can share them through git and edit them
+ * as ordinary files. Nothing is added to `.gitignore` — anyone who wants them
+ * private can add the `supabase/.locabase/` line themselves.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
@@ -11,8 +11,8 @@ import { get as getProject, paths } from './projects.js'
 import type { Project, SavedQuery } from '@shared/types.js'
 
 /**
- * Nöqtə QƏSDƏN yoxdur: bu, `..`, `a.b`, `/abs` və NUL hiylələrini bir qaydada
- * öldürür. `resolve()` yoxlaması müdafiənin ikinci qatıdır.
+ * The dot is left out DELIBERATELY: that kills `..`, `a.b`, `/abs` and NUL tricks
+ * with one rule. The `resolve()` check is the second layer of defence.
  */
 const NAME_RE = /^[A-Za-z0-9əöğışçüĞÖİŞÇÜƏ _-]{1,64}$/
 
@@ -22,28 +22,28 @@ export function dirFor(project: Project): string {
 
 export function fileFor(project: Project, name: string): string {
   if (!NAME_RE.test(name)) {
-    throw new Error('Ad yalnız hərf, rəqəm, boşluq, `_` və `-` ola bilər (ən çox 64 simvol).')
+    throw new Error('The name may only contain letters, digits, spaces, `_` and `-` (64 characters max).')
   }
   const dir = dirFor(project)
   const file = resolve(dir, `${name}.sql`)
-  // İkinci qat: ad yoxlanışından sonra da yolun qovluqdan çıxmadığını təsdiqlə.
-  // `startsWith(dir)` tək başına qonşu `queries-evil/`-i qəbul edərdi — ona
-  // görə ayırıcı ilə birlikdə yoxlanılır.
+  // Second layer: even after the name check, confirm the path stays inside the
+  // folder. `startsWith(dir)` alone would accept a sibling `queries-evil/`, so
+  // the separator is checked along with it.
   if (file !== join(dir, `${name}.sql`) || !file.startsWith(dir + sep)) {
-    throw new Error('Yol qovluqdan kənara çıxır')
+    throw new Error('The path escapes the folder')
   }
   return file
 }
 
 const README = `# .locabase
 
-Locabase tətbiqinin layihəyə aid faylları.
+Project-scoped files belonging to the Locabase app.
 
-- \`queries/\` — SQL redaktorunda saxlanmış sorğular. Adi \`.sql\` faylıdır,
-  redaktorda da, burada da dəyişdirilə bilər.
+- \`queries/\` — queries saved from the SQL editor. Ordinary \`.sql\` files that
+  can be edited here or in the editor.
 
-Bu qovluq qəsdən commit olunur ki, komanda sorğuları paylaşsın. Şəxsi saxlamaq
-istəyirsənsə \`.gitignore\`-a \`supabase/.locabase/\` əlavə et.
+This folder is committed on purpose so the team can share queries. If you would
+rather keep them private, add \`supabase/.locabase/\` to \`.gitignore\`.
 `
 
 function ensureDir(project: Project): string {
@@ -59,7 +59,7 @@ function describe(file: string, name: string): SavedQuery {
   return { name, path: file, bytes: st.size, updatedAt: st.mtime.toISOString() }
 }
 
-/* ---------------------------------------------------------- nüvə (Project) */
+/* --------------------------------------------------------- core (Project) */
 
 export function listFor(project: Project): SavedQuery[] {
   const dir = dirFor(project)
@@ -72,7 +72,7 @@ export function listFor(project: Project): SavedQuery[] {
 
 export function readFor(project: Project, name: string): { name: string; sql: string } {
   const file = fileFor(project, name)
-  if (!existsSync(file)) throw new Error(`Sorğu tapılmadı: ${name}`)
+  if (!existsSync(file)) throw new Error(`Query not found: ${name}`)
   return { name, sql: readFileSync(file, 'utf8') }
 }
 
@@ -86,8 +86,8 @@ export function writeFor(project: Project, name: string, sql: string): SavedQuer
 export function renameFor(project: Project, name: string, to: string): SavedQuery {
   const from = fileFor(project, name)
   const dest = fileFor(project, to)
-  if (!existsSync(from)) throw new Error(`Sorğu tapılmadı: ${name}`)
-  if (existsSync(dest) && from !== dest) throw new Error(`Bu adda sorğu artıq var: ${to}`)
+  if (!existsSync(from)) throw new Error(`Query not found: ${name}`)
+  if (existsSync(dest) && from !== dest) throw new Error(`A query with this name already exists: ${to}`)
   renameSync(from, dest)
   return describe(dest, to)
 }
@@ -96,7 +96,7 @@ export function removeFor(project: Project, name: string): void {
   rmSync(fileFor(project, name), { force: true })
 }
 
-/* ---------------------------------------------------------- id əsaslı örtük */
+/* ------------------------------------------------------- id-based wrapper */
 
 export const list = (id: string): SavedQuery[] => listFor(getProject(id))
 export const read = (id: string, name: string): { name: string; sql: string } =>

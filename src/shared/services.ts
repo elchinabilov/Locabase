@@ -1,20 +1,19 @@
 /**
- * Supabase stack-inin servisləri və onları idarə edən `config.toml` açarları.
+ * The services of a Supabase stack and the `config.toml` keys that control them.
  *
- * Lokal stack-də servis "söndürmək" konteyneri dayandırmaq deyil — CLI onu
- * ümumiyyətlə qaldırmır. Ona görə açar/dəyər cütü buradadır: `analytics` və
- * `studio` kimi ağır servisləri bağlamaq RAM-da ən çox qazandıran addımdır.
+ * On the local stack, "turning a service off" does not stop its container — the CLI
+ * never brings it up in the first place. That is why the key/value pair lives here:
+ * switching off heavy services like `analytics` and `studio` is the biggest RAM win.
  */
 
 export interface ServiceDef {
-  /** konteyner adındakı açar: `supabase_<key>_<project_id>` */
+  /** the key inside the container name: `supabase_<key>_<project_id>` */
   key: string
   label: string
-  /** eyni `configPath`-i bölüşən servislər bir keçidlə idarə olunur */
+  /** services sharing the same `configPath` are controlled by one toggle */
   configPath: string | null
-  /** dayandırıla bilməz */
+  /** cannot be stopped */
   required?: boolean
-  note?: string
 }
 
 export const SERVICES: ServiceDef[] = [
@@ -24,48 +23,31 @@ export const SERVICES: ServiceDef[] = [
   { key: 'auth', label: 'GoTrue (auth)', configPath: 'auth.enabled' },
   { key: 'realtime', label: 'Realtime', configPath: 'realtime.enabled' },
   { key: 'storage', label: 'Storage', configPath: 'storage.enabled' },
-  {
-    key: 'imgproxy',
-    label: 'Imgproxy',
-    configPath: 'storage.image_transformation.enabled',
-    note: 'Şəkil çevirmə. Storage bağlıdırsa onsuz da qalxmır.'
-  },
+  { key: 'imgproxy', label: 'Imgproxy', configPath: 'storage.image_transformation.enabled' },
   { key: 'studio', label: 'Studio', configPath: 'studio.enabled' },
   { key: 'pg_meta', label: 'pg-meta', configPath: 'studio.enabled' },
   { key: 'edge_runtime', label: 'Edge runtime', configPath: 'edge_runtime.enabled' },
   { key: 'inbucket', label: 'Mailpit', configPath: 'local_smtp.enabled' },
-  {
-    key: 'analytics',
-    label: 'Logflare',
-    configPath: 'analytics.enabled',
-    note: 'Lokalda ən ağır və ən tez sınan servis. Lazım deyilsə bağlı saxla.'
-  },
+  { key: 'analytics', label: 'Logflare', configPath: 'analytics.enabled' },
   { key: 'vector', label: 'Vector', configPath: 'analytics.enabled' },
   { key: 'pooler', label: 'Supavisor (pooler)', configPath: 'db.pooler.enabled' }
 ]
 
 export interface ServiceGroup {
-  /** keçidin yazdığı açar; `null` = məcburi servis */
+  /** the key the toggle writes; `null` = a mandatory service */
   configPath: string | null
   label: string
   keys: string[]
   required: boolean
-  note?: string
 }
 
-/** Eyni açarla idarə olunan servisləri bir sətirdə birləşdirir. */
+/** Collapses services controlled by the same key into one row. */
 export const SERVICE_GROUPS: ServiceGroup[] = (() => {
   const byPath = new Map<string, ServiceDef[]>()
   const groups: ServiceGroup[] = []
   for (const svc of SERVICES) {
     if (svc.configPath === null) {
-      groups.push({
-        configPath: null,
-        label: svc.label,
-        keys: [svc.key],
-        required: true,
-        note: svc.note
-      })
+      groups.push({ configPath: null, label: svc.label, keys: [svc.key], required: true })
       continue
     }
     byPath.set(svc.configPath, [...(byPath.get(svc.configPath) ?? []), svc])
@@ -75,8 +57,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = (() => {
       configPath,
       label: defs.map((d) => d.label).join(' + '),
       keys: defs.map((d) => d.key),
-      required: false,
-      note: defs.find((d) => d.note)?.note
+      required: false
     })
   }
   return groups
@@ -89,8 +70,8 @@ export function labelFor(key: string): string {
 }
 
 /**
- * `192.5MiB`, `1.2GiB`, `15.66GiB` → bayt. Docker CLI-nin `MemUsage` sütunu bu
- * formatdadır və self-hosted tərəfdə yeganə mənbədir.
+ * `192.5MiB`, `1.2GiB`, `15.66GiB` → bytes. The Docker CLI's `MemUsage` column
+ * uses this format and it is the only source on the self-hosted side.
  */
 export function parseBytes(text: string): number | null {
   const m = /([\d.]+)\s*([KMGT]?i?B)/i.exec(text.trim())

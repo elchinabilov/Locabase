@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import type { ConfigPatch, PatchPreview, Project } from '@shared/types'
+import type { ConfigField, ConfigPatch, PatchPreview, Project } from '@shared/types'
 import { CONFIG_FIELDS, CONFIG_GROUPS } from '@shared/config-schema'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
+import { useI18n } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Modal, Skeleton } from '../components/ui'
 import { DiffView } from '../components/diff-view'
 import {
@@ -13,7 +14,21 @@ import {
   type Draft
 } from '../components/field-editor'
 
+/**
+ * `field.label`/`field.help` are the Azerbaijani source (`config-schema.ts`) —
+ * before rendering, a translation is looked up under `config.fields.<path>.*`,
+ * and the AZ text stays when there is none. The path itself contains dots, so it
+ * cannot satisfy `t()`'s static `TranslationKey` check — `tDynamic` is used.
+ */
+function localize(field: ConfigField, tDynamic: (k: string) => string | undefined): ConfigField {
+  const label = tDynamic(`config.fields.${field.path}.label`)
+  const help = tDynamic(`config.fields.${field.path}.help`)
+  if (label === undefined && help === undefined) return field
+  return { ...field, label: label ?? field.label, help: help ?? field.help }
+}
+
 export function ConfigRoute({ project }: { project: Project }): ReactNode {
+  const { t, tDynamic } = useI18n()
   const doc = useQuery('config:read', { id: project.id }, [project.id])
   const [group, setGroup] = useState<string>('General')
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
@@ -76,15 +91,20 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
     }
   }, [project.id])
 
+  const localized = useMemo(
+    () => CONFIG_FIELDS.map((f) => localize(f, tDynamic)),
+    [tDynamic]
+  )
+
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase()
     if (q) {
-      return CONFIG_FIELDS.filter(
+      return localized.filter(
         (f) => f.path.toLowerCase().includes(q) || f.label.toLowerCase().includes(q)
       )
     }
-    return CONFIG_FIELDS.filter((f) => f.group === group)
-  }, [group, filter])
+    return localized.filter((f) => f.group === group)
+  }, [localized, group, filter])
 
   const dirtyByGroup = useMemo(() => {
     const map: Record<string, number> = {}
@@ -98,21 +118,21 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <h1 className="text-[15px] font-medium">Konfiqurasiya</h1>
+        <h1 className="text-[15px] font-medium">{t('config.title')}</h1>
         <span className="font-mono text-[11px] text-muted">supabase/config.toml</span>
         <div className="flex-1" />
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="sahə axtar…"
+          placeholder={t('config.searchPlaceholder')}
           className="w-52 rounded border border-line bg-[#0d141b] px-2 py-1 text-[11.5px] outline-none focus:border-accent-dim"
         />
         {patches.length > 0 && (
           <>
-            <Badge tone="ok">{patches.length} dəyişiklik</Badge>
-            <Button onClick={() => setDrafts({})}>Ləğv et</Button>
+            <Badge tone="ok">{t('auth.changeCount', { count: patches.length })}</Badge>
+            <Button onClick={() => setDrafts({})}>{t('common.cancel')}</Button>
             <Button variant="primary" onClick={() => void openPreview()}>
-              Yadda saxla…
+              {t('auth.saveEllipsis')}
             </Button>
           </>
         )}
@@ -120,13 +140,12 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
 
       {savedRestart && (
         <div className="flex items-center gap-3 border-b border-[#4a3c17] bg-[#211c10] px-4 py-2 text-[12px] text-warn">
-          Dəyişikliklər yazıldı, amma konteynerlərə hələ çatmayıb — Supabase konfiqurasiyanı yalnız
-          başlanğıcda oxuyur.
+          {t('config.savedRestartMessage')}
           <Button onClick={() => void restart()} loading={restarting}>
-            İndi restart et
+            {t('dashboard.needsRestart.now')}
           </Button>
           <button onClick={() => setSavedRestart(false)} className="text-muted hover:text-text">
-            sonra
+            {t('dashboard.needsRestart.later')}
           </button>
         </div>
       )}
@@ -165,7 +184,7 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
 
         <div className="min-w-0 flex-1 overflow-auto p-3">
           {doc.loading && (
-            <Card title="Yüklənir">
+            <Card title={t('common.loading')}>
               <div className="divide-y divide-line-soft">
                 {[0, 1, 2, 3, 4].map((i) => (
                   <div
@@ -185,10 +204,8 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
           {doc.error && <ErrorNote>{doc.error}</ErrorNote>}
           {values && (
             <Card
-              title={filter ? `Axtarış: ${shown.length} sahə` : group}
-              subtitle={
-                filter ? undefined : 'Faylda olmayan sahələr default dəyərlə göstərilir.'
-              }
+              title={filter ? t('config.searchResults', { count: shown.length }) : group}
+              subtitle={filter ? undefined : t('config.defaultHint')}
             >
               <div className="divide-y divide-line-soft">
                 {shown.map((field) => (
@@ -201,7 +218,9 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
                   />
                 ))}
                 {shown.length === 0 && (
-                  <p className="px-3.5 py-6 text-center text-[12px] text-muted">Sahə tapılmadı.</p>
+                  <p className="px-3.5 py-6 text-center text-[12px] text-muted">
+                    {t('config.fieldNotFound')}
+                  </p>
                 )}
               </div>
             </Card>
@@ -212,22 +231,22 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
       {preview && (
         <Modal
           wide
-          title="Dəyişikliklərin önizləməsi"
+          title={t('config.previewTitle')}
           onClose={() => setPreview(null)}
           footer={
             <>
-              <Button onClick={() => setPreview(null)}>Ləğv et</Button>
+              <Button onClick={() => setPreview(null)}>{t('common.cancel')}</Button>
               <Button variant="primary" onClick={() => void save()} loading={saving}>
-                Faylı yaz
+                {t('auth.writeFile')}
               </Button>
             </>
           }
         >
           <p className="mb-3 text-[12px] text-muted">
-            {preview.changedLines} sətir dəyişir. Şərhlər və sıra olduğu kimi qalır; yazmazdan əvvəl{' '}
-            <code>config.toml.bak</code> nüsxəsi götürülür.
+            {t('config.previewChangedLines', { count: preview.changedLines })}{' '}
+            <code>config.toml.bak</code> {t('config.previewBackupSuffix')}
             {preview.restartRequired && (
-              <span className="text-warn"> Dəyişiklik restart tələb edir.</span>
+              <span className="text-warn"> {t('config.previewRestartRequired')}</span>
             )}
           </p>
           <DiffView before={preview.before} after={preview.after} />

@@ -1,9 +1,9 @@
 /**
- * SQL icrası və sətir CRUD-u.
+ * SQL execution and row CRUD.
  *
- * Xəta rejimi: `execute()` SQL xətasında İSTİSNA ATMIR — router yalnız
- * `string` qaytardığına görə `position`/`hint`/`detail` itərdi. Xəta uğurlu
- * cavabın içində, `SqlRun.error`-da gedir (`TaskResult` üslubu).
+ * Error handling: `execute()` DOES NOT THROW on a SQL error — since the router
+ * only returns `string`, `position`/`hint`/`detail` would be lost. The error
+ * travels inside a successful response, in `SqlRun.error` (`TaskResult` style).
  */
 import { oidNames, poolFor } from './pool.js'
 import {
@@ -39,13 +39,13 @@ export interface ExecuteOpts {
   readOnly: boolean
   maxRows: number
   timeoutMs: number
-  /** Ləğv üçün renderer-in verdiyi təsadüfi açar. Yalnız lokalda işləyir. */
+  /** A random token from the renderer, used for cancellation. Local only. */
   token?: string
-  /** null = lokal Postgres; əks halda layihənin uzaq mühiti */
+  /** null = the local Postgres; otherwise one of the project's remote environments */
   envId?: string | null
 }
 
-/** token → icra edən backend-in pid-i */
+/** token → pid of the backend running the query */
 const inflight = new Map<string, { id: string; pid: number }>()
 
 export async function execute(id: string, sql: string, opts: ExecuteOpts): Promise<SqlRun> {
@@ -54,12 +54,12 @@ export async function execute(id: string, sql: string, opts: ExecuteOpts): Promi
   const readOnly = opts.readOnly !== false
   const started = Date.now()
 
-  // Uzaq mühit: nəqliyyat adapterdədir (Management API / psql). Ləğv, çoxlu
-  // nəticə bloku və `position` orada yoxdur — adapter özü izah edir.
+  // Remote environment: the transport lives in the adapter (Management API / psql).
+  // Cancellation, multiple result blocks and `position` don't exist there — the
   const envId = opts.envId ?? null
   if (envId) {
     const target = targetFor(id, envId)
-    if (!target.adapter) throw new Error(`Mühit tapılmadı: ${envId}`)
+    if (!target.adapter) throw new Error(`Environment not found: ${envId}`)
     try {
       return await target.adapter.runSql(sql, { readOnly, maxRows, timeoutMs })
     } catch (err) {
@@ -87,18 +87,18 @@ export async function execute(id: string, sql: string, opts: ExecuteOpts): Promi
       if (typeof pid === 'number') inflight.set(opts.token, { id, pid })
     }
 
-    // SET parametrləşdirilmir — ona görə dəyər tam ədəd kimi clamp olunur
+    // SET cannot be parameterized — so the value is clamped to an integer
     await client.query(`set statement_timeout = ${timeoutMs}`)
     if (readOnly) await client.query('begin read only')
 
     const raw = await client.query({ text: sql, rowMode: 'array', types: TEXT_TYPES })
     const names = await oidNames(id)
-    // Çoxifadəli skriptdə pg massiv qaytarır — HAMISI göstərilir, yalnız
-    // sonuncu deyil (`insert…; select…`-in rowCount-u itməsin)
+    // For a multi-statement script pg returns an array — ALL of them are shown,
+    // not just the last one (so the rowCount of `insert…; select…` isn't lost)
     const list = (Array.isArray(raw) ? raw : [raw]) as unknown[]
     const results: SqlResult[] = list.map((r) => toResult(r as never, names, maxRows))
 
-    // Yalnız-oxu tranzaksiyada commit ilə rollback eynidir
+    // Inside a read-only transaction, commit and rollback are the same thing
     if (readOnly) await client.query('rollback')
 
     return { ok: true, results, durationMs: Date.now() - started, readOnly, error: null }
@@ -119,24 +119,24 @@ export async function execute(id: string, sql: string, opts: ExecuteOpts): Promi
 }
 
 /**
- * İşləyən sorğunu ləğv et. `pg_terminate_backend` DEYİL — `cancel` bağlantını
- * sağ saxlayır, sorğu `57014` ilə təmiz qayıdır və klient hovuza dönür.
+ * Cancel a running query. NOT `pg_terminate_backend` — `cancel` keeps the
+ * connection alive, the query returns cleanly with `57014`, and the client goes
  */
 export async function cancel(id: string, token: string): Promise<{ cancelled: boolean }> {
   const hit = inflight.get(token)
   if (!hit || hit.id !== id) return { cancelled: false }
-  // Ayrıca bağlantıdan — icra edən klient bloklanıb
+  // From a separate connection — the executing client is blocked
   const res = await poolFor(id).query<{ ok: boolean }>('select pg_cancel_backend($1) as ok', [
     hit.pid
   ])
   return { cancelled: res.rows[0]?.ok === true }
 }
 
-/* ------------------------------------------------------------ sətir CRUD */
+/* -------------------------------------------------------------- row CRUD */
 
 /**
- * Sətir əməliyyatları həmişə əvvəlcə sütunları oxuyur: PK bundan tapılır və
- * hər identifikator sütun siyahısına qarşı yoxlanılır (`requireColumn`).
+ * Row operations always read the columns first: the PK comes from there and every
+ * identifier is checked against the column list (`requireColumn`).
  */
 async function relation(
   target: Target,
@@ -144,18 +144,18 @@ async function relation(
   table: string
 ): Promise<{ cols: DbColumn[]; keys: DbColumn[] }> {
   const cols = await introspect.columns(target.id, target.envId, schema, table)
-  if (cols.length === 0) throw new Error(`Cədvəl tapılmadı: ${schema}.${table}`)
+  if (cols.length === 0) throw new Error(`Table not found: ${schema}.${table}`)
   return { cols, keys: pkColumns(cols) }
 }
 
 /**
- * Yazma fraqmentini nəqliyyata uyğun icra edir.
+ * Runs a write fragment through the transport it belongs to.
  *
- * Uzaq mühitdə YAZMA `queryJson()`-dan KEÇMİR: o, nəticəni `json_agg` ilə alt
- * sorğuya sarıyır, Postgres isə datanı dəyişən CTE-nin yalnız yuxarı səviyyədə
- * olmasına icazə verir («WITH clause containing a data-modifying statement
- * must be at the top level»). Ona görə yazma `runSql()` ilə gedir — orada
- * ifadə yuxarı səviyyədədir və nəticə onsuz da mətn xanaları kimi qayıdır.
+ * On a remote environment a WRITE DOES NOT go through `queryJson()`: that wraps
+ * the result into a subquery with `json_agg`, and Postgres only allows a
+ * data-modifying CTE at the top level ("WITH clause containing a data-modifying
+ * statement must be at the top level"). So writes go through `runSql()` — there
+ * the statement is top level and the result comes back as text cells anyway.
  */
 async function runFragment(
   target: Target,
@@ -176,11 +176,11 @@ async function runFragment(
     maxRows: 5000,
     timeoutMs: 60_000
   })
-  if (!run.ok) throw new Error(run.error?.message ?? 'Uzaq mühitdə sorğu uğursuz oldu')
+  if (!run.ok) throw new Error(run.error?.message ?? 'The query failed on the remote environment')
   const result = run.results[0]
   if (!result) return []
-  // Uzaq nəticənin sütun sırası bizim introspeksiya sırası ilə eyni olmaya
-  // bilər — adla uyğunlaşdırılır
+  // The column order of a remote result may not match our introspection order —
+  // they are matched by name
   const index = new Map(result.columns.map((c, i) => [c.name, i]))
   return result.rows.map((row) =>
     cols.map((c) => {
@@ -206,7 +206,7 @@ export interface SelectRowsReq {
   exactCount?: boolean
 }
 
-/** Böyükdürsə `count(*)` işə salınmır — offset paginasiya onsuz da lokal dev üçündür. */
+/** Above this size `count(*)` is skipped — offset pagination is for local dev anyway. */
 const COUNT_LIMIT = 500_000
 
 export async function selectRows(id: string, req: SelectRowsReq): Promise<DbRowsPage> {
@@ -298,9 +298,9 @@ export async function insertRow(
 }
 
 /**
- * `update`/`delete` tranzaksiya içindədir və təsirlənən sətir sayını yoxlayır:
- * trigger və ya köhnəlmiş UI vəziyyəti səbəbindən kütləvi dəyişikliyin
- * qarşısını alır.
+ * `update`/`delete` run inside a transaction and check the affected row count:
+ * this prevents a mass change caused by a trigger or by stale UI state.
+ *
  */
 export async function updateRow(
   id: string,
@@ -312,17 +312,17 @@ export async function updateRow(
 ): Promise<{ row: DbRow }> {
   const target = targetFor(id, envId)
   const { cols, keys } = await relation(target, schema, table)
-  // UI təhlükəsizlik sərhədi deyil — guard burada da var
-  if (keys.length === 0) throw new Error('PK yoxdur — bu cədvəlin sətirləri redaktə olunmur')
+  // The UI is not a security boundary — the guard exists here too
+  if (keys.length === 0) throw new Error('No PK — rows of this table cannot be edited')
 
   const q = buildUpdate(schema, table, cols, pk, patch)
 
   if (target.adapter) {
-    // Uzaqda tranzaksiya idarə edilmir; datanı dəyişən CTE onsuz da atomikdir
-    // və qayıdan sətir sayı eyni yoxlamanı verir.
+    // Transactions aren't managed remotely; a data-modifying CTE is atomic anyway
+    // and the number of returned rows gives the same check.
     const rows = await runFragment(target, cols, q)
     if (rows.length !== 1) {
-      throw new Error(`Gözlənilən 1 sətir, dəyişən ${rows.length}.`)
+      throw new Error(`Expected 1 row, changed ${rows.length}.`)
     }
     return { row: rows[0] ?? [] }
   }
@@ -339,7 +339,7 @@ export async function updateRow(
     if (res.rowCount !== 1) {
       await client.query('rollback')
       throw new Error(
-        `Gözlənilən 1 sətir, dəyişən ${res.rowCount ?? 0} — dəyişiklik geri qaytarıldı.`
+        `Expected 1 row, changed ${res.rowCount ?? 0} — the change was rolled back.`
       )
     }
     await client.query('commit')
@@ -361,21 +361,21 @@ export async function deleteRows(
 ): Promise<{ deleted: number }> {
   const target = targetFor(id, envId)
   const { cols, keys } = await relation(target, schema, table)
-  if (keys.length === 0) throw new Error('PK yoxdur — bu cədvəlin sətirləri silinmir')
+  if (keys.length === 0) throw new Error('No PK — rows of this table cannot be deleted')
 
   const q = buildDelete(schema, table, cols, pks)
 
   if (target.adapter) {
-    // `returning` sətirlərinin sayı silinənlərin sayıdır — uzaqda `rowCount`
-    // etibarlı gəlmir (psql CSV-də command tag söndürülüb)
+    // The number of `returning` rows is the number deleted — remotely `rowCount`
+    // is not reliable (command tags are off in psql's CSV mode)
     const run = await target.adapter.runSql(
       `${inlineParams(q.text, q.params)} returning 1`,
       { readOnly: false, maxRows: 5000, timeoutMs: 60_000 }
     )
-    if (!run.ok) throw new Error(run.error?.message ?? 'Silinmə uğursuz oldu')
+    if (!run.ok) throw new Error(run.error?.message ?? 'The delete failed')
     const deleted = run.results[0]?.rows.length ?? 0
     if (deleted > pks.length) {
-      throw new Error(`Gözləniləndən çox sətir silindi (${deleted}).`)
+      throw new Error(`More rows were deleted than expected (${deleted}).`)
     }
     return { deleted }
   }
@@ -387,7 +387,7 @@ export async function deleteRows(
     if ((res.rowCount ?? 0) > pks.length) {
       await client.query('rollback')
       throw new Error(
-        `Gözləniləndən çox sətir silinirdi (${res.rowCount}) — əməliyyat geri qaytarıldı.`
+        `More rows than expected were being deleted (${res.rowCount}) — the operation was rolled back.`
       )
     }
     await client.query('commit')

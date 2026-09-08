@@ -1,10 +1,10 @@
 /**
- * `supabase` CLI və digər xarici əmrlərin işə salınması.
+ * Running the `supabase` CLI and other external commands.
  *
- * İki qayda:
- *  - secret dəyərlər **heç vaxt** arqument kimi verilmir (ps siyahısında görünür);
- *    onlar ya stdin, ya da env vasitəsilə ötürülür.
- *  - hər çıxış sətri log avtobusuna düşür, ona görə UI canlı izləyə bilir.
+ * Two rules:
+ *  - secret values are **never** passed as arguments (they show up in `ps`);
+ *    they go through stdin or the environment instead.
+ *  - every output line lands on the log bus, so the UI can follow along live.
  */
 import { spawn, type SpawnOptions } from 'node:child_process'
 import { logBus } from './log.js'
@@ -14,19 +14,19 @@ import type { TaskResult } from '@shared/types.js'
 export interface RunOptions {
   cwd?: string
   env?: Record<string, string>
-  /** loglar bu axın adı altında görünür, məs. `stack:next-cv` */
+  /** logs appear under this stream name, e.g. `stack:sample-c` */
   stream?: string
-  /** stdin-ə yazılacaq mətn (miqrasiya SQL-i, secret dəyərləri və s.) */
+  /** text to write to stdin (migration SQL, secret values, …) */
   input?: string
   timeoutMs?: number
-  /** true olduqda çıxış loga düşmür — yalnız json parse üçün */
+  /** when true the output is not logged — for JSON parsing only */
   quiet?: boolean
-  /** abort edildikdə prosesə SIGTERM, 3 san. sonra SIGKILL göndərilir */
+  /** on abort the process gets SIGTERM, then SIGKILL 3s later */
   signal?: AbortSignal
   /**
-   * Çıxışın saxlanan son sətir sayı. Default 200 — loglar üçün kifayətdir,
-   * amma `psql --csv` kimi NƏTİCƏ qaytaran əmrlərdə kəsilmə datanı sakitcə
-   * korlayardı, ona görə onlar bu limiti qaldırır.
+   * How many trailing output lines are kept. Default 200 — plenty for logs,
+   * but for commands that return RESULTS, like `psql --csv`, truncation would
+   * silently corrupt the data, so those raise the limit.
    */
   maxOutputLines?: number
 }
@@ -53,8 +53,8 @@ export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise
     }
     if (!opts.quiet) logBus.push(stream, 'info', `$ ${cmd} ${args.join(' ')}`)
 
-    // GUI-dən açılan tətbiqdə PATH kasıb olur; binarı özümüz tapıb tam yolla
-    // çağırırıq ki, spawn ENOENT verməsin.
+    // An app launched from the GUI has a poor PATH; we resolve the binary
+    // ourselves and call it by full path so spawn doesn't fail with ENOENT.
     const bin = whichBin(cmd) ?? cmd
     const child = spawn(bin, args, spawnOpts)
     const chunks: string[] = []
@@ -108,7 +108,7 @@ export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise
     child.on('error', (err) => {
       const msg =
         (err as NodeJS.ErrnoException).code === 'ENOENT'
-          ? `\`${cmd}\` tapılmadı — PATH-də quraşdırılıbmı? (axtarılan PATH: ${path})`
+          ? `\`${cmd}\` not found — is it installed and on PATH? (PATH searched: ${path})`
           : err.message
       if (!opts.quiet) logBus.push(stream, 'error', msg)
       finish(null, msg)
@@ -117,7 +117,7 @@ export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise
   })
 }
 
-/** Uğursuzluqda istisna atan variant. */
+/** Variant that throws on failure. */
 export async function runOrThrow(
   cmd: string,
   args: string[],
@@ -125,14 +125,14 @@ export async function runOrThrow(
 ): Promise<TaskResult> {
   const res = await run(cmd, args, opts)
   if (!res.ok) {
-    throw new CommandError(res.error ?? `${cmd} ${args[0] ?? ''} uğursuz oldu (kod ${res.code})`, res)
+    throw new CommandError(res.error ?? `${cmd} ${args[0] ?? ''} failed (code ${res.code})`, res)
   }
   return res
 }
 
 /**
- * Mətnin `start` mövqeyindən başlayan balanslaşdırılmış JSON parçasını qaytarır.
- * Sətir içindəki mötərizələr sayılmır.
+ * Returns the balanced JSON slice starting at `start` in the text.
+ * Brackets inside strings are not counted.
  */
 function balancedSlice(text: string, start: number): string | null {
   const open = text[start]
@@ -157,11 +157,11 @@ function balancedSlice(text: string, start: number): string | null {
 }
 
 /**
- * JSON qaytaran CLI əmri.
+ * A CLI command that returns JSON.
  *
- * Supabase CLI JSON-dan əvvəl sərbəst mətn yazır — və o mətnin özündə də
- * mötərizə ola bilər (`Stopped services: [supabase_imgproxy_...]`). Ona görə
- * hər namizəd mövqe sınanır və ilk **parse olunan** parça götürülür.
+ * The Supabase CLI prints free-form text before the JSON — and that text can
+ * contain brackets itself (`Stopped services: [supabase_imgproxy_...]`). So every
+ * candidate position is tried and the first slice that **parses** wins.
  */
 export async function runJson<T>(
   cmd: string,
@@ -185,12 +185,12 @@ export async function runJson<T>(
   }
 
   throw new CommandError(
-    res.error ?? `${cmd} ${args.join(' ')}: JSON çıxışı tapılmadı${last ? ` (${last})` : ''}`,
+    res.error ?? `${cmd} ${args.join(' ')}: no JSON output found${last ? ` (${last})` : ''}`,
     res
   )
 }
 
-/** `supabase` CLI-ni layihə qovluğunda işə sal. */
+/** Run the `supabase` CLI inside the project folder. */
 export function supabase(
   args: string[],
   opts: RunOptions & { cwd: string }

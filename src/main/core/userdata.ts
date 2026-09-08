@@ -1,10 +1,10 @@
 /**
- * Tətbiq adı əvvəlcə «Supabase GUI», sonra «Localbase», indi «Locabase»-dir.
- * Electron istifadəçi qovluğunu ad üzərindən qurduğuna görə köhnə registry yeni
- * qovluqda görünməzdi — bu bir dəfəlik köçürmə onu qarşılayır.
+ * The app was called «Supabase GUI», then «Localbase», and is now «Locabase».
+ * Electron derives the user-data folder from the name, so an old registry would
+ * be invisible under the new one — this one-off migration carries it over.
  *
- * Yalnız yeni qovluqda hələ heç nə yoxdursa işləyir və köhnəni silmir.
- * Sıra vacibdir: ən yeni köhnə ad birinci yoxlanılır.
+ * It only runs when the new folder is still empty, and it never deletes the old one.
+ * Order matters: the most recent old name is checked first.
  */
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -34,7 +34,7 @@ export function migrateUserData(): string | null {
       copyFileSync(from, join(userData, file));
       moved.push(file);
     } catch {
-      // köçürmə uğursuzdursa tətbiq boş registry ilə açılsın — dayanmasın
+      // if the move fails, let the app open with an empty registry rather than die
     }
   }
   return moved.length > 0

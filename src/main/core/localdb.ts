@@ -1,7 +1,8 @@
 /**
- * Lokal Postgres-ə birbaşa bağlantı — miqrasiya ledger-ini oxumaq üçün.
- * CLI-nin `migration list` çıxışını parse etməkdənsə cədvəli özümüz oxuyuruq:
- * nəticə həmişə eyni formadadır və CLI-nin mətn formatından asılı deyil.
+ * A direct connection to the local Postgres — used to read the migration ledger.
+ * Rather than parsing the CLI's `migration list` output we read the table
+ * ourselves: the result always has a fixed shape, independent of the CLI's text
+ * format.
  */
 import { readFileSync } from 'node:fs'
 import { Client } from 'pg'
@@ -28,7 +29,7 @@ const LEDGER_SQL = `
   order by version
 `
 
-/** Ledger sətirlərini oxu. Baza qalxmayıbsa `null` qaytarır (xəta atmır). */
+/** Read the ledger rows. Returns `null` if the database is down (never throws). */
 export async function readLedger(project: Project): Promise<LedgerRow[] | null> {
   const client = new Client({ connectionString: connectionString(project), connectionTimeoutMillis: 4000 })
   try {

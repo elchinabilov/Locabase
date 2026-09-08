@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 
 /**
- * Brend işarəsi — `resources/logo.svg` ilə eyni həndəsə, inline SVG kimi.
- * Gradient id-ləri unikaldır ki, bir səhifədə bir neçə ölçü yan-yana dursun.
+ * The brand mark — the same geometry as `resources/logo.svg`, as inline SVG.
+ * Gradient ids are unique so several sizes can sit next to each other on one page.
  */
 export function Mark({ size = 20 }: { size?: number }): ReactNode {
   const id = `lb${size}`

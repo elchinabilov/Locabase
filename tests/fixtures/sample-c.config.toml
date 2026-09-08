@@ -1,12 +1,12 @@
-# Lokal Supabase stack — Docker/OrbStack üzərində işləyir.
-# Konfiqurasiya sənədi: https://supabase.com/docs/guides/local-development/cli/config
+# Local Supabase stack — runs on Docker/OrbStack.
+# Configuration reference: https://supabase.com/docs/guides/local-development/cli/config
 #
-# Portlar standart 543xx deyil: bu maşında alocar (543xx) və e-tehsil (553xx)
-# layihələri də lokal Supabase işlədir. next-cv **563xx**-dədir.
+# Ports are not the default 543xx: this machine already runs two other local
+# Supabase projects (543xx and 553xx). This one sits at **563xx**.
 #
-# `project_id` konteynerləri və volume-ları bağlayan açardır — dəyişsən,
-# köhnə baza sahibsiz qalır.
-project_id = "next-cv"
+# `project_id` is the key that binds containers and volumes — change it and the
+# old database is orphaned.
+project_id = "sample-c"
 
 [api]
 enabled = true
@@ -22,7 +22,7 @@ enabled = false
 port = 56322
 shadow_port = 56320
 health_timeout = "2m"
-# Produksiya (self-hosted) da 17-dir — ikisi eyni qalmalıdır.
+# Production (self-hosted) is 17 as well — the two must stay in sync.
 major_version = 17
 
 [db.pooler]
@@ -53,7 +53,7 @@ enabled = true
 port = 56323
 api_url = "http://127.0.0.1"
 
-# Mailpit — lokalda göndərilən e-poçtlar həqiqətən getmir, bu panelə düşür.
+# Mailpit — mail sent locally never really leaves, it lands in this panel.
 [local_smtp]
 enabled = true
 port = 56324
@@ -62,8 +62,8 @@ port = 56324
 enabled = true
 file_size_limit = "50MiB"
 
-# `photos` bucket-i 00001_init.sql miqrasiyasında yaradılır (RLS policy-ləri ilə
-# bir yerdə), ona görə burada təkrarlanmır.
+# The `photos` bucket is created in the 00001_init.sql migration (together with
+# its RLS policies), so it is not repeated here.
 
 [storage.s3_protocol]
 enabled = true
@@ -76,7 +76,7 @@ enabled = false
 
 [auth]
 enabled = true
-# Web tətbiq: brauzer origin-i. Produksiyada serverin .env-ində SITE_URL.
+# Web app: the browser origin. In production this is SITE_URL in the server's .env.
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/**"]
 jwt_expiry = 3600
@@ -98,7 +98,7 @@ token_verifications = 30
 web3 = 30
 
 [auth.email]
-# Tətbiq yalnız OAuth işlədir; e-poçt signup lokalda sınaq üçün açıq qalır.
+# The app only uses OAuth; email signup stays on locally for testing.
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
@@ -127,8 +127,8 @@ otp_length = 6
 template = "Your code is {{ .Code }}"
 max_frequency = "5s"
 
-# OAuth provider-ləri. Açarlar kök `.env` faylından oxunur (gitignored) —
-# `supabase/functions/.env` kimi ikinci fayl qəsdən yoxdur: bir fayl, bir restart.
+# OAuth providers. Keys are read from the root `.env` file (gitignored) —
+# there is deliberately no second `supabase/functions/.env`: one file, one restart.
 #
 # Google Cloud Console > Credentials > OAuth 2.0 Client (Web):
 #   Authorized redirect URI: http://127.0.0.1:56321/auth/v1/callback
@@ -154,8 +154,8 @@ email_optional = false
 
 # LinkedIn Developers > App > Auth > "Sign In with LinkedIn using OpenID Connect":
 #   Authorized redirect URL: http://127.0.0.1:56321/auth/v1/callback
-# Diqqət: provider adı `linkedin_oidc`-dir, köhnə `linkedin` deyil — login
-# səhifəsi də bu adı göndərir (src/app/login/page.tsx).
+# Note: the provider name is `linkedin_oidc`, not the old `linkedin` — the login
+# page sends this name too (src/app/login/page.tsx).
 [auth.external.linkedin_oidc]
 enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_LINKEDIN_OIDC_CLIENT_ID)"
@@ -185,12 +185,12 @@ enabled = false
 authorization_url_path = "/oauth/consent"
 allow_dynamic_registration = false
 
-# Layihədə edge funksiya yoxdur — bütün backend məntiqi RLS + Next.js server
-# tərəfindədir. Lazım olsa `supabase/functions/` yarat və burada aç.
+# The project has no edge functions — all backend logic lives in RLS + the Next.js
+# server. If you need them, create `supabase/functions/` and enable it here.
 [edge_runtime]
 enabled = false
 
-# Logflare lokalda ən tez sınan hissədir və bizə lazım deyil.
+# Logflare is the first thing to break locally and we don't need it.
 [analytics]
 enabled = false
 port = 56327

@@ -1,9 +1,9 @@
 /**
- * Managed mühit — supabase.com layihəsi.
+ * The managed environment — a supabase.com project.
  *
- * İşin çoxunu CLI görür (link, db push, functions deploy, secrets), auth
- * konfiqurasiyası isə Management API ilə oxunur. Access token heç vaxt
- * arqument kimi verilmir — yalnız `SUPABASE_ACCESS_TOKEN` env dəyişəni ilə.
+ * The CLI does most of the work (link, db push, functions deploy, secrets), while
+ * the auth configuration is read through the Management API. The access token is
+ * never passed as an argument — only through the `SUPABASE_ACCESS_TOKEN` env var.
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -53,7 +53,7 @@ export class ManagedAdapter implements RemoteAdapter {
     const token = getSecret(keys.managedToken(this.env.id))
     if (!token) {
       throw new Error(
-        `«${this.env.name}» üçün access token yoxdur — mühit ayarlarından əlavə et.`
+        `No access token for «${this.env.name}» — add one in the environment settings.`
       )
     }
     return token
@@ -66,7 +66,7 @@ export class ManagedAdapter implements RemoteAdapter {
     return out
   }
 
-  /** `supabase/.temp/project-ref` bu mühitə baxmırsa yenidən link et. */
+  /** Re-link when `supabase/.temp/project-ref` points somewhere other than this environment. */
   private async ensureLinked(): Promise<void> {
     const refFile = join(this.project.path, 'supabase', '.temp', 'project-ref')
     const current = existsSync(refFile) ? readFileSync(refFile, 'utf8').trim() : null
@@ -77,7 +77,7 @@ export class ManagedAdapter implements RemoteAdapter {
       stream: this.stream,
       timeoutMs: 120_000
     })
-    if (!res.ok) throw new Error(`link uğursuz: ${res.error ?? res.output}`)
+    if (!res.ok) throw new Error(`link failed: ${res.error ?? res.output}`)
   }
 
   private async api<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -101,9 +101,9 @@ export class ManagedAdapter implements RemoteAdapter {
       const p = await this.api<{ name: string; region: string; status: string }>(
         `/v1/projects/${this.env.projectRef}`
       )
-      details.push({ label: 'Layihə', ok: true, info: `${p.name} · ${p.region} · ${p.status}` })
+      details.push({ label: 'Project', ok: true, info: `${p.name} · ${p.region} · ${p.status}` })
     } catch (err) {
-      details.push({ label: 'Layihə', ok: false, info: (err as Error).message })
+      details.push({ label: 'Project', ok: false, info: (err as Error).message })
     }
     return { ok: details.every((d) => d.ok), kind: this.kind, details }
   }
@@ -120,12 +120,12 @@ export class ManagedAdapter implements RemoteAdapter {
   }
 
   /**
-   * Managed tərəfdə seçmə miqrasiya tətbiqi yoxdur — `db push` gözləyən
-   * hamısını sıra ilə tətbiq edir. UI istifadəçini bu barədə xəbərdar edir.
+   * There is no selective migration apply on managed — `db push` applies every
+   * pending migration in order. The UI warns the user about this.
    */
   async applyMigrations(_files: MigrationFile[], log: LogFn): Promise<void> {
     await this.ensureLinked()
-    log('supabase db push — gözləyən bütün miqrasiyalar tətbiq olunur')
+    log('supabase db push — every pending migration will be applied')
     const res = await supabase(['db', 'push', '--yes'], {
       cwd: this.project.path,
       env: this.cliEnv(),
@@ -141,7 +141,7 @@ export class ManagedAdapter implements RemoteAdapter {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     const file = join(dir, `${this.env.projectRef}-${stamp}.sql`)
     mkdirSync(dir, { recursive: true })
-    log(`Sxem yedəyi: ${file}`)
+    log(`Schema backup: ${file}`)
     const res = await supabase(['db', 'dump', '--linked', '-f', file], {
       cwd: this.project.path,
       env: this.cliEnv(),
@@ -160,7 +160,7 @@ export class ManagedAdapter implements RemoteAdapter {
     return rows.map((r) => r.name).sort()
   }
 
-  /** Dəyərlər müvəqqəti 0600 fayl ilə ötürülür — `ps` siyahısında görünməsin. */
+  /** Values go through a temporary 0600 file — so they never show up in `ps`. */
   async setSecrets(kv: Record<string, string>, log: LogFn): Promise<void> {
     const entries = Object.entries(kv)
     if (entries.length === 0) return
@@ -172,7 +172,7 @@ export class ManagedAdapter implements RemoteAdapter {
         entries.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join('\n'),
         { mode: 0o600 }
       )
-      log(`${entries.length} secret göndərilir: ${entries.map(([k]) => k).join(', ')}`)
+      log(`Sending ${entries.length} secret(s): ${entries.map(([k]) => k).join(', ')}`)
       const res = await supabase(
         ['secrets', 'set', '--project-ref', this.env.projectRef, '--env-file', file],
         { cwd: this.project.path, env: this.cliEnv(), stream: this.stream, timeoutMs: 120_000 }
@@ -193,25 +193,26 @@ export class ManagedAdapter implements RemoteAdapter {
       status: r.status ?? null,
       updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
       verifyJwt: r.verify_jwt ?? null,
-      // Management API fayl siyahısı vermir — fərq yalnız `readFunction` ilə
+      // The Management API gives no file listing — the diff is only available
+      // through `readFunction`.
       files: null
     }))
   }
 
   /**
-   * Uzaq mənbə `functions download` ilə **müvəqqəti** iş qovluğuna endirilir —
-   * layihənin öz `supabase/functions/` qovluğu heç vaxt üstündən yazılmır.
+   * The remote source is downloaded with `functions download` into a **temporary**
+   * working folder — the project's own `supabase/functions/` is never overwritten.
    */
   async readFunction(name: string): Promise<RemoteFile[]> {
-    if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error(`yararsız funksiya adı: ${name}`)
+    if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error(`invalid function name: ${name}`)
     const work = mkdtempSync(join(tmpdir(), 'locabase-fn-'))
     try {
       mkdirSync(join(work, 'supabase'), { recursive: true })
       writeFileSync(join(work, 'supabase', 'config.toml'), `project_id = "download"\n`, 'utf8')
       const args = ['functions', 'download', name, '--project-ref', this.env.projectRef, '--workdir', work]
       const opts = { cwd: work, env: this.cliEnv(), stream: this.stream, timeoutMs: 5 * 60 * 1000 }
-      // `--use-api` server tərəfdə unbundle edir — Docker tələb olunmur.
-      // Köhnə CLI bu bayrağı tanımır, onda adi yolla təkrarlanır.
+      // `--use-api` unbundles server-side — no Docker required.
+      // Older CLIs don't know the flag, in which case we retry the normal way.
       let res = await supabase([...args, '--use-api'], opts)
       if (!res.ok && /unknown flag|unknown shorthand/i.test(res.output)) {
         res = await supabase(args, opts)
@@ -236,8 +237,8 @@ export class ManagedAdapter implements RemoteAdapter {
   }
 
   /**
-   * Managed layihədə ayrı-ayrı servisləri söndürmək mümkün deyil — platforma
-   * onları özü idarə edir və belə bir API yoxdur.
+   * Individual services cannot be turned off on a managed project — the platform
+   * manages them and there is no API for it.
    */
   async listServices(): Promise<RemoteService[]> {
     return []
@@ -245,7 +246,7 @@ export class ManagedAdapter implements RemoteAdapter {
 
   async setServiceState(): Promise<void> {
     throw new Error(
-      'Managed layihədə servisləri ayrıca söndürmək mümkün deyil — supabase.com onları özü idarə edir.'
+      'Services cannot be switched off individually on a managed project — supabase.com manages them.'
     )
   }
 
@@ -281,11 +282,11 @@ export class ManagedAdapter implements RemoteAdapter {
   /* ------------------------------------------------------------ SQL */
 
   /**
-   * Management API-nin `database/query` endpoint-i. Nəticə JSON sətir
-   * obyektləri kimi gəlir — nə sütun metadata-sı, nə də command tag var.
+   * The Management API's `database/query` endpoint. Results arrive as JSON row
+   * objects — there is no column metadata and no command tag.
    *
-   * `read_only` SERVER tərəfdə tətbiq olunur: bu bizim yeganə qorunmamızdır,
-   * çünki bu nəqliyyatda `begin read only` göndərməyin yolu yoxdur.
+   * `read_only` is enforced SERVER-side: that is our only protection here, because
+   * this transport has no way to send `begin read only`.
    */
   private async queryApi(query: string, readOnly: boolean): Promise<Array<Record<string, unknown>>> {
     return this.api<Array<Record<string, unknown>>>(
@@ -322,9 +323,9 @@ export class ManagedAdapter implements RemoteAdapter {
 }
 
 /**
- * JSON sətirlərini şəbəkə formasına çevirir. Sütun sırası ilk sətrin açar
- * sırasıdır — API sütun metadata-sı vermir, ona görə eyniadlı sütunlar
- * (`select 1 as a, 2 as a`) burada birləşir. Lokal yolda belə deyil.
+ * Turns JSON rows into a grid. Column order is the key order of the first row —
+ * the API gives no column metadata, so identically named columns
+ * (`select 1 as a, 2 as a`) collapse here. The local path does not do this.
  */
 function jsonToResult(rows: Array<Record<string, unknown>>, maxRows: number): SqlResult {
   const names: string[] = []
@@ -343,7 +344,7 @@ function jsonToResult(rows: Array<Record<string, unknown>>, maxRows: number): Sq
   }
 }
 
-/** Bütün xanalar mətn olmalıdır — lokal yoldakı `TEXT_TYPES` ilə eyni müqavilə. */
+/** Every cell has to be text — the same contract as `TEXT_TYPES` on the local path. */
 function cellText(value: unknown): string | null {
   if (value === null || value === undefined) return null
   if (typeof value === 'string') return value

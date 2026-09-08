@@ -25,6 +25,8 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*",
+    "src/renderer/src/i18n/types.ts",
+    "src/renderer/src/i18n/locales/**/*",
     "tests/**/*"
   ]
 }

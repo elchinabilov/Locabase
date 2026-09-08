@@ -1,6 +1,6 @@
 /**
- * Lokal stack idarəsi. `supabase` CLI-ni layihə qovluğunda işə salır və
- * konteyner vəziyyətini docker-dən oxuyur.
+ * Local stack control. Runs the `supabase` CLI inside the project folder and
+ * reads container state from Docker.
  */
 import { servicesFor } from './docker.js'
 import { run, supabase, supabaseJson } from './cli.js'
@@ -9,7 +9,7 @@ import { logBus } from './log.js'
 import { write as writeConfig } from './config.js'
 import { SERVICE_GROUPS } from '@shared/services.js'
 
-/** Yalnız kataloqdakı açarlara icazə var — ixtiyari config yolu yazılmasın. */
+/** Only keys from the catalog are allowed — no arbitrary config path may be written. */
 const SERVICE_PATHS = new Set(
   SERVICE_GROUPS.map((g) => g.configPath).filter((p): p is string => p !== null)
 )
@@ -29,7 +29,7 @@ export async function status(id: string, withStats = false): Promise<StackStatus
   try {
     services = await servicesFor(project.projectId, withStats)
   } catch (err) {
-    error = `Docker əlçatmazdır: ${(err as Error).message}`
+    error = `Docker is unavailable: ${(err as Error).message}`
   }
 
   const running = services.some((s) => s.state === 'running')
@@ -42,7 +42,7 @@ export async function status(id: string, withStats = false): Promise<StackStatus
         timeoutMs: 60_000
       })
     } catch (err) {
-      // stack qalxır və ya yarımçıqdır — status json hazır deyil
+      // the stack is coming up or half-up — the status JSON isn't ready yet
       error ??= (err as Error).message
     }
   }
@@ -69,7 +69,7 @@ export async function start(id: string): Promise<TaskResult> {
 export async function stop(id: string, noBackup = true): Promise<TaskResult> {
   const project = getProject(id)
   const args = ['stop']
-  // `--no-backup` lokal bazanı silir; default olaraq SAXLAYIRIQ
+  // `--no-backup` wipes the local database; by default we KEEP it
   if (!noBackup) args.push('--no-backup')
   return supabase(args, {
     cwd: project.path,
@@ -81,16 +81,16 @@ export async function stop(id: string, noBackup = true): Promise<TaskResult> {
 export async function restart(id: string): Promise<TaskResult> {
   const project = getProject(id)
   const stream = streamFor(project.projectId)
-  logBus.push(stream, 'info', 'Restart: dayandırılır…')
+  logBus.push(stream, 'info', 'Restart: stopping…')
   const stopped = await stop(id, true)
   if (!stopped.ok) return stopped
-  logBus.push(stream, 'info', 'Restart: qaldırılır…')
+  logBus.push(stream, 'info', 'Restart: starting…')
   return start(id)
 }
 
 /**
- * `db reset` — bazanı silib bütün miqrasiyaları yenidən tətbiq edir.
- * Təsdiq mətni layihənin adı ilə üst-üstə düşməlidir.
+ * `db reset` — drops the database and re-applies every migration.
+ * The confirmation text has to match the project's name.
  */
 export async function reset(id: string, confirm: string): Promise<TaskResult> {
   const project = getProject(id)
@@ -99,7 +99,7 @@ export async function reset(id: string, confirm: string): Promise<TaskResult> {
       ok: false,
       code: null,
       output: '',
-      error: `Təsdiq uyğun gəlmir — «${project.name}» yazılmalıdır.`
+      error: `Confirmation does not match — «${project.name}» must be typed.`
     }
   }
   return supabase(['db', 'reset'], {
@@ -110,19 +110,19 @@ export async function reset(id: string, confirm: string): Promise<TaskResult> {
 }
 
 /**
- * Servisi aç/bağla. Lokal stack-də bu, konteyneri dayandırmaq deyil — CLI onu
- * ümumiyyətlə qaldırmasın deyə `config.toml`-dakı `enabled` açarı yazılır.
- * Dəyişiklik yalnız restartdan sonra qüvvəyə minir.
+ * Turn a service on/off. On the local stack this does not stop the container —
+ * it writes the `enabled` key in `config.toml` so the CLI never brings it up.
+ * The change only takes effect after a restart.
  */
 export function setService(id: string, configPath: string, on: boolean): { restartRequired: true } {
   if (!SERVICE_PATHS.has(configPath)) {
-    throw new Error(`Bu açar servis keçidi deyil: ${configPath}`)
+    throw new Error(`This key is not a service toggle: ${configPath}`)
   }
   writeConfig(id, [{ path: configPath, value: on }])
   return { restartRequired: true }
 }
 
-/** `supabase`, `docker` və `git` mövcuddurmu. */
+/** Whether `supabase`, `docker` and `git` are present. */
 export async function doctor(): Promise<Array<{ label: string; ok: boolean; info: string }>> {
   const checks: Array<{ label: string; ok: boolean; info: string }> = []
   for (const [label, cmd, args] of [
@@ -135,7 +135,7 @@ export async function doctor(): Promise<Array<{ label: string; ok: boolean; info
     checks.push({
       label,
       ok: res.ok,
-      info: res.ok ? res.output.split('\n')[0]!.trim() : (res.error ?? 'tapılmadı')
+      info: res.ok ? res.output.split('\n')[0]!.trim() : (res.error ?? 'not found')
     })
   }
   return checks

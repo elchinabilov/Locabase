@@ -1,34 +1,34 @@
 /**
- * `config.toml` üçün minimal, mövqe-saxlayan skaner.
+ * A minimal, position-preserving scanner for `config.toml`.
  *
- * Məqsəd tam TOML parseri deyil — oxuma işini `smol-toml` görür. Buranın işi
- * hər açarın **dəyərinin faylda harada başlayıb harada bitdiyini** tapmaqdır ki,
- * yamaqlayıcı yalnız həmin aralığı əvəz etsin və şərhlər toxunulmaz qalsın.
+ * The goal is not a full TOML parser — `smol-toml` does the reading. This file's
+ * job is to find **where each key's value starts and ends in the file**, so the
+ * patcher can replace only that range and leave comments untouched.
  */
 
 export interface TomlEntry {
-  /** nöqtəli tam yol, məs. `auth.external.google.client_id` */
+  /** full dotted path, e.g. `auth.external.google.client_id` */
   path: string
-  /** cədvəl yolu (`auth.external.google`) — kök səviyyə üçün boş sətir */
+  /** table path (`auth.external.google`) — empty string at the root level */
   table: string
-  /** açarın fayldakı başlanğıc offset-i */
+  /** the key's start offset in the file */
   keyStart: number
-  /** dəyərin ilk simvolunun offset-i */
+  /** offset of the value's first character */
   valueStart: number
-  /** dəyərin son simvolundan sonrakı offset (trailing şərh daxil deyil) */
+  /** offset just past the value's last character (excludes a trailing comment) */
   valueEnd: number
-  /** açarın sətirinin başlanğıcı (girinti daxil) */
+  /** start of the key's line (including indentation) */
   lineStart: number
-  /** sətirin sonu — trailing şərh daxil, sətir sonu simvolu daxil deyil */
+  /** end of the line — includes a trailing comment, excludes the newline itself */
   lineEnd: number
 }
 
 export interface TomlTable {
-  /** `[a.b]` → `a.b`. Array-of-tables (`[[x]]`) üçün `x#0`, `x#1`, ... */
+  /** `[a.b]` → `a.b`. For arrays of tables (`[[x]]`): `x#0`, `x#1`, … */
   path: string
   headerStart: number
   headerEnd: number
-  /** bu cədvələ aid sonuncu açarın `lineEnd`-i; açar yoxdursa `headerEnd` */
+  /** `lineEnd` of the last key in this table; `headerEnd` when it has none */
   lastEntryEnd: number
 }
 
@@ -38,20 +38,20 @@ export interface TomlScan {
   tables: TomlTable[]
   byPath: Map<string, TomlEntry>
   tableByPath: Map<string, TomlTable>
-  /** faylın sətir sonu üslubu */
+  /** the file's line-ending style */
   eol: '\n' | '\r\n'
 }
 
 const isWs = (c: string): boolean => c === ' ' || c === '\t'
 const isNl = (c: string): boolean => c === '\n' || c === '\r'
 
-/** Verilmiş offset-dən sətir sonuna qədər atla (sətir sonu simvolunu yemədən). */
+/** Skip from the given offset to the end of the line (without eating the newline). */
 function toEol(text: string, i: number): number {
   while (i < text.length && !isNl(text[i]!)) i++
   return i
 }
 
-/** Sətir sonu simvol(lar)ını ye. */
+/** Eat the newline character(s). */
 function eatEol(text: string, i: number): number {
   if (text[i] === '\r' && text[i + 1] === '\n') return i + 2
   if (isNl(text[i] ?? '')) return i + 1
@@ -59,8 +59,8 @@ function eatEol(text: string, i: number): number {
 }
 
 /**
- * String literalının sonunu tap. `i` açılış dırnağının üstündədir.
- * Qapanmayan string üçün sətir/fayl sonunu qaytarır — skaner heç vaxt ilişmir.
+ * Find the end of a string literal. `i` sits on the opening quote.
+ * For an unterminated string it returns the end of line/file — the scanner never hangs.
  */
 function skipString(text: string, i: number): number {
   const q = text[i]!
@@ -72,7 +72,7 @@ function skipString(text: string, i: number): number {
   let j = i + 1
   while (j < text.length) {
     const c = text[j]!
-    if (isNl(c)) return j // qapanmayıb: sətir bitdi
+    if (isNl(c)) return j // unterminated: the line ended
     if (q === '"' && c === '\\') {
       j += 2
       continue
@@ -84,8 +84,8 @@ function skipString(text: string, i: number): number {
 }
 
 /**
- * Dəyərin sonunu tap. Massiv/inline-table dərinliyini sayır, ona görə çoxsətirli
- * dəyərlər də düzgün tutulur; dərinlik 0-da `#` şərh başlanğıcıdır.
+ * Find the end of a value. Array/inline-table depth is tracked, so multi-line
+ * values are captured correctly; at depth 0 a `#` starts a comment.
  */
 function findValueEnd(text: string, start: number): number {
   let i = start
@@ -119,7 +119,7 @@ function findValueEnd(text: string, start: number): number {
     }
     i++
   }
-  // trailing boşluqları geri qaytar
+  // give the trailing whitespace back
   while (i > start && isWs(text[i - 1] ?? '')) i--
   return i
 }
@@ -175,7 +175,7 @@ export function scanToml(text: string): TomlScan {
       const headerStart = i
       const isArray = text[i + 1] === '['
       let j = i + (isArray ? 2 : 1)
-      // bağlayan mötərizəyə qədər — dırnaqlı açarları nəzərə alaraq
+      // up to the closing bracket — accounting for quoted keys
       while (j < text.length && text[j] !== ']' && !isNl(text[j]!)) {
         if (text[j] === '"' || text[j] === "'") {
           j = skipString(text, j)
@@ -216,7 +216,7 @@ export function scanToml(text: string): TomlScan {
       j++
     }
     if (eq === -1) {
-      // `=` yoxdur — bu sətri olduğu kimi buraxırıq
+      // no `=` — leave this line as it is
       i = eatEol(text, toEol(text, i))
       continue
     }

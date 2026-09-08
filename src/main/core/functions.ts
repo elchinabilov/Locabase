@@ -1,7 +1,7 @@
 /**
- * Edge funksiyalar. Lokal qovluq `supabase/functions/<ad>/`, uzaq tərəf isə
- * adapterdən gəlir. Lokal/uzaq fərqi məzmun hash-i ilə hesablanır — deploy-un
- * lazım olub-olmadığını göstərən yeganə etibarlı siqnal budur.
+ * Edge functions. The local side is the `supabase/functions/<name>/` folder, the
+ * remote side comes from the adapter. The difference between them is computed
+ * from a content hash — the only reliable signal for whether a deploy is needed.
  */
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
@@ -23,8 +23,8 @@ import type {
 } from '@shared/types.js'
 
 /**
- * Qovluğun məzmun hash-i + fayl-fayl md5-lər. Fayllar bir dəfə oxunur: eyni
- * siyahı həm ümumi hash, həm də uzaqla tutuşdurma üçün işlədilir.
+ * Content hash of a folder plus per-file md5s. Files are read once: the same
+ * listing feeds both the overall hash and the comparison against the remote.
  */
 export function hashDir(dir: string): { hash: string; files: number; checksums: RemoteFileChecksum[] } {
   const list = checksums(dir)
@@ -38,7 +38,7 @@ export function hashDir(dir: string): { hash: string; files: number; checksums: 
   return { hash: h.digest('hex').slice(0, 16), files: list.length, checksums: list }
 }
 
-/** Uzaq və lokal fayl md5-lərini tutuşdur. */
+/** Compare remote and local file md5s. */
 function driftOf(local: RemoteFileChecksum[], remote: RemoteFileChecksum[]): FunctionDrift {
   const r = new Map(remote.map((f) => [f.path, f.md5]))
   if (local.length !== r.size) return 'changed'
@@ -75,12 +75,12 @@ export async function list(id: string, envId: string | null): Promise<FunctionIn
       return {
         name: e.name,
         path,
-        entrypoint: entrypoint ?? '(tapılmadı)',
+        entrypoint: entrypoint ?? '(not found)',
         hash,
         files,
         verifyJwt: verifyJwtOf(configPath, e.name),
         remote: null,
-        // remote siyahısı oxunana qədər fərq bilinmir
+        // until the remote listing is read, the difference is unknown
         drift: 'unknown' as FunctionDrift
       }
     })
@@ -97,8 +97,8 @@ export async function list(id: string, envId: string | null): Promise<FunctionIn
         fn.drift = 'local-only'
         continue
       }
-      // Uzaq tərəf fayl siyahısı verməyəndə (managed) fərq bilinmir —
-      // «Fərqə bax» onu tələb üzərinə hesablayır.
+      // When the remote gives no file listing (managed) the difference is unknown —
+      // "View diff" computes it on demand.
       fn.drift =
         fn.remote.files === null
           ? 'unknown'
@@ -109,7 +109,7 @@ export async function list(id: string, envId: string | null): Promise<FunctionIn
       local.push({
         name: r.name,
         path: '',
-        entrypoint: '(yalnız remote)',
+        entrypoint: '(remote only)',
         hash: '',
         files: r.files?.length ?? 0,
         verifyJwt: r.verifyJwt ?? true,
@@ -118,15 +118,15 @@ export async function list(id: string, envId: string | null): Promise<FunctionIn
       })
     }
   } catch (err) {
-    logBus.push('functions', 'warn', `Remote funksiyalar oxunmadı: ${(err as Error).message}`)
+    logBus.push('functions', 'warn', `Could not read remote functions: ${(err as Error).message}`)
   }
   return local
 }
 
 /**
- * Bir funksiyanın lokal və uzaq **məzmun** fərqi. Uzaq fayllar tələb üzərinə
- * gətirilir: self-hosted-də ssh ilə, managed-də `functions download` ilə
- * müvəqqəti qovluğa.
+ * The **content** diff between one function's local and remote copy. Remote files
+ * are fetched on demand: over ssh for self-hosted, via `functions download` into
+ * a temporary folder for managed.
  */
 export async function diff(id: string, envId: string, name: string): Promise<FunctionDiff> {
   const project = getProject(id)
@@ -137,8 +137,8 @@ export async function diff(id: string, envId: string, name: string): Promise<Fun
     remoteFiles = await adapterFor(project, getEnv(id, envId)).readFunction(name)
   } catch (err) {
     if (localFiles.length === 0) throw err
-    // uzaqda yoxdursa bu normaldır — hamısı «yalnız lokal» kimi göstərilir
-    logBus.push('functions', 'warn', `${name}: uzaq mənbə oxunmadı — ${(err as Error).message}`)
+    // missing on the remote is fine — everything shows up as "local only"
+    logBus.push('functions', 'warn', `${name}: could not read the remote source — ${(err as Error).message}`)
   }
 
   const byPath = new Map(remoteFiles.map((f) => [f.path, f]))
@@ -157,7 +157,7 @@ export async function diff(id: string, envId: string, name: string): Promise<Fun
 const TEMPLATE = `// <name> — Supabase Edge Function (Deno)
 //
 // Lokal: supabase functions serve
-// Çağırış: POST \${SUPABASE_URL}/functions/v1/<name>
+// Call it with: POST \${SUPABASE_URL}/functions/v1/<name>
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -185,17 +185,17 @@ const NAME_RE = /^[a-z][a-z0-9-]*$/
 
 export function create(id: string, name: string): { path: string } {
   if (!NAME_RE.test(name)) {
-    throw new Error('Ad kiçik hərflə başlamalı, yalnız hərf/rəqəm/tire ola bilər.')
+    throw new Error('The name must start with a lowercase letter and may only contain letters, digits and dashes.')
   }
   const project = getProject(id)
   const dir = join(paths.functionsDir(project), name)
-  if (existsSync(dir)) throw new Error(`«${name}» artıq var`)
+  if (existsSync(dir)) throw new Error(`«${name}» already exists`)
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'index.ts'), TEMPLATE.replaceAll('<name>', name), 'utf8')
   return { path: dir }
 }
 
-/** `[functions.<ad>] verify_jwt` açarını yaz. */
+/** Write the `[functions.<name>] verify_jwt` key. */
 export function setVerifyJwt(id: string, name: string, verifyJwt: boolean): void {
   writeConfig(id, [{ path: `functions.${name}.verify_jwt`, value: verifyJwt }])
 }
@@ -211,7 +211,7 @@ export function serve(id: string, on: boolean): void {
   if (existing) {
     existing.abort()
     serving.delete(id)
-    logBus.push(stream, 'info', 'functions serve dayandırıldı')
+    logBus.push(stream, 'info', 'functions serve stopped')
   }
   if (!on) return
 
@@ -222,14 +222,14 @@ export function serve(id: string, on: boolean): void {
     stream,
     signal: controller.signal
   }).then(() => serving.delete(id))
-  logBus.push(stream, 'info', 'functions serve başladı — dəyişikliklər hər sorğuda yenidən yüklənir')
+  logBus.push(stream, 'info', 'functions serve started — changes are reloaded on every request')
 }
 
 export function isServing(id: string): boolean {
   return serving.has(id)
 }
 
-/** Faylı yoxlanılan qovluqda: `statSync` yalnız mövcudluq üçün. */
+/** Is the path a file: `statSync` for existence only. */
 export function exists(path: string): boolean {
   try {
     return statSync(path).isDirectory()

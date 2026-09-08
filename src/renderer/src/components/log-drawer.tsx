@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LogLine } from '@shared/types'
 import { useEvent } from '../lib/ipc'
 import { clock, cx } from '../lib/format'
+import { useI18n, useT } from '../i18n'
 
 const MAX = 800
 
@@ -23,6 +24,8 @@ export function LogDrawer({
   const [lines, setLines] = useState<LogLine[]>([])
   const [filter, setFilter] = useState('')
   const [unseen, setUnseen] = useState(0)
+  const t = useT()
+  const { locale } = useI18n()
   const boxRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
 
@@ -56,7 +59,7 @@ export function LogDrawer({
           className="flex items-center gap-1.5 text-[11.5px] text-muted hover:text-text"
         >
           <span className={cx('transition-transform', open && 'rotate-90')}>▸</span>
-          Loglar
+          {t('logDrawer.title')}
         </button>
         {!open && unseen > 0 && (
           <span className="rounded bg-[#1a242f] px-1.5 py-0.5 text-[10px] text-accent">
@@ -69,14 +72,14 @@ export function LogDrawer({
             <input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="filtr…"
+              placeholder={t('logDrawer.filterPlaceholder')}
               className="w-40 rounded border border-line bg-[#0d141b] px-2 py-1 text-[11.5px] outline-none focus:border-accent-dim"
             />
             <button
               onClick={() => setLines([])}
               className="text-[11.5px] text-muted hover:text-text"
             >
-              təmizlə
+              {t('logDrawer.clear')}
             </button>
           </>
         )}
@@ -91,10 +94,10 @@ export function LogDrawer({
           }}
           className="h-[220px] overflow-auto px-3 pb-2 font-mono text-[11px] leading-[1.55]"
         >
-          {shown.length === 0 && <p className="py-4 text-muted">Hələ log yoxdur.</p>}
+          {shown.length === 0 && <p className="py-4 text-muted">{t('logDrawer.empty')}</p>}
           {shown.map((l, i) => (
             <div key={i} className="flex gap-2 whitespace-pre-wrap">
-              <span className="shrink-0 text-[#4a5b6c]">{clock(l.at)}</span>
+              <span className="shrink-0 text-[#4a5b6c]">{clock(l.at, locale)}</span>
               <span className="w-[120px] shrink-0 truncate text-[#5f7488]">{l.stream}</span>
               <span className={cx('min-w-0 flex-1', LEVEL_CLASS[l.level] ?? '')}>{l.text}</span>
             </div>

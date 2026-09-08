@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { ManagedEnv, Project, RemoteEnv, SelfHostedEnv } from '@shared/types'
 import { call } from '../lib/ipc'
+import { useT } from '../i18n'
 import { Button, ErrorNote, Input, Modal, Row, Select } from './ui'
 
 const uuid = (): string => crypto.randomUUID()
@@ -38,6 +39,7 @@ export function EnvForm({
   onClose: () => void
   onSaved: () => void
 }): ReactNode {
+  const t = useT()
   const [env, setEnv] = useState<RemoteEnv>(initial ?? emptyManaged())
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
@@ -80,35 +82,35 @@ export function EnvForm({
   return (
     <Modal
       wide
-      title={initial ? `Mühit — ${initial.name}` : 'Yeni remote mühit'}
+      title={initial ? t('envForm.editTitle', { name: initial.name }) : t('envForm.newTitle')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Ləğv et</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" onClick={() => void save()} loading={busy} disabled={!valid}>
-            Yadda saxla
+            {t('common.save')}
           </Button>
         </>
       }
     >
       <div className="divide-y divide-line-soft rounded-md border border-line">
-        <Row label="Ad" hint="production, staging, …">
+        <Row label={t('envForm.name.label')} hint={t('envForm.name.hint')}>
           <Input value={env.name} onChange={(e) => patch({ name: e.target.value })} />
         </Row>
-        <Row label="Növ">
+        <Row label={t('envForm.kind.label')}>
           <Select
             value={env.kind}
             onChange={setKind}
             options={[
-              { value: 'managed', label: 'Managed — supabase.com' },
-              { value: 'self-hosted', label: 'Self-hosted — SSH + Docker' }
+              { value: 'managed', label: t('envForm.kind.managed') },
+              { value: 'self-hosted', label: t('envForm.kind.selfHosted') }
             ]}
           />
         </Row>
 
         {env.kind === 'managed' ? (
           <>
-            <Row label="Project ref" hint="supabase.com/dashboard/project/<ref>">
+            <Row label={t('envForm.projectRef.label')} hint="supabase.com/dashboard/project/<ref>">
               <Input
                 value={env.projectRef}
                 onChange={(e) => patch<ManagedEnv>({ projectRef: e.target.value.trim() })}
@@ -117,12 +119,8 @@ export function EnvForm({
               />
             </Row>
             <Row
-              label="Access token"
-              hint={
-                env.hasToken
-                  ? 'Saxlanılıb. Yeni dəyər yazsan əvəzlənəcək.'
-                  : 'supabase.com → Account → Access Tokens. Sistem açar anbarında şifrələnir.'
-              }
+              label={t('envForm.accessToken.label')}
+              hint={env.hasToken ? t('envForm.accessToken.hintSaved') : t('envForm.accessToken.hintNew')}
             >
               <Input
                 type="password"
@@ -135,7 +133,7 @@ export function EnvForm({
           </>
         ) : (
           <>
-            <Row label="SSH host" hint="`root@server` və ya ~/.ssh/config-dakı alias">
+            <Row label={t('envForm.sshHost.label')} hint={t('envForm.sshHost.hint')}>
               <Input
                 value={env.sshHost}
                 onChange={(e) => patch<SelfHostedEnv>({ sshHost: e.target.value.trim() })}
@@ -143,7 +141,7 @@ export function EnvForm({
                 placeholder="root@my-contabo-server"
               />
             </Row>
-            <Row label="SSH port">
+            <Row label={t('envForm.sshPort.label')}>
               <Input
                 type="number"
                 value={String(env.sshPort)}
@@ -151,7 +149,7 @@ export function EnvForm({
                 className="max-w-[120px]"
               />
             </Row>
-            <Row label="SSH açarı" hint="Boş buraxsan ssh-agent və default açarlar işlənir">
+            <Row label={t('envForm.sshKey.label')} hint={t('envForm.sshKey.hint')}>
               <Input
                 value={env.sshKeyPath}
                 onChange={(e) => patch<SelfHostedEnv>({ sshKeyPath: e.target.value })}
@@ -159,10 +157,7 @@ export function EnvForm({
                 placeholder="~/.ssh/id_ed25519"
               />
             </Row>
-            <Row
-              label="Postgres konteyneri"
-              hint="serverdə: docker ps --format '{{.Names}}' | grep supabase-db"
-            >
+            <Row label={t('envForm.dbContainer.label')} hint={t('envForm.dbContainer.hint')}>
               <Input
                 value={env.dbContainer}
                 onChange={(e) => patch<SelfHostedEnv>({ dbContainer: e.target.value.trim() })}
@@ -170,17 +165,14 @@ export function EnvForm({
                 placeholder="supabase-db-xxxxxxxx"
               />
             </Row>
-            <Row label="Servis qovluğu" hint="Coolify: /data/coolify/services/<id>">
+            <Row label={t('envForm.remoteDir.label')} hint={t('envForm.remoteDir.hint')}>
               <Input
                 value={env.remoteDir}
                 onChange={(e) => patch<SelfHostedEnv>({ remoteDir: e.target.value.trim() })}
                 className="font-mono"
               />
             </Row>
-            <Row
-              label="Edge runtime konteyneri"
-              hint="Boş qalsa funksiya deploy-u söndürülür"
-            >
+            <Row label={t('envForm.functionsContainer.label')} hint={t('envForm.functionsContainer.hint')}>
               <Input
                 value={env.functionsContainer}
                 onChange={(e) => patch<SelfHostedEnv>({ functionsContainer: e.target.value.trim() })}
@@ -188,7 +180,7 @@ export function EnvForm({
                 placeholder="supabase-edge-functions-xxxxxxxx"
               />
             </Row>
-            <Row label="API URL">
+            <Row label={t('envForm.apiUrl.label')}>
               <Input
                 value={env.apiUrl}
                 onChange={(e) => patch<SelfHostedEnv>({ apiUrl: e.target.value.trim() })}
@@ -196,7 +188,7 @@ export function EnvForm({
                 placeholder="https://api.next-cv.app"
               />
             </Row>
-            <Row label="Site URL">
+            <Row label={t('envForm.siteUrl.label')}>
               <Input
                 value={env.siteUrl}
                 onChange={(e) => patch<SelfHostedEnv>({ siteUrl: e.target.value.trim() })}
@@ -204,14 +196,14 @@ export function EnvForm({
                 placeholder="https://next-cv.app"
               />
             </Row>
-            <Row label="Yedək qovluğu">
+            <Row label={t('envForm.backupDir.label')}>
               <Input
                 value={env.backupDir}
                 onChange={(e) => patch<SelfHostedEnv>({ backupDir: e.target.value.trim() })}
                 className="font-mono"
               />
             </Row>
-            <Row label="Yedək saxlama (gün)">
+            <Row label={t('envForm.backupRetention.label')}>
               <Input
                 type="number"
                 value={String(env.backupRetentionDays)}

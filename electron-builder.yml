@@ -1,5 +1,6 @@
 appId: app.locabase
 productName: Locabase
+copyright: Copyright © 2025 Elchin Abilov
 icon: resources/icon.png
 directories:
   buildResources: resources
@@ -15,7 +16,7 @@ mac:
   target:
     - target: dmg
       arch: [arm64]
-  # İmzalama və notarization sonrakı mərhələdə — hələlik lokal build.
+  # Signing and notarization come later — local, unsigned builds for now.
   identity: null
   darkModeSupport: true
 win:

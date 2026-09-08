@@ -6,9 +6,9 @@ export interface DiffLine {
 }
 
 /**
- * Sadə LCS-siz sətir diff-i: yamaqlayıcı yalnız nöqtəvi dəyişikliklər etdiyinə
- * görə sətirləri sıra ilə tutuşdurmaq kifayətdir. Uzunluq fərqi olduqda
- * əlavə/silinmə blokları ayrıca göstərilir.
+ * A simple line diff without LCS: since the patcher only makes pinpoint changes,
+ * comparing lines in order is enough. When the lengths differ, added/removed
+ * blocks are shown separately.
  */
 export function diffLines(before: string, after: string, context = 2): DiffLine[] {
   const a = before.split('\n')
@@ -26,7 +26,7 @@ export function diffLines(before: string, after: string, context = 2): DiffLine[
       j++
       continue
     }
-    // növbəti uyğunluğu axtar — kiçik pəncərə ilə
+    // look for the next match — with a small window
     const ahead = 40
     let matched = false
     for (let k = 1; k <= ahead && !matched; k++) {
@@ -51,7 +51,7 @@ export function diffLines(before: string, after: string, context = 2): DiffLine[
     }
   }
 
-  // yalnız dəyişikliklərin ətrafını saxla
+  // keep only what surrounds the changes
   const keep = new Set<number>()
   raw.forEach((line, idx) => {
     if (line.kind === 'same') return

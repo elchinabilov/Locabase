@@ -1,7 +1,7 @@
 /**
- * `project_id` adlandırma qaydası. Bu dəyər `config.toml`-a yazılır və docker
- * konteyner adlarının şəkilçisi olur (`supabase_db_<project_id>`), ona görə
- * yalnız kiçik hərf, rəqəm və `_ . -` saxlanılır.
+ * The `project_id` naming rule. This value is written into `config.toml` and
+ * becomes the suffix of the docker container names (`supabase_db_<project_id>`),
+ * so only lowercase letters, digits and `_ . -` are kept.
  */
 export function sanitizeProjectId(input: string): string {
   return input

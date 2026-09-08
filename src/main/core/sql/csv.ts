@@ -1,12 +1,12 @@
 /**
- * `psql --csv` çıxışının parseri (RFC 4180).
+ * Parser for `psql --csv` output (RFC 4180).
  *
- * Self-hosted mühitdə nəticələr SSH üzərindən `psql` ilə gəlir — orada nə `pg`
- * sürücüsü, nə də tip metadata-sı var. CSV seçilib, çünki dırnaqlama qaydası
- * dəyərin içindəki vergül, sətir keçidi və dırnağı itirmədən daşıyır.
+ * In a self-hosted environment results come back from `psql` over SSH — there is
+ * no `pg` driver and no type metadata there. CSV is chosen because its quoting
+ * rules carry commas, line breaks and quotes inside a value without losing them.
  *
- * NULL ilə boş sətri ayırmaq üçün psql-ə `-P null=<sentinel>` verilir: CSV-də
- * ikisi də boş sahə kimi görünərdi.
+ * To tell NULL apart from an empty string, psql is given `-P null=<sentinel>`:
+ * in CSV both would otherwise look like an empty field.
  */
 
 export function parseCsv(text: string): string[][] {
@@ -60,9 +60,9 @@ export function parseCsv(text: string): string[][] {
     started = true
   }
 
-  // Sonda sətir keçidi yoxdursa qalan sahəni bağla
+  // if there is no trailing newline, close the remaining field
   if (field.length > 0 || row.length > 0 || quoted) endRow()
-  // psql çıxışı `\n` ilə bitir — sonuncu boş sətri at
+  // psql output ends with `\n` — drop the last empty row
   if (rows.length > 0) {
     const last = rows[rows.length - 1]
     if (last && last.length === 1 && last[0] === '') rows.pop()
@@ -71,8 +71,8 @@ export function parseCsv(text: string): string[][] {
 }
 
 /**
- * `psql -q --csv -P null=<token>` çıxışını sütun/sətir cütünə çevirir.
- * Nəticə qaytarmayan ifadə (DDL) boş çıxış verir → sütun yoxdur.
+ * Turns `psql -q --csv -P null=<token>` output into a columns/rows pair.
+ * A statement that returns nothing (DDL) produces empty output → no columns.
  */
 export function parsePsqlCsv(
   output: string,
@@ -88,9 +88,9 @@ export function parsePsqlCsv(
 }
 
 /**
- * psql-in stderr mesajından `ERROR:` / `DETAIL:` / `HINT:` sətirlərini çıxarır.
- * Uzaq mühitdə `position` yoxdur — psql onu vermir, ona görə redaktorda
- * dalğalı işarə yalnız lokalda görünür.
+ * Extracts the `ERROR:` / `DETAIL:` / `HINT:` lines from psql's stderr message.
+ * There is no `position` on a remote environment — psql doesn't provide it, so
+ * the squiggly marker in the editor only appears locally.
  */
 export function parsePsqlError(output: string): {
   message: string
@@ -103,8 +103,8 @@ export function parsePsqlError(output: string): {
     if (!hit) return null
     return hit.slice(hit.indexOf(`${label}:`) + label.length + 1).trim() || null
   }
-  const message = pick('ERROR') ?? pick('FATAL') ?? output.trim().split('\n')[0] ?? 'psql xətası'
-  // `LINE n: …` və caret sətri kontekst üçün faydalıdır
+  const message = pick('ERROR') ?? pick('FATAL') ?? output.trim().split('\n')[0] ?? 'psql error'
+  // the `LINE n: …` and caret lines are useful context
   const lineIdx = lines.findIndex((l) => /^LINE \d+:/.test(l.trim()))
   const context =
     lineIdx >= 0 ? lines.slice(lineIdx, lineIdx + 2).join('\n').trimEnd() : null

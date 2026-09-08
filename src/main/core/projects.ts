@@ -1,7 +1,8 @@
 /**
- * Layihə registry-si. Diskdə saxlanılan yeganə şey yol + mühit metadata-sıdır;
- * `config.toml`, `.env` və miqrasiyalar həmişə fayl sistemindən oxunur, kopyası
- * saxlanılmır — tool ilə redaktorun bir-birini üzməsinin qarşısını alır.
+ * The project registry. The only thing stored on disk is the path plus
+ * environment metadata; `config.toml`, `.env` and migrations are always read
+ * from the filesystem and never cached — which stops the tool and an editor
+ * from fighting over the same file.
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, isAbsolute, join, resolve } from 'node:path'
@@ -15,8 +16,8 @@ interface RegistryShape {
 }
 
 /**
- * Store tənbəl yaradılır: `app.getPath('userData')` yalnız ilk müraciətdə
- * oxunur, beləcə `app.setName()` və userData miqrasiyası ondan əvvəl işləyə bilir.
+ * The store is created lazily: `app.getPath('userData')` is only read on first
+ * access, so `app.setName()` and the userData migration can run before it.
  */
 let _store: Store<RegistryShape> | null = null
 function store(): Store<RegistryShape> {
@@ -34,12 +35,12 @@ export interface InspectResult {
   reason: string | null
 }
 
-/** Qovluğun içində işlək bir Supabase layihəsi varmı? */
+/** Does this folder contain a usable Supabase project? */
 export function inspect(dir: string): InspectResult {
-  if (!isAbsolute(dir)) return { valid: false, projectId: null, reason: 'Yol mütləq olmalıdır' }
+  if (!isAbsolute(dir)) return { valid: false, projectId: null, reason: 'The path must be absolute' }
   const configPath = join(dir, 'supabase', 'config.toml')
   if (!existsSync(configPath)) {
-    return { valid: false, projectId: null, reason: 'supabase/config.toml tapılmadı' }
+    return { valid: false, projectId: null, reason: 'supabase/config.toml not found' }
   }
   try {
     const parsed = parseToml(readFileSync(configPath, 'utf8')) as { project_id?: unknown }
@@ -49,7 +50,7 @@ export function inspect(dir: string): InspectResult {
     }
     return { valid: true, projectId: id, reason: null }
   } catch (err) {
-    return { valid: false, projectId: null, reason: `config.toml oxunmadı: ${(err as Error).message}` }
+    return { valid: false, projectId: null, reason: `Could not read config.toml: ${(err as Error).message}` }
   }
 }
 
@@ -61,7 +62,7 @@ export function list(): Project[] {
 
 export function get(id: string): Project {
   const found = list().find((p) => p.id === id)
-  if (!found) throw new ProjectError(`Layihə tapılmadı: ${id}`)
+  if (!found) throw new ProjectError(`Project not found: ${id}`)
   return found
 }
 
@@ -69,7 +70,7 @@ export function add(dir: string): Project {
   const path = resolve(dir)
   const info = inspect(path)
   if (!info.valid || !info.projectId) {
-    throw new ProjectError(info.reason ?? 'Yararsız layihə qovluğu')
+    throw new ProjectError(info.reason ?? 'Not a usable project folder')
   }
   const existing = list().find((p) => p.path === path)
   if (existing) return existing
@@ -90,9 +91,9 @@ export function add(dir: string): Project {
 export function update(id: string, patch: Partial<Project>): Project {
   const projects = list()
   const idx = projects.findIndex((p) => p.id === id)
-  if (idx === -1) throw new ProjectError(`Layihə tapılmadı: ${id}`)
+  if (idx === -1) throw new ProjectError(`Project not found: ${id}`)
   const current = projects[idx]!
-  // id və path dəyişməz — onlar registry-nin açarıdır
+  // id and path are immutable — they are the registry's key
   const next: Project = { ...current, ...patch, id: current.id, path: current.path }
   projects[idx] = next
   store().set('projects', projects)
@@ -106,7 +107,7 @@ export function remove(id: string): void {
   )
 }
 
-/* ------------------------------------------------------------- mühitlər */
+/* ---------------------------------------------------------- environments */
 
 export function upsertEnv(id: string, env: RemoteEnv): Project {
   const project = get(id)
@@ -121,7 +122,7 @@ export function removeEnv(id: string, envId: string): Project {
 
 export function getEnv(id: string, envId: string): RemoteEnv {
   const found = get(id).environments.find((e) => e.id === envId)
-  if (!found) throw new ProjectError(`Mühit tapılmadı: ${envId}`)
+  if (!found) throw new ProjectError(`Environment not found: ${envId}`)
   return found
 }
 

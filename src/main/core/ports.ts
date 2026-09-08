@@ -1,25 +1,25 @@
 /**
- * Port menecer. Bu maşında bir neçə lokal Supabase stack-i yan-yana işləyir və
- * hər layihə öz 100-lük aralığını tutur (543xx, 553xx, 563xx...). Aralıq bölgüsü
- * indiyə qədər sənəddəki şərh kimi yaşayırdı — burada hesablanır.
+ * Port manager. Several local Supabase stacks run side by side on one machine
+ * and each project claims its own block of 100 (543xx, 553xx, 563xx…). That
+ * split used to live as a comment in a document — here it is computed.
  */
 import { readFileSync } from 'node:fs'
 import { parse as parseToml } from 'smol-toml'
 import { list as listProjects, paths } from './projects.js'
 import type { ConfigPatch, PortConflict, PortUsage, Project } from '@shared/types.js'
 
-/** Supabase-in standart port bazası: 543xx. */
+/** Supabase's default port base: 543xx. */
 export const DEFAULT_PORT_BASE = 543
 
 /**
- * `edge_runtime.inspector_port` standartda 8083-dür — 543xx blokundan
- * kənarda. Yeni layihədə onu da layihənin öz blokuna salırıq ki, yan-yana
- * işləyən stack-lər bir-birinin inspector portunu tutmasın.
+ * `edge_runtime.inspector_port` defaults to 8083 — outside the 543xx block. For
+ * a new project we move it into the project's own block too, so stacks running
+ * side by side don't claim each other's inspector port.
  */
 const INSPECTOR_PATH = 'edge_runtime.inspector_port'
 const INSPECTOR_OFFSET = 83
 
-/** `config.toml`-da port saxlayan açarlar. */
+/** The keys in `config.toml` that hold ports. */
 const PORT_PATHS: string[] = [
   'api.port',
   'db.port',
@@ -76,8 +76,8 @@ export function conflicts(): PortConflict[] {
 }
 
 /**
- * Boş 100-lük aralığın bazasını qaytarır: 543 → 543xx. Supabase-in standartı
- * 543-dür, ona görə axtarış oradan başlayır.
+ * Returns the base of a free block of 100: 543 → 543xx. Supabase's default is
+ * 543, so the search starts there.
  */
 export function suggestRange(): number {
   const used = new Set<number>()
@@ -91,9 +91,9 @@ export function suggestRange(): number {
 }
 
 /**
- * Təzə `supabase init`-in 543xx portlarını `base`xx blokuna köçürən yamaqlar.
- * `parsed` — parse olunmuş `config.toml`; yalnız faylda **mövcud** açarlar
- * qaytarılır, beləcə CLI versiyasında olmayan açar əlavə edilmir.
+ * Patches that move a fresh `supabase init`'s 543xx ports into the `base`xx block.
+ * `parsed` is the parsed `config.toml`; only keys that **exist** in the file are
+ * returned, so a key absent from this CLI version is never added.
  */
 export function remapPatches(parsed: unknown, base: number): ConfigPatch[] {
   if (base === DEFAULT_PORT_BASE) return []

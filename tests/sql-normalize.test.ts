@@ -7,7 +7,7 @@ const OIDS = new Map<number, string>([
 ])
 
 describe('TEXT_TYPES', () => {
-  it('dəyəri toxunmadan qaytarır', () => {
+  it('returns the value untouched', () => {
     const parse = TEXT_TYPES.getTypeParser()
     expect(parse('2024-01-01 10:00:00+00')).toBe('2024-01-01 10:00:00+00')
     expect(parse('{"a":1}')).toBe('{"a":1}')
@@ -15,7 +15,7 @@ describe('TEXT_TYPES', () => {
 })
 
 describe('toResult', () => {
-  it('eyniadlı sütunları saxlayır', () => {
+  it('keeps identically named columns', () => {
     const res = toResult(
       {
         command: 'SELECT',
@@ -35,13 +35,13 @@ describe('toResult', () => {
     expect(res.truncated).toBe(false)
   })
 
-  it('naməlum oid üçün fallback ad verir', () => {
+  it('falls back to a generated name for an unknown oid', () => {
     const res = toResult({ fields: [{ name: 'x', dataTypeID: 99999 }], rows: [] }, OIDS, 10)
     expect(res.columns[0]?.typeName).toBe('oid:99999')
     expect(res.command).toBeNull()
   })
 
-  it('maxRows-a görə kəsir', () => {
+  it('truncates according to maxRows', () => {
     const rows = Array.from({ length: 5 }, (_, i) => [String(i)])
     const res = toResult({ rows, rowCount: 5, fields: [{ name: 'i', dataTypeID: 23 }] }, OIDS, 3)
     expect(res.rows).toHaveLength(3)
@@ -49,7 +49,7 @@ describe('toResult', () => {
     expect(res.rowCount).toBe(5)
   })
 
-  it('sütunsuz nəticəni (DDL) emal edir', () => {
+  it('handles a result with no columns (DDL)', () => {
     const res = toResult({ command: 'CREATE TABLE', rowCount: null }, OIDS, 100)
     expect(res.columns).toEqual([])
     expect(res.rows).toEqual([])
@@ -57,7 +57,7 @@ describe('toResult', () => {
 })
 
 describe('toSqlError', () => {
-  it('pg xətasını tam köçürür və position-u 0-əsaslı edir', () => {
+  it('copies a pg error in full and makes position 0-based', () => {
     const info = toSqlError({
       message: 'syntax error at or near "selct"',
       code: '42601',
@@ -84,7 +84,7 @@ describe('toSqlError', () => {
     expect(info.code).toBeNull()
   })
 
-  it('obyekt olmayan dəyəri də emal edir', () => {
-    expect(toSqlError('nə isə').message).toBe('nə isə')
+  it('handles a non-object value too', () => {
+    expect(toSqlError('something').message).toBe('something')
   })
 })

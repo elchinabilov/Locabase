@@ -1,8 +1,8 @@
 /**
- * Remote access token və SSH parolları. Diskə açıq mətnlə yazılmır —
- * Electron `safeStorage` (macOS Keychain / Windows DPAPI / libsecret) ilə
- * şifrələnir. Şifrələmə mövcud deyilsə saxlamırıq: yalançı təhlükəsizlik
- * hissindənsə istifadəçidən hər dəfə soruşmaq yaxşıdır.
+ * Remote access tokens and SSH passwords. Never written to disk in clear text —
+ * they are encrypted with Electron `safeStorage` (macOS Keychain / Windows DPAPI
+ * / libsecret). If encryption is unavailable we don't store them at all: asking
+ * the user every time beats a false sense of security.
  */
 import { safeStorage } from 'electron'
 import Store from 'electron-store'
@@ -11,7 +11,7 @@ interface Shape {
   items: Record<string, string>
 }
 
-/** Tənbəl — bax `projects.ts`-dəki eyni səbəb. */
+/** Lazy — same reason as in `projects.ts`. */
 let _store: Store<Shape> | null = null
 function store(): Store<Shape> {
   _store ??= new Store<Shape>({ name: 'credentials', defaults: { items: {} } })
@@ -31,7 +31,7 @@ export function available(): boolean {
 export function set(key: string, value: string): void {
   if (!available()) {
     throw new SecretStoreError(
-      'Sistem açar anbarı əlçatmazdır — token saxlanıla bilməz (macOS-də Keychain girişini yoxla).'
+      'The system key store is unavailable — the token cannot be saved (on macOS, check Keychain access).'
     )
   }
   const items = { ...store().get('items') }

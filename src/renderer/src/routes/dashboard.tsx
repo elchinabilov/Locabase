@@ -3,8 +3,15 @@ import type { FieldValue, Project, ServiceStatus, StackStatus } from '@shared/ty
 import { formatBytes, SERVICE_GROUPS } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
 import { cx, timeAgo } from '../lib/format'
+import { useI18n, useT, type TranslationKey } from '../i18n'
 import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Row, Skeleton, Toggle } from '../components/ui'
 import type { RouteId } from '../app'
+
+/** `SERVICE_GROUPS` carries no `note` (so `shared/` stays free of i18n) — the key lives here. */
+const SERVICE_NOTE_KEY: Record<string, TranslationKey | undefined> = {
+  'storage.image_transformation.enabled': 'dashboard.services.note.imgproxy',
+  'analytics.enabled': 'dashboard.services.note.analytics'
+}
 
 export function Dashboard({
   project,
@@ -19,22 +26,22 @@ export function Dashboard({
   onNew: () => void
   onRoute: (r: RouteId) => void
 }): ReactNode {
+  const t = useT()
   if (!project) {
     return (
       <Empty
-        title="Layihə əlavə edilməyib"
+        title={t('dashboard.empty.title')}
         hint={
           <div className="flex flex-col items-center gap-3">
             <p>
-              Boş qovluqda sıfırdan yeni layihə qur, ya da içində{' '}
-              <code className="text-accent">supabase/config.toml</code> olan repo-nu aç. Mövcud
-              layihədə tool heç nə kopyalamır — bütün fayllar olduğu yerdə qalır.
+              {t('dashboard.empty.hintBefore')}{' '}
+              <code className="text-accent">supabase/config.toml</code> {t('dashboard.empty.hintAfter')}
             </p>
             <div className="flex gap-2">
               <Button variant="primary" onClick={onNew}>
-                Yeni layihə
+                {t('dashboard.empty.newProject')}
               </Button>
-              <Button onClick={onOpen}>Mövcud layihəni aç</Button>
+              <Button onClick={onOpen}>{t('dashboard.empty.openProject')}</Button>
             </div>
           </div>
         }
@@ -53,6 +60,8 @@ function ProjectView({
   onChanged: () => void
   onRoute: (r: RouteId) => void
 }): ReactNode {
+  const t = useT()
+  const { locale } = useI18n()
   const status = useQuery('stack:status', { id: project.id, withStats: true }, [project.id], {
     pollMs: 8000
   })
@@ -91,7 +100,9 @@ function ProjectView({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="truncate text-[17px] font-medium">{project.name}</h1>
-            <Badge tone={running ? 'ok' : 'muted'}>{running ? 'işləyir' : 'dayanıb'}</Badge>
+            <Badge tone={running ? 'ok' : 'muted'}>
+              {running ? t('dashboard.status.running') : t('dashboard.status.stopped')}
+            </Badge>
             <Badge tone="muted">{project.projectId}</Badge>
           </div>
           <p className="mt-1 truncate font-mono text-[11.5px] text-muted">{project.path}</p>
@@ -100,19 +111,19 @@ function ProjectView({
           {running ? (
             <>
               <Button onClick={() => void act('restart')} loading={busy === 'restart'}>
-                Restart
+                {t('dashboard.actions.restart')}
               </Button>
               <Button onClick={() => void act('stop')} loading={busy === 'stop'}>
-                Dayandır
+                {t('dashboard.actions.stop')}
               </Button>
             </>
           ) : (
             <Button variant="primary" onClick={() => void act('start')} loading={busy === 'start'}>
-              Başlat
+              {t('dashboard.actions.start')}
             </Button>
           )}
           <Button variant="danger" onClick={() => setConfirmReset(true)} disabled={!running}>
-            db reset
+            {t('dashboard.actions.dbReset')}
           </Button>
         </div>
       </header>
@@ -122,20 +133,18 @@ function ProjectView({
 
       {mine.length > 0 && (
         <div className="rounded-md border border-[#4a3c17] bg-[#211c10] px-3 py-2 text-[12px] text-warn">
-          Port toqquşması:{' '}
-          {mine.map((c) => c.port).join(', ')} — eyni port bir neçə layihədə yazılıb. Konfiqurasiya
-          ekranından portları başqa 100-lük aralığa keçir.
+          {t('dashboard.portConflict', { ports: mine.map((c) => c.port).join(', ') })}
         </div>
       )}
 
       {needsRestart && (
         <div className="flex items-center gap-3 rounded-md border border-[#4a3c17] bg-[#211c10] px-3.5 py-2 text-[12px] text-warn">
-          Servis keçidi `config.toml`-a yazıldı. Konteynerlər yalnız restartdan sonra dəyişəcək.
+          {t('dashboard.needsRestart.message')}
           <Button onClick={() => void act('restart')} loading={busy === 'restart'}>
-            İndi restart et
+            {t('dashboard.needsRestart.now')}
           </Button>
           <button onClick={() => setNeedsRestart(false)} className="text-muted hover:text-text">
-            sonra
+            {t('dashboard.needsRestart.later')}
           </button>
         </div>
       )}
@@ -162,7 +171,9 @@ function ProjectView({
       </div>
 
       {s && (
-        <p className="px-1 text-[11px] text-muted">Sonuncu yoxlama: {timeAgo(s.checkedAt)}</p>
+        <p className="px-1 text-[11px] text-muted">
+          {t('dashboard.lastCheck', { time: timeAgo(s.checkedAt, locale) })}
+        </p>
       )}
 
       {confirmReset && (
@@ -173,9 +184,9 @@ function ProjectView({
 }
 
 /**
- * Servis siyahısı: hər sətir bir `config.toml` açarına bağlıdır. Söndürmək
- * konteyneri dayandırmır — CLI-yə onu ümumiyyətlə qaldırmamağı deyir, ona görə
- * dəyişiklik restartdan sonra qüvvəyə minir.
+ * The service list: each row maps to one `config.toml` key. Switching one off
+ * doesn't stop its container — it tells the CLI never to bring it up, so the
+ * change takes effect after a restart.
  */
 function Services({
   status,
@@ -185,12 +196,15 @@ function Services({
   onToggled
 }: {
   status: StackStatus | null
-  /** İlk `stack:status` hələ gəlməyib — hər sətir «dayanıb» görünməsin. */
+  /** The first `stack:status` hasn't arrived — don't make every row look stopped. */
   loading?: boolean
   projectId: string
   configValues: Record<string, FieldValue> | undefined
   onToggled: () => void
 }): ReactNode {
+  const t = useT()
+  const noteFor = (configPath: string | null): string | undefined =>
+    configPath ? SERVICE_NOTE_KEY[configPath] && t(SERVICE_NOTE_KEY[configPath]!) : undefined
   const [tailing, setTailing] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [saving, setSaving] = useState<string | null>(null)
@@ -226,21 +240,21 @@ function Services({
 
   const total = services.reduce((sum, s) => sum + (s.memory ?? 0), 0)
 
-  // Sətirlər `SERVICE_GROUPS`-dur, konteynerlər yox: Kong+PostgREST kimi
-  // qruplarda bir sətrin arxasında iki konteyner dayanır. Başlıqdakı say da
-  // gözlə görünən sətirləri saysın deyə eyni siyahıdan gəlir.
+  // The rows are `SERVICE_GROUPS`, not containers: a group like Kong+PostgREST has
+  // two containers behind one row. The count in the header comes from the same list
+  // so it matches what the eye sees.
   const rows = SERVICE_GROUPS.map((group) => {
     const members = group.keys.map((k) => byKey.get(k)).filter(Boolean) as ServiceStatus[]
     const live = members.filter((m) => m.state === 'running')
-    // Həqiqət mənbəyi `config.toml`-dur; açar faylda yoxdursa konteynerin
-    // işləyib-işləməməsinə baxırıq (CLI default-u onda qüvvədədir).
+    // `config.toml` is the source of truth; when the key is absent from the file we
+    // look at whether the container runs (the CLI default applies then).
     const fv = group.configPath ? configValues?.[group.configPath] : undefined
     const enabled =
       group.configPath === null ? true : fv?.present ? fv.value === true : live.length > 0
     const mem = members.reduce((sum, m) => sum + (m.memory ?? 0), 0)
     const isRunning = live.length > 0
-    // Konfiqurasiya «açıq» deyir, amma konteyner qalxmayıb: stack köhnə
-    // konfiqurasiya ilə işləyir — keçid yaşıl yox, sarı görünməlidir.
+    // The configuration says "on" but the container isn't up: the stack is running
+    // with the old configuration — the toggle should look amber, not green.
     const pending = enabled && !isRunning && (status?.running ?? false)
     const tone: 'ok' | 'warn' | 'danger' | 'muted' = !isRunning
       ? pending
@@ -252,23 +266,23 @@ function Services({
           ? 'warn'
           : 'ok'
     const statusText = !enabled
-      ? 'söndürülüb'
+      ? t('dashboard.services.disabled')
       : isRunning
-        ? (members[0]?.health ?? 'running')
+        ? (members[0]?.health ?? t('dashboard.status.running'))
         : pending
-          ? 'restart lazım'
-          : 'dayanıb'
+          ? t('dashboard.services.restartNeeded')
+          : t('dashboard.status.stopped')
     return { group, members, enabled, mem, isRunning, pending, tone, statusText }
   })
 
-  // Məxrəc — siyahıdakı bütün sətirlər (söndürülmüşlər də daxil), sol tərəf isə
-  // hazırda işləyənlər. İkisi də eyni vahiddədir: sətir, konteyner yox.
+  // The denominator is every row in the list (switched-off ones included), the
+  // numerator those currently running. Both in the same unit: rows, not containers.
   const running = rows.filter((r) => r.isRunning).length
 
   if (loading) {
     return (
-      <Card title="Servislər" subtitle="docker yoxlanılır…">
-        <ul className="divide-y divide-line-soft" role="status" aria-label="yüklənir">
+      <Card title={t('dashboard.services.title')} subtitle={t('dashboard.services.checking')}>
+        <ul className="divide-y divide-line-soft" role="status" aria-label={t('common.loading')}>
           {SERVICE_GROUPS.map((group, i) => (
             <li key={group.label} className="flex items-center gap-2.5 px-3.5 py-2">
               <Skeleton w={32} h={18} delay={i * 70} className="shrink-0 rounded-full" />
@@ -285,8 +299,11 @@ function Services({
 
   return (
     <Card
-      title="Servislər"
-      subtitle={`${running} / ${rows.length} işləyir${total > 0 ? ` · ${formatBytes(total)} RAM` : ''}`}
+      title={t('dashboard.services.title')}
+      subtitle={
+        t('dashboard.services.subtitle', { running, total: rows.length }) +
+        (total > 0 ? t('dashboard.services.ramSuffix', { size: formatBytes(total) }) : '')
+      }
     >
       {error && (
         <div className="px-3.5 pt-2.5">
@@ -311,7 +328,7 @@ function Services({
                   onClick={() => setExpanded(open ? null : group.label)}
                   disabled={members.length < 2}
                   className="min-w-0 flex-1 truncate text-left text-[12.5px] disabled:cursor-default"
-                  title={group.note}
+                  title={noteFor(group.configPath)}
                 >
                   {group.label}
                   {members.length > 1 && (
@@ -363,7 +380,7 @@ function Services({
       </ul>
       {services.length === 0 && (
         <p className="px-3.5 py-3 text-center text-[11.5px] text-muted">
-          Konteyner yoxdur — keçidlər `config.toml`-u göstərir, stack qalxanda vəziyyət də gələcək.
+          {t('dashboard.services.noContainers')}
         </p>
       )}
     </Card>
@@ -371,6 +388,7 @@ function Services({
 }
 
 function LogButton({ active, onClick }: { active: boolean; onClick: () => void }): ReactNode {
+  const t = useT()
   return (
     <button
       onClick={onClick}
@@ -379,7 +397,7 @@ function LogButton({ active, onClick }: { active: boolean; onClick: () => void }
         active ? 'bg-accent-dim text-accent' : 'text-muted hover:bg-panel-2 hover:text-text'
       )}
     >
-      log
+      {t('dashboard.services.logButton')}
     </button>
   )
 }
@@ -403,6 +421,7 @@ function QuickLinks({
   running: boolean
   loading?: boolean
 }): ReactNode {
+  const t = useT()
   const [copied, setCopied] = useState<string | null>(null)
 
   const copy = useCallback((key: string, value: string) => {
@@ -412,9 +431,9 @@ function QuickLinks({
   }, [])
 
   return (
-    <Card title="Sürətli linklər">
+    <Card title={t('dashboard.quickLinks.title')}>
       {loading ? (
-        <ul className="divide-y divide-line-soft" role="status" aria-label="yüklənir">
+        <ul className="divide-y divide-line-soft" role="status" aria-label={t('common.loading')}>
           {[0, 1, 2, 3].map((i) => (
             <li key={i} className="flex items-center gap-2 px-3.5 py-2">
               <Skeleton w={104} h={10} delay={i * 80} className="shrink-0" />
@@ -424,7 +443,7 @@ function QuickLinks({
         </ul>
       ) : !running ? (
         <p className="px-3.5 py-6 text-center text-[12px] text-muted">
-          Stack qalxanda ünvanlar burada görünür.
+          {t('dashboard.quickLinks.empty')}
         </p>
       ) : (
         <ul className="divide-y divide-line-soft">
@@ -438,14 +457,14 @@ function QuickLinks({
                 onClick={() => copy(l.key, vars[l.key]!)}
                 className="text-[10.5px] text-muted hover:text-accent"
               >
-                {copied === l.key ? '✓' : 'kopyala'}
+                {copied === l.key ? '✓' : t('dashboard.quickLinks.copy')}
               </button>
               {l.open && (
                 <button
                   onClick={() => void call('stack:openUrl', { url: vars[l.key]! })}
                   className="text-[10.5px] text-muted hover:text-accent"
                 >
-                  aç
+                  {t('dashboard.quickLinks.open')}
                 </button>
               )}
             </li>
@@ -464,26 +483,30 @@ function Environments({
   onRoute: (r: RouteId) => void
   onChanged: () => void
 }): ReactNode {
+  const t = useT()
   return (
     <Card
-      title="Remote mühitlər"
+      title={t('dashboard.environments.title')}
       actions={
         <Button onClick={() => onRoute('sync')}>
-          {project.environments.length === 0 ? 'Əlavə et' : 'Sync'}
+          {project.environments.length === 0
+            ? t('dashboard.environments.add')
+            : t('dashboard.environments.sync')}
         </Button>
       }
     >
       {project.environments.length === 0 ? (
         <p className="px-3.5 py-4 text-[11.5px] leading-relaxed text-muted">
-          Mühit yoxdur. Managed (supabase.com) və ya self-hosted (SSH) mühit əlavə edib lokal ilə
-          fərqi görə bilərsən.
+          {t('dashboard.environments.empty')}
         </p>
       ) : (
         <ul className="divide-y divide-line-soft">
           {project.environments.map((e) => (
             <li key={e.id} className="flex items-center gap-2 px-3.5 py-2">
               <Badge tone={e.kind === 'managed' ? 'info' : 'warn'}>
-                {e.kind === 'managed' ? 'managed' : 'self-hosted'}
+                {e.kind === 'managed'
+                  ? t('dashboard.environments.managed')
+                  : t('dashboard.environments.selfHosted')}
               </Badge>
               <span className="flex-1 truncate text-[12.5px]">{e.name}</span>
               <span className="truncate font-mono text-[10.5px] text-muted">
@@ -506,6 +529,7 @@ function ResetModal({
   onClose: () => void
   onDone: () => void
 }): ReactNode {
+  const t = useT()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -515,7 +539,7 @@ function ResetModal({
     setError(null)
     try {
       const res = await call('stack:reset', { id: project.id, confirm: text })
-      if (!res.ok) setError(res.error ?? 'Uğursuz oldu')
+      if (!res.ok) setError(res.error ?? t('dashboard.reset.genericError'))
       else onClose()
     } catch (err) {
       setError((err as Error).message)
@@ -523,31 +547,30 @@ function ResetModal({
       setBusy(false)
       onDone()
     }
-  }, [project.id, text, onClose, onDone])
+  }, [project.id, text, onClose, onDone, t])
 
   return (
     <Modal
-      title="db reset"
+      title={t('dashboard.reset.title')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Ləğv et</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="danger"
             onClick={() => void go()}
             loading={busy}
             disabled={text !== project.name}
           >
-            Bazanı sıfırla
+            {t('dashboard.reset.confirmButton')}
           </Button>
         </>
       }
     >
       <p className="mb-3 text-[12.5px] leading-relaxed">
-        Lokal baza tamamilə silinir və bütün miqrasiyalar boş bazaya yenidən tətbiq olunur. Seed
-        faylı da işə düşür. <span className="text-danger">Lokal data itir.</span>
+        {t('dashboard.reset.body')} <span className="text-danger">{t('dashboard.reset.dataLoss')}</span>
       </p>
-      <Row label={`Təsdiq üçün «${project.name}» yaz`}>
+      <Row label={t('dashboard.reset.confirmLabel', { name: project.name })}>
         <Input value={text} onChange={(e) => setText(e.target.value)} autoFocus />
       </Row>
       {error && <ErrorNote>{error}</ErrorNote>}

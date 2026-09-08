@@ -2,9 +2,11 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
+import { useT } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Input, Modal, SkeletonList } from '../components/ui'
 
 export function SecretsRoute({ project }: { project: Project }): ReactNode {
+  const t = useT()
   const [reveal, setReveal] = useState(false)
   const entries = useQuery('env:read', { id: project.id, reveal }, [project.id, reveal])
   const doc = useQuery('config:read', { id: project.id }, [project.id])
@@ -13,7 +15,7 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  /** `config.toml`-da `env(X)` yazılıb, amma `.env`-də X yoxdursa. */
+  /** When `config.toml` says `env(X)` but `.env` has no X. */
   const missing = useMemo(() => {
     const values = doc.data?.values ?? {}
     const out: Array<{ varName: string; path: string }> = []
@@ -57,17 +59,19 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <h1 className="text-[15px] font-medium">Secrets</h1>
+        <h1 className="text-[15px] font-medium">{t('app.nav.secrets')}</h1>
         <span className="font-mono text-[11px] text-muted">{project.envFile}</span>
         <div className="flex-1" />
-        <Button onClick={() => setReveal((v) => !v)}>{reveal ? 'gizlət' : 'dəyərləri göstər'}</Button>
-        <Button onClick={() => setAdding(true)}>+ dəyişən</Button>
+        <Button onClick={() => setReveal((v) => !v)}>
+          {reveal ? t('fieldEditor.hide') : t('secrets.showValues')}
+        </Button>
+        <Button onClick={() => setAdding(true)}>{t('secrets.addVar')}</Button>
         {dirty && (
           <>
             <Badge tone="ok">{Object.keys(edits).length}</Badge>
-            <Button onClick={() => setEdits({})}>Ləğv et</Button>
+            <Button onClick={() => setEdits({})}>{t('common.cancel')}</Button>
             <Button variant="primary" onClick={() => void save()} loading={saving}>
-              Yaz
+              {t('secrets.write')}
             </Button>
           </>
         )}
@@ -80,10 +84,7 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
 
           {missing.length > 0 && (
             <div className="rounded-md border border-[#4a3c17] bg-[#211c10] px-3.5 py-2.5 text-[12px] text-warn">
-              <p className="mb-1.5 font-medium">
-                {missing.length} referens boşdur — `config.toml` bu dəyişənləri gözləyir, `.env`-də
-                yoxdur:
-              </p>
+              <p className="mb-1.5 font-medium">{t('secrets.missingHeading', { count: missing.length })}</p>
               <ul className="space-y-0.5 font-mono text-[11px]">
                 {missing.slice(0, 8).map((m) => (
                   <li key={m.path}>
@@ -94,14 +95,11 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
             </div>
           )}
 
-          <Card
-            title="Lokal backend dəyişənləri"
-            subtitle="Supabase CLI `config.toml`-dakı hər env() referensini buradan oxuyur"
-          >
+          <Card title={t('secrets.cardTitle')} subtitle={t('secrets.cardSubtitle')}>
             {entries.loading && <SkeletonList rows={5} trailing />}
             {!entries.loading && list.length === 0 && (
               <p className="px-3.5 py-6 text-center text-[12px] text-muted">
-                {project.envFile} faylı boşdur və ya yoxdur.
+                {t('secrets.fileEmpty', { file: project.envFile })}
               </p>
             )}
             <ul className="divide-y divide-line-soft">
@@ -124,9 +122,7 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
                           ))}
                         </div>
                       ) : (
-                        <div className="mt-1 text-[10px] text-[#54677a]">
-                          config.toml-dan istifadə olunmur
-                        </div>
+                        <div className="mt-1 text-[10px] text-[#54677a]">{t('secrets.unused')}</div>
                       )}
                     </div>
                     <Input
@@ -142,7 +138,7 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
                       onClick={() => void remove(e.key)}
                       className="mt-1.5 text-[11px] text-muted hover:text-danger"
                     >
-                      sil
+                      {t('common.delete').toLowerCase()}
                     </button>
                   </li>
                 )
@@ -150,11 +146,7 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
             </ul>
           </Card>
 
-          <p className="px-1 text-[11.5px] leading-relaxed text-muted">
-            Maskalanmış sahəyə klikləyəndə xana təmizlənir — maska mətnini təsadüfən yazmamaq üçün.
-            Dəyişikliklər fayla yazılandan sonra stack-i restart et; CLI `.env`-i yalnız başlanğıcda
-            oxuyur.
-          </p>
+          <p className="px-1 text-[11.5px] leading-relaxed text-muted">{t('secrets.footerHint')}</p>
         </div>
       </div>
 
@@ -183,6 +175,7 @@ function AddVar({
   onAdd: (key: string, value: string) => Promise<void>
   suggestions: string[]
 }): ReactNode {
+  const t = useT()
   const [key, setKey] = useState('')
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
@@ -190,11 +183,11 @@ function AddVar({
 
   return (
     <Modal
-      title="Yeni dəyişən"
+      title={t('secrets.newVarTitle')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Ləğv et</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
             loading={busy}
@@ -204,23 +197,23 @@ function AddVar({
               void onAdd(key, value).finally(() => setBusy(false))
             }}
           >
-            Əlavə et
+            {t('common.add')}
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-3">
         <div>
-          <label className="mb-1 block text-[12px] text-muted">Ad</label>
+          <label className="mb-1 block text-[12px] text-muted">{t('newProject.name.label')}</label>
           <Input value={key} onChange={(e) => setKey(e.target.value)} className="font-mono" autoFocus />
         </div>
         <div>
-          <label className="mb-1 block text-[12px] text-muted">Dəyər</label>
+          <label className="mb-1 block text-[12px] text-muted">{t('secrets.value')}</label>
           <Input value={value} onChange={(e) => setValue(e.target.value)} className="font-mono" />
         </div>
         {uniq.length > 0 && (
           <div>
-            <p className="mb-1.5 text-[11.5px] text-muted">config.toml-un gözlədiyi boş adlar:</p>
+            <p className="mb-1.5 text-[11.5px] text-muted">{t('secrets.expectedNames')}</p>
             <div className="flex flex-wrap gap-1.5">
               {uniq.map((s) => (
                 <button

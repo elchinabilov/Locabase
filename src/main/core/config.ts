@@ -1,6 +1,6 @@
 /**
- * `config.toml`-un UI görünüşü: hər sahə üçün ya literal dəyər, ya da
- * `env(VAR)` referensi + həmin dəyişənin `.env`-dəki hazırkı dəyəri.
+ * The UI view of `config.toml`: for every field either a literal value or an
+ * `env(VAR)` reference plus that variable's current value from `.env`.
  */
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { parse as parseToml } from 'smol-toml'
@@ -29,14 +29,14 @@ function pick(obj: unknown, path: string): unknown {
   return cur
 }
 
-/** UI-ın idarə etdiyi bütün yollar: sxem sahələri + provider sahələri + secrets. */
+/** Every path the UI controls: schema fields + provider fields + secrets. */
 export function knownPaths(configText: string): string[] {
   const out = new Set(CONFIG_FIELDS.map((f) => f.path))
   for (const p of AUTH_PROVIDERS) {
     out.add(`auth.external.${p.id}.enabled`)
     for (const f of p.fields) out.add(`auth.external.${p.id}.${f}`)
   }
-  // `[edge_runtime.secrets]` açarları sərbəstdir — fayldan oxunur
+  // `[edge_runtime.secrets]` keys are free-form — they are read from the file
   for (const entry of scanToml(configText).entries) {
     if (entry.path.startsWith('edge_runtime.secrets.')) out.add(entry.path)
   }
@@ -87,7 +87,7 @@ export function read(projectId: string): ConfigDocument {
   return { path, raw, values }
 }
 
-/** Yamağın nəticəsini yazmadan göstər. */
+/** Show the result of a patch without writing it. */
 export function preview(projectId: string, patches: ConfigPatch[]): PatchPreview {
   const project = getProject(projectId)
   const path = paths.configToml(project)
@@ -102,8 +102,8 @@ export function preview(projectId: string, patches: ConfigPatch[]): PatchPreview
 }
 
 /**
- * Yaz. Yazmadan əvvəl `.bak` nüsxəsi götürülür; `applyPatches` özü nəticəni
- * yenidən parse edib yoxlayır, ona görə bu nöqtəyə çatan mətn həmişə etibarlıdır.
+ * Write. A `.bak` copy is taken first; `applyPatches` re-parses and verifies the
+ * result itself, so text that reaches this point is always valid.
  */
 export function write(projectId: string, patches: ConfigPatch[]): PatchPreview {
   const result = preview(projectId, patches)
@@ -115,7 +115,7 @@ export function write(projectId: string, patches: ConfigPatch[]): PatchPreview {
   return result
 }
 
-/** Layihənin lokal API ünvanı — callback URL-ləri bundan hesablanır. */
+/** The project's local API address — callback URLs are derived from it. */
 export function localApiUrl(projectId: string): string {
   const project = getProject(projectId)
   const parsed = parseToml(readFileSync(paths.configToml(project), 'utf8'))

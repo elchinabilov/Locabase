@@ -1,10 +1,10 @@
 /**
- * Sorğunun hara getdiyi: lokal Postgres, yoxsa uzaq mühit.
+ * Where a query goes: the local Postgres, or a remote environment.
  *
- * Fərq yalnız NƏQLİYYATDADIR — sorğu mətnləri eynidir:
- *  - lokal: `pg` sürücüsü, `$n` parametrləri;
- *  - uzaq: Management API / `psql`, `$n` bağlana bilmir, ona görə çağırışdan
- *    əvvəl `inlineParams()` ilə literal yapışdırılır.
+ * The only difference is the TRANSPORT — the query text is identical:
+ *  - local: the `pg` driver, `$n` parameters;
+ *  - remote: Management API / `psql`, where `$n` cannot be bound, so literals are
+ *    pasted in with `inlineParams()` before the call.
  */
 import { poolFor } from './pool.js'
 import { inlineParams } from './ident.js'
@@ -14,7 +14,7 @@ import { adapterFor, type RemoteAdapter } from '../remote/index.js'
 export interface Target {
   id: string
   envId: string | null
-  /** UI-da görünən ad — xəta mesajlarında işlənir */
+  /** The name shown in the UI — used in error messages */
   label: string
   adapter: RemoteAdapter | null
 }
@@ -29,11 +29,11 @@ export function targetFor(id: string, envId: string | null): Target {
 export const isRemote = (t: Target): boolean => t.adapter !== null
 
 /**
- * Daxili sorğu: nəticə obyekt sətirləri kimi qayıdır və tiplər qorunur
- * (lokal `pg` parserləri, uzaqda `json_agg`).
+ * An internal query: results come back as object rows with types preserved
+ * (local `pg` parsers, `json_agg` remotely).
  *
- * `int8` iki tərəfdə fərqli gəlir — lokalda sətir, uzaqda ədəd — ona görə
- * çağıran həmişə `Number()` ilə oxuyur.
+ * `int8` differs between the two — a string locally, a number remotely — so the
+ * caller always reads it through `Number()`.
  */
 export async function rowsOf<T extends Record<string, unknown>>(
   target: Target,

@@ -1,6 +1,6 @@
 /**
- * IPC kontraktı. Kanal adları və hər kanalın giriş/çıxış tipləri burada,
- * bir yerdə saxlanılır — main handler-i və renderer çağırışı eyni tipi görür.
+ * The IPC contract. Channel names and the input/output types of every channel
+ * live here, in one place — the main handler and the renderer call see the same type.
  */
 import type {
   BackupInfo,
@@ -36,19 +36,19 @@ import type {
 } from './types.js'
 
 export interface IpcContract {
-  /* --- layihələr --- */
+  /* --- projects --- */
   'projects:list': { req: void; res: Project[] }
   'projects:add': { req: { path: string }; res: Project }
-  /** Seçilmiş qovluqda sıfırdan `supabase init` işlədib layihəni qeydə alır */
+  /** Runs `supabase init` from scratch in the chosen folder and registers the project */
   'projects:create': {
     req: { path: string; name?: string; portBase?: number }
     res: Project
   }
   'projects:remove': { req: { id: string }; res: void }
   'projects:update': { req: { id: string; patch: Partial<Project> }; res: Project }
-  /** Qovluq seçimi dialoqu; ləğv edilsə null */
+  /** Folder picker dialog; null when cancelled */
   'projects:pickFolder': { req: void; res: string | null }
-  /** Qovluqda `supabase/config.toml` varmı, `project_id` nədir */
+  /** Whether the folder has `supabase/config.toml`, and what `project_id` is */
   'projects:inspect': {
     req: { path: string }
     res: { valid: boolean; projectId: string | null; reason: string | null }
@@ -56,7 +56,7 @@ export interface IpcContract {
 
   /* --- stack --- */
   'stack:status': { req: { id: string; withStats?: boolean }; res: StackStatus }
-  /** `config.toml`-dakı `<servis>.enabled` açarını yaz; restart tələb edir */
+  /** Write the `<service>.enabled` key in `config.toml`; needs a restart */
   'stack:setService': {
     req: { id: string; configPath: string; on: boolean }
     res: { restartRequired: true }
@@ -66,12 +66,12 @@ export interface IpcContract {
   'stack:restart': { req: { id: string }; res: TaskResult }
   'stack:reset': { req: { id: string; confirm: string }; res: TaskResult }
   'stack:openUrl': { req: { url: string }; res: void }
-  /** Konteyner loglarını `log:line` hadisəsi kimi axıtmağa başla/dayan */
+  /** Start/stop streaming container logs as `log:line` events */
   'stack:tailLogs': { req: { id: string; container: string; on: boolean }; res: void }
 
   /* --- portlar --- */
   'ports:conflicts': { req: void; res: PortConflict[] }
-  /** Boş 100-lük aralıq təklif et, məs. 573 → 573xx */
+  /** Suggest a free block of 100, e.g. 573 → 573xx */
   'ports:suggestRange': { req: void; res: number }
 
   /* --- config.toml --- */
@@ -96,13 +96,13 @@ export interface IpcContract {
 
   /* --- funksiyalar --- */
   'functions:list': { req: { id: string; envId: string | null }; res: FunctionInfo[] }
-  /** Bir funksiyanın lokal ↔ uzaq məzmun fərqi (fayl-fayl) */
+  /** The local ↔ remote content diff of one function (file by file) */
   'functions:diff': { req: { id: string; envId: string; name: string }; res: FunctionDiff }
   'functions:create': { req: { id: string; name: string }; res: { path: string } }
   'functions:setVerifyJwt': { req: { id: string; name: string; verifyJwt: boolean }; res: void }
   'functions:serve': { req: { id: string; on: boolean }; res: void }
 
-  /* --- mühitlər --- */
+  /* --- environments --- */
   'envs:upsert': { req: { id: string; env: RemoteEnv }; res: Project }
   'envs:remove': { req: { id: string; envId: string }; res: Project }
   'envs:setToken': { req: { id: string; envId: string; token: string }; res: void }
@@ -113,9 +113,9 @@ export interface IpcContract {
   'sync:deploy': { req: { id: string; plan: DeployPlan; confirm: string }; res: TaskResult }
   'remote:backup': { req: { id: string; envId: string }; res: BackupInfo }
   'remote:verify': { req: { id: string; envId: string }; res: VerifyReport }
-  /** Uzaq serverdəki konteynerlər — vəziyyət və RAM */
+  /** Containers on the remote server — state and RAM */
   'remote:services': { req: { id: string; envId: string }; res: RemoteService[] }
-  /** Uzaq konteyneri dayandır / başlat */
+  /** Stop / start a remote container */
   'remote:setService': {
     req: { id: string; envId: string; container: string; on: boolean }
     res: TaskResult
@@ -123,35 +123,35 @@ export interface IpcContract {
 
   /* --- SQL redaktoru --- */
   /**
-   * SQL icra et. Uğursuz sorğu İSTİSNA ATMIR — xəta `res.error`-dədir ki,
-   * `position`/`hint`/`detail` itməsin (router yalnız `string` qaytarır).
+   * Execute SQL. A failing query DOES NOT THROW — the error is in `res.error` so
+   * that `position`/`hint`/`detail` survive (the router only returns `string`).
    */
   'sql:execute': {
     req: {
       id: string
-      /** null = lokal Postgres; əks halda `Project.environments`-dəki mühit */
+      /** null = the local Postgres; otherwise an environment from `Project.environments` */
       envId: string | null
       sql: string
       readOnly: boolean
       maxRows: number
       timeoutMs: number
-      /** Ləğv üçün təsadüfi açar. Yalnız lokalda işləyir. */
+      /** A random token for cancellation. Local only. */
       token?: string
     }
     res: SqlRun
   }
   'sql:cancel': { req: { id: string; token: string }; res: { cancelled: boolean } }
-  /** Redaktordakı SQL-i yeni timestamped miqrasiya faylına yaz */
+  /** Write the SQL from the editor into a new timestamped migration file */
   'sql:saveAsMigration': { req: { id: string; name: string; sql: string }; res: { file: string } }
 
-  /* --- saxlanmış sorğular (supabase/.locabase/queries) --- */
+  /* --- saved queries (supabase/.locabase/queries) --- */
   'queries:list': { req: { id: string }; res: SavedQuery[] }
   'queries:read': { req: { id: string; name: string }; res: { name: string; sql: string } }
   'queries:write': { req: { id: string; name: string; sql: string }; res: SavedQuery }
   'queries:rename': { req: { id: string; name: string; to: string }; res: SavedQuery }
   'queries:remove': { req: { id: string; name: string }; res: void }
 
-  /* --- cədvəl redaktoru --- */
+  /* --- table editor --- */
   'db:schemas': {
     req: { id: string; envId: string | null; includeSystem?: boolean }
     res: DbSchema[]
@@ -161,7 +161,7 @@ export interface IpcContract {
     req: { id: string; envId: string | null; schema: string; table: string }
     res: DbColumn[]
   }
-  /** Avtotamamlama üçün bütün sxem/cədvəl/sütun adları */
+  /** Every schema/table/column name, for autocompletion */
   'db:completion': { req: { id: string; envId: string | null }; res: DbCompletion }
   'db:rows': {
     req: {
@@ -173,7 +173,7 @@ export interface IpcContract {
       offset: number
       orderBy: DbOrder | null
       filters: DbFilter[]
-      /** Böyük cədvəldə `count(*)` yalnız açıq tələblə işləyir */
+      /** On a large table `count(*)` only runs when explicitly requested */
       exactCount?: boolean
     }
     res: DbRowsPage
@@ -209,7 +209,7 @@ export type IpcChannel = keyof IpcContract
 export type IpcReq<C extends IpcChannel> = IpcContract[C]['req']
 export type IpcRes<C extends IpcChannel> = IpcContract[C]['res']
 
-/** main → renderer push hadisələri */
+/** main → renderer push events */
 export interface IpcEvents {
   'log:line': LogLine
   'stack:changed': { projectId: string }

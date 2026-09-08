@@ -1,16 +1,16 @@
 /**
- * Qovluğun fayl-fayl oxunması: funksiya fərqi həm lokal, həm də uzaqdan
- * gətirilmiş ağac üzərində eyni formada işləsin deyə bir yerdədir.
+ * Reading a folder file by file: kept in one place so the function diff works
+ * the same way over a local tree and over one fetched from a remote.
  */
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { RemoteFile, RemoteFileChecksum } from '@shared/types.js'
 
-/** Bundan böyük fayl göstərilmir — bundle/asset diffi mənasızdır. */
+/** Files larger than this are not shown — diffing a bundle or asset is pointless. */
 export const MAX_FILE_BYTES = 512 * 1024
 
-/** Nisbi fayl yolları, sıralanmış. Nöqtə ilə başlayanlar atılır. */
+/** Relative file paths, sorted. Dot-prefixed entries are dropped. */
 export function walk(dir: string, base = dir): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

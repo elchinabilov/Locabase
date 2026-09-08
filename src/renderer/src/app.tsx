@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type { Project } from '@shared/types'
 import { call, useQuery } from './lib/ipc'
 import { cx, shortPath } from './lib/format'
+import { useT, type TranslationKey } from './i18n'
 import { Badge, Button, Dot, Empty, ErrorNote, SkeletonRows } from './components/ui'
 import { LogDrawer } from './components/log-drawer'
 import { Mark, Wordmark } from './components/brand'
@@ -29,17 +30,17 @@ export type RouteId =
   | 'sync'
   | 'settings'
 
-const NAV: Array<{ id: RouteId; label: string; icon: string; needsProject: boolean }> = [
-  { id: 'dashboard', label: 'Ümumi', icon: '▣', needsProject: false },
-  { id: 'config', label: 'Konfiqurasiya', icon: '⚙', needsProject: true },
-  { id: 'auth', label: 'Auth', icon: '⚿', needsProject: true },
-  { id: 'tables', label: 'Cədvəllər', icon: '▤', needsProject: true },
-  { id: 'sql', label: 'SQL', icon: '⌗', needsProject: true },
-  { id: 'secrets', label: 'Secrets', icon: '✱', needsProject: true },
-  { id: 'migrations', label: 'Miqrasiyalar', icon: '⇅', needsProject: true },
-  { id: 'functions', label: 'Funksiyalar', icon: 'ƒ', needsProject: true },
-  { id: 'sync', label: 'Sync / Deploy', icon: '⇈', needsProject: true },
-  { id: 'settings', label: 'Ayarlar', icon: '⋯', needsProject: false }
+const NAV: Array<{ id: RouteId; labelKey: TranslationKey; icon: string; needsProject: boolean }> = [
+  { id: 'dashboard', labelKey: 'app.nav.dashboard', icon: '▣', needsProject: false },
+  { id: 'config', labelKey: 'app.nav.config', icon: '⚙', needsProject: true },
+  { id: 'auth', labelKey: 'app.nav.auth', icon: '⚿', needsProject: true },
+  { id: 'tables', labelKey: 'app.nav.tables', icon: '▤', needsProject: true },
+  { id: 'sql', labelKey: 'app.nav.sql', icon: '⌗', needsProject: true },
+  { id: 'secrets', labelKey: 'app.nav.secrets', icon: '✱', needsProject: true },
+  { id: 'migrations', labelKey: 'app.nav.migrations', icon: '⇅', needsProject: true },
+  { id: 'functions', labelKey: 'app.nav.functions', icon: 'ƒ', needsProject: true },
+  { id: 'sync', labelKey: 'app.nav.sync', icon: '⇈', needsProject: true },
+  { id: 'settings', labelKey: 'app.nav.settings', icon: '⋯', needsProject: false }
 ]
 
 export function App(): ReactNode {
@@ -47,9 +48,9 @@ export function App(): ReactNode {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [route, setRoute] = useState<RouteId>('dashboard')
   const [logOpen, setLogOpen] = useState(false)
-  /** «+» → yeni/mövcud seçimi */
+  /** «+» → the new/existing choice */
   const [addOpen, setAddOpen] = useState(false)
-  /** «Yeni layihə» üçün seçilmiş qovluq; modal bunun üstündə açılır */
+  /** the folder chosen for «New project»; the modal opens on top of it */
   const [newProjectDir, setNewProjectDir] = useState<string | null>(null)
 
   const list = projects.data ?? []
@@ -153,15 +154,16 @@ function Content({
       />
     )
   }
+  const t = useT()
   if (!project) {
-    return <Empty title="Əvvəlcə layihə seç" hint="Sol tərəfdən layihə əlavə et." />
+    return <Empty title={t('app.selectProject.title')} hint={t('app.selectProject.hint')} />
   }
   switch (route) {
     case 'config':
       return <ConfigRoute project={project} />
     case 'auth':
       return <AuthRoute project={project} />
-    // key: layihə dəyişəndə sxem/cədvəl/redaktor vəziyyəti sıfırlansın
+    // key: reset schema/table/editor state when the project changes
     case 'tables':
       return <TablesRoute key={project.id} project={project} />
     case 'sql':
@@ -198,6 +200,7 @@ function Sidebar({
   loading: boolean
   error: string | null
 }): ReactNode {
+  const t = useT()
   return (
     <aside className="flex w-[228px] shrink-0 flex-col border-r border-line bg-panel">
       <div className="flex items-center gap-2 border-b border-line-soft px-3 py-2.5">
@@ -207,11 +210,11 @@ function Sidebar({
 
       <div className="flex items-center justify-between px-3 pt-3 pb-1.5">
         <span className="text-[10.5px] font-semibold tracking-[0.09em] text-muted uppercase">
-          Layihələr
+          {t('app.sidebar.projects')}
         </span>
         <button
           onClick={onAdd}
-          title="Layihə əlavə et"
+          title={t('app.sidebar.addProject')}
           className="rounded px-1.5 text-[15px] leading-none text-muted hover:bg-panel-2 hover:text-accent"
         >
           +
@@ -223,8 +226,8 @@ function Sidebar({
         {error && <ErrorNote>{error}</ErrorNote>}
         {!loading && projects.length === 0 && (
           <p className="px-2 py-3 text-[11.5px] leading-relaxed text-muted">
-            Hələ layihə yoxdur. <span className="text-accent">+</span> ilə yeni layihə qur və ya
-            `supabase/` qovluğu olan repo-nu aç.
+            {t('app.sidebar.emptyBeforePlus')} <span className="text-accent">+</span>{' '}
+            {t('app.sidebar.emptyAfterPlus')}
           </p>
         )}
         {projects.map((p) => (
@@ -243,6 +246,7 @@ function Sidebar({
           return (
             <button
               key={item.id}
+              data-route={item.id}
               disabled={disabled}
               onClick={() => onRoute(item.id)}
               className={cx(
@@ -254,7 +258,7 @@ function Sidebar({
               )}
             >
               <span className="w-3.5 text-center text-[12px] opacity-80">{item.icon}</span>
-              {item.label}
+              {t(item.labelKey)}
             </button>
           )
         })}

@@ -2,17 +2,22 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { MigrationRow, MigrationState, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
+import { useT, type TranslationKey } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Input, Modal, Select, SkeletonTable } from '../components/ui'
 
-const STATE_META: Record<MigrationState, { tone: 'ok' | 'warn' | 'danger' | 'info' | 'muted'; label: string }> = {
-  synced: { tone: 'ok', label: 'sinxron' },
-  'pending-local': { tone: 'warn', label: 'lokala tətbiq olunmayıb' },
-  'pending-remote': { tone: 'info', label: 'remote-da yoxdur' },
-  'remote-only': { tone: 'danger', label: 'faylı yoxdur' },
-  'local-only': { tone: 'danger', label: 'faylı yoxdur (lokal)' }
+const STATE_META: Record<
+  MigrationState,
+  { tone: 'ok' | 'warn' | 'danger' | 'info' | 'muted'; labelKey: TranslationKey }
+> = {
+  synced: { tone: 'ok', labelKey: 'migrations.state.synced' },
+  'pending-local': { tone: 'warn', labelKey: 'migrations.state.pendingLocal' },
+  'pending-remote': { tone: 'info', labelKey: 'migrations.state.pendingRemote' },
+  'remote-only': { tone: 'danger', labelKey: 'migrations.state.remoteOnly' },
+  'local-only': { tone: 'danger', labelKey: 'migrations.state.localOnly' }
 }
 
 export function MigrationsRoute({ project }: { project: Project }): ReactNode {
+  const t = useT()
   const [envId, setEnvId] = useState<string>(project.environments[0]?.id ?? '')
   const report = useQuery(
     'migrations:report',
@@ -38,7 +43,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
       setError(null)
       try {
         const res = await fn()
-        if (!res.ok) setError(res.error ?? 'Uğursuz oldu')
+        if (!res.ok) setError(res.error ?? t('dashboard.reset.genericError'))
       } catch (err) {
         setError((err as Error).message)
       } finally {
@@ -46,25 +51,25 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
         report.refresh()
       }
     },
-    [report]
+    [report, t]
   )
 
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <h1 className="text-[15px] font-medium">Miqrasiyalar</h1>
+        <h1 className="text-[15px] font-medium">{t('app.nav.migrations')}</h1>
         <div className="w-56">
           <Select
             value={envId}
             onChange={setEnvId}
             options={[
-              { value: '', label: 'Yalnız lokal' },
+              { value: '', label: t('functions.localOnly') },
               ...project.environments.map((e) => ({ value: e.id, label: `↔ ${e.name}` }))
             ]}
           />
         </div>
         <div className="flex-1" />
-        <Button onClick={() => setCreating(true)}>+ miqrasiya</Button>
+        <Button onClick={() => setCreating(true)}>{t('migrations.newMigration')}</Button>
         <Button
           loading={busy === 'diff'}
           onClick={() =>
@@ -82,7 +87,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
           loading={busy === 'up'}
           onClick={() => void runTask('up', () => call('migrations:up', { id: project.id }))}
         >
-          Lokala tətbiq et
+          {t('migrations.applyLocal')}
         </Button>
       </header>
 
@@ -94,39 +99,44 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
 
           <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
             <Badge tone={report.data?.localReachable ? 'ok' : 'muted'}>
-              lokal ledger {report.data?.localReachable ? 'oxundu' : 'əlçatmaz'}
+              {t('migrations.localLedger', {
+                status: report.data?.localReachable ? t('migrations.read') : t('migrations.unreachable')
+              })}
             </Badge>
             {envId && (
               <Badge tone={report.data?.remoteReachable ? 'ok' : 'danger'}>
-                remote ledger {report.data?.remoteReachable ? 'oxundu' : 'əlçatmaz'}
+                {t('migrations.remoteLedger', {
+                  status: report.data?.remoteReachable ? t('migrations.read') : t('migrations.unreachable')
+                })}
               </Badge>
             )}
             {Object.entries(counts).map(([state, n]) => (
               <Badge key={state} tone={STATE_META[state as MigrationState].tone}>
-                {n} {STATE_META[state as MigrationState].label}
+                {n} {t(STATE_META[state as MigrationState].labelKey)}
               </Badge>
             ))}
           </div>
 
-          <Card title={`${rows.length} miqrasiya`} subtitle="fayllar · lokal ledger · remote ledger">
+          <Card
+            title={t('migrations.count', { count: rows.length })}
+            subtitle={t('migrations.cardSubtitle')}
+          >
             {report.loading && (
               <SkeletonTable rows={6} cols={5} widths={['26%', '30%', 42, 42, 42]} />
             )}
             {!report.loading && rows.length === 0 && (
-              <p className="px-3.5 py-6 text-center text-[12px] text-muted">
-                supabase/migrations qovluğu boşdur.
-              </p>
+              <p className="px-3.5 py-6 text-center text-[12px] text-muted">{t('migrations.empty')}</p>
             )}
             {rows.length > 0 && (
               <table className="w-full text-[12px]">
                 <thead>
                   <tr className="border-b border-line-soft text-[10.5px] tracking-wide text-muted uppercase">
-                    <th className="px-3.5 py-1.5 text-left font-medium">Versiya</th>
-                    <th className="px-2 py-1.5 text-left font-medium">Ad</th>
-                    <th className="px-2 py-1.5 text-center font-medium">Fayl</th>
-                    <th className="px-2 py-1.5 text-center font-medium">Lokal</th>
-                    <th className="px-2 py-1.5 text-center font-medium">Remote</th>
-                    <th className="px-3.5 py-1.5 text-right font-medium">Vəziyyət</th>
+                    <th className="px-3.5 py-1.5 text-left font-medium">{t('migrations.col.version')}</th>
+                    <th className="px-2 py-1.5 text-left font-medium">{t('migrations.col.name')}</th>
+                    <th className="px-2 py-1.5 text-center font-medium">{t('migrations.col.file')}</th>
+                    <th className="px-2 py-1.5 text-center font-medium">{t('migrations.col.local')}</th>
+                    <th className="px-2 py-1.5 text-center font-medium">{t('migrations.col.remote')}</th>
+                    <th className="px-3.5 py-1.5 text-right font-medium">{t('migrations.col.state')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -145,14 +155,16 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
                       <Cell on={r.appliedRemote} />
                       <td className="px-3.5 py-1.5 text-right">
                         {r.state === 'synced' ? (
-                          <span className="text-[11px] text-muted">sinxron</span>
+                          <span className="text-[11px] text-muted">{t('migrations.state.synced')}</span>
                         ) : (
                           <button
                             onClick={() => setRepairRow(r)}
                             disabled={!envId}
                             className="disabled:cursor-default disabled:opacity-100"
                           >
-                            <Badge tone={STATE_META[r.state].tone}>{STATE_META[r.state].label}</Badge>
+                            <Badge tone={STATE_META[r.state].tone}>
+                              {t(STATE_META[r.state].labelKey)}
+                            </Badge>
                           </button>
                         )}
                       </td>
@@ -163,10 +175,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
             )}
           </Card>
 
-          <p className="px-1 text-[11.5px] leading-relaxed text-muted">
-            SQL-i Studio-dan tətbiq etmə: ledger sətri yazılmır və növbəti deploy ya faylı təkrar
-            işlədir, ya da heç vaxt olmamış işi atlayır. Bir dəyişiklik = bir versiya nömrəsi.
-          </p>
+          <p className="px-1 text-[11.5px] leading-relaxed text-muted">{t('migrations.footerHint')}</p>
         </div>
       </div>
 
@@ -183,9 +192,9 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
       )}
 
       {diff !== null && (
-        <Modal wide title="db diff — lokal sxemdə tutulmayan dəyişikliklər" onClose={() => setDiff(null)}>
+        <Modal wide title={t('migrations.diffTitle')} onClose={() => setDiff(null)}>
           <pre className="overflow-auto rounded-md border border-line bg-[#0d141b] p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap">
-            {diff.trim() || 'Fərq yoxdur.'}
+            {diff.trim() || t('diffView.noDiff')}
           </pre>
         </Modal>
       )}
@@ -233,6 +242,7 @@ function NewMigration({
   onClose: () => void
   onCreate: (name: string) => Promise<string>
 }): ReactNode {
+  const t = useT()
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -240,11 +250,11 @@ function NewMigration({
 
   return (
     <Modal
-      title="Yeni miqrasiya"
+      title={t('migrations.newTitle')}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Ləğv et</Button>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="primary"
             disabled={!valid}
@@ -257,12 +267,12 @@ function NewMigration({
                 .finally(() => setBusy(false))
             }}
           >
-            Yarat
+            {t('functions.create')}
           </Button>
         </>
       }
     >
-      <label className="mb-1 block text-[12px] text-muted">Ad</label>
+      <label className="mb-1 block text-[12px] text-muted">{t('newProject.name.label')}</label>
       <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -271,8 +281,7 @@ function NewMigration({
         autoFocus
       />
       <p className="mt-2 text-[11.5px] text-muted">
-        Yalnız kiçik hərf, rəqəm və alt xətt. Fayl `supabase/migrations/&lt;versiya&gt;_{name ||
-          'ad'}.sql` kimi yaranır.
+        {t('migrations.nameHint', { name: name || t('functions.namePlaceholder') })}
       </p>
       {error && (
         <div className="mt-3">
@@ -294,6 +303,7 @@ function RepairModal({
   onClose: () => void
   onRepair: (status: 'applied' | 'reverted') => Promise<void>
 }): ReactNode {
+  const t = useT()
   const [busy, setBusy] = useState<'applied' | 'reverted' | null>(null)
   const go = (status: 'applied' | 'reverted'): void => {
     setBusy(status)
@@ -301,18 +311,17 @@ function RepairModal({
   }
 
   return (
-    <Modal title={`Ledger təmiri — ${row.version}`} onClose={onClose}>
+    <Modal title={t('migrations.repairTitle', { version: row.version })} onClose={onClose}>
       <p className="mb-3 text-[12.5px] leading-relaxed">
-        «{envName}» mühitinin ledger-i düzəldilir. <b>Heç bir SQL işə düşmür</b> — yalnız
-        `supabase_migrations.schema_migrations` cədvəlindəki sətir dəyişir. Yalnız obyektlərin
-        həqiqətən bazada olub-olmadığını təsdiqlədikdən sonra istifadə et.
+        {t('migrations.repairBodyBefore', { env: envName })} <b>{t('migrations.repairBodyBold')}</b>{' '}
+        {t('migrations.repairBodyAfter')}
       </p>
       <div className="flex flex-col gap-2">
         <Button variant="subtle" loading={busy === 'applied'} onClick={() => go('applied')}>
-          «tətbiq olunub» kimi işarələ (sətri əlavə et)
+          {t('migrations.markApplied')}
         </Button>
         <Button variant="danger" loading={busy === 'reverted'} onClick={() => go('reverted')}>
-          «geri qaytarılıb» kimi işarələ (sətri sil)
+          {t('migrations.markReverted')}
         </Button>
       </div>
     </Modal>

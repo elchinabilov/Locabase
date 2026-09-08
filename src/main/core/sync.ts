@@ -1,10 +1,10 @@
 /**
- * Sync — lokal ilə remote arasındakı fərqin bir yerdə toplanması, sonra da
- * seçilmişlərin deploy-u.
+ * Sync — collecting the differences between local and remote in one place, then
+ * deploying the selected ones.
  *
- * Deploy ardıcıllığı sabitdir: **backup → miqrasiyalar → funksiyalar →
- * secrets → verify**. Sxem dəyişikliyi tətbiq koduna toxunduqda əvvəlcə
- * miqrasiya getməlidir, ona görə funksiyalar sonradır.
+ * The deploy order is fixed: **backup → migrations → functions → secrets →
+ * verify**. When a schema change touches application code the migration has to
+ * land first, which is why functions come after it.
  */
 import { readMap } from './envfile.js'
 import { logBus } from './log.js'
@@ -50,13 +50,13 @@ export async function report(id: string, envId: string): Promise<SyncReport> {
 
   /* --- funksiyalar --- */
   const [functions, fnErr] = await safe(() => listFunctions(id, envId), [] as FunctionInfo[])
-  // Yalnız məzmunu fərqlənən (və ya uzaqda olmayan) funksiyalar «çirkli»dir;
-  // `unknown` — uzaq tərəf fayl vermir, fərq tələb üzərinə hesablanır.
+  // Only functions whose content differs (or that are missing remotely) are "dirty";
+  // `unknown` means the remote gives no file listing, so the diff is computed on demand.
   const fnDirty = functions.filter(
     (f) => f.path !== '' && (f.drift === 'local-only' || f.drift === 'changed')
   )
 
-  /* --- secret adları --- */
+  /* --- secret names --- */
   const localNames = [...readMap(paths.envFile(project)).keys()]
   const [remoteNames, secretErr] = await safe(() => adapter.listSecretNames(), [] as string[])
   const secretDiff: SecretDiff[] = []
@@ -82,8 +82,8 @@ export async function report(id: string, envId: string): Promise<SyncReport> {
       [],
       false,
       env.kind === 'self-hosted'
-        ? 'Self-hosted-də auth ayarları serverin .env-indədir — Secrets oxu ilə müqayisə olunur.'
-        : 'Auth konfiqurasiyası `supabase config push` ilə göndərilir.'
+        ? 'On self-hosted, auth settings live in the server\u2019s .env — they are compared through the Secrets read.'
+        : 'Auth configuration is pushed with `supabase config push`.'
     ),
     generatedAt: new Date().toISOString()
   }
@@ -98,7 +98,7 @@ export async function deploy(id: string, plan: DeployPlan, confirm: string): Pro
       ok: false,
       code: null,
       output: '',
-      error: `Təsdiq uyğun gəlmir — «${project.name}» yazılmalıdır.`
+      error: `Confirmation does not match — «${project.name}» must be typed.`
     }
   }
   const env = getEnv(id, plan.envId)
@@ -109,16 +109,16 @@ export async function deploy(id: string, plan: DeployPlan, confirm: string): Pro
 
   try {
     if (plan.dryRun) {
-      log('QURU REJİM — heç nə dəyişdirilmir')
+      log('DRY RUN — nothing is changed')
       log(`miqrasiyalar: ${plan.migrations.join(', ') || 'yoxdur'}`)
       log(`funksiyalar: ${plan.functions.join(', ') || 'yoxdur'}`)
       log(`secrets: ${plan.secrets.join(', ') || 'yoxdur'}`)
-      return { ok: true, code: 0, output: 'dry-run tamamlandı', error: null }
+      return { ok: true, code: 0, output: 'dry run finished', error: null }
     }
 
     if (plan.steps.includes('backup')) {
       const info = await adapter.backup(log)
-      log(`yedək hazırdır: ${info.path} (${info.size})`)
+      log(`backup ready: ${info.path} (${info.size})`)
       done.push('backup')
     }
 
@@ -138,7 +138,7 @@ export async function deploy(id: string, plan: DeployPlan, confirm: string): Pro
       const kv: Record<string, string> = {}
       for (const key of plan.secrets) {
         const value = local.get(key)
-        if (value === undefined) throw new Error(`${key} lokal .env-də yoxdur`)
+        if (value === undefined) throw new Error(`${key} is missing from the local .env`)
         kv[key] = value
       }
       await adapter.setSecrets(kv, log)
@@ -150,18 +150,18 @@ export async function deploy(id: string, plan: DeployPlan, confirm: string): Pro
       for (const c of v.checks) {
         logBus.push(stream, c.ok ? 'info' : 'error', `${c.label}: ${c.info}`)
       }
-      if (!v.ok) throw new Error('Yoxlama uğursuz oldu — loglara bax')
+      if (!v.ok) throw new Error('Verification failed — check the logs')
       done.push('verify')
     }
 
-    return { ok: true, code: 0, output: `Tamamlandı: ${done.join(' · ')}`, error: null }
+    return { ok: true, code: 0, output: `Finished: ${done.join(' · ')}`, error: null }
   } catch (err) {
     const message = (err as Error).message
     logBus.push(stream, 'error', message)
     return {
       ok: false,
       code: null,
-      output: done.length > 0 ? `Tamamlanan addımlar: ${done.join(' · ')}` : '',
+      output: done.length > 0 ? `Completed steps: ${done.join(' · ')}` : '',
       error: message
     }
   }

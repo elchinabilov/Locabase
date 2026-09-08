@@ -1,13 +1,13 @@
 /**
- * Layihə başına bir `pg` hovuzu.
+ * One `pg` pool per project.
  *
- * Niyə hovuz, per-call `Client` deyil: cədvəl ekranının bir yüklənməsi ~4
- * gediş-gəliş edir, `max: 4` isə lokal stack-in `max_connections`-unu qoruyur
- * (GoTrue, PostgREST və Realtime eyni bazanı paylaşır).
+ * Why a pool rather than a `Client` per call: a single load of the Tables screen
+ * makes ~4 round trips, and `max: 4` protects the local stack's `max_connections`
+ * (GoTrue, PostgREST and Realtime share the same database).
  *
- * DİQQƏT: `pool.on('error')` MÜTLƏQDİR. `supabase stop` boşdakı bağlantılara
- * ECONNRESET verir; dinləyicisi olmayan EventEmitter `'error'` hadisəsi
- * Electron main prosesini çökdürür.
+ * NOTE: `pool.on('error')` is MANDATORY. `supabase stop` gives idle connections
+ * an ECONNRESET; an EventEmitter `'error'` event with no listener crashes the
+ * Electron main process.
  */
 import { Pool } from 'pg'
 import { connectionString } from '../localdb.js'
@@ -16,9 +16,9 @@ import { logBus } from '../log.js'
 
 interface Entry {
   pool: Pool
-  /** Hovuzun qurulduğu bağlantı sətri — `db.port` dəyişibsə hovuz köhnəlir. */
+  /** The connection string the pool was built from — if `db.port` changed, the pool is stale. */
   conn: string
-  /** `pg_type` oid → typname; tənbəl doldurulur. */
+  /** `pg_type` oid → typname; filled lazily. */
   oids: Map<number, string> | null
 }
 
@@ -27,7 +27,7 @@ const cache = new Map<string, Entry>()
 function entryFor(projectId: string): Entry {
   const conn = connectionString(getProject(projectId))
   const hit = cache.get(projectId)
-  // Port dəyişibsə köhnə hovuz artıq başqa bazaya baxır
+  // If the port changed, the old pool is looking at a different database
   if (hit && hit.conn !== conn) invalidate(projectId)
   const live = cache.get(projectId)
   if (live) return live
@@ -42,7 +42,7 @@ function entryFor(projectId: string): Entry {
     application_name: 'locabase'
   })
   pool.on('error', (err) => {
-    logBus.push('sql', 'warn', `hovuz bağlantısı düşdü: ${err.message}`)
+    logBus.push('sql', 'warn', `pool connection dropped: ${err.message}`)
     invalidate(projectId)
   })
 
@@ -55,7 +55,7 @@ export function poolFor(projectId: string): Pool {
   return entryFor(projectId).pool
 }
 
-/** `pg_type` xəritəsi — nəticə sütunlarının tip adları üçün. */
+/** The `pg_type` map — for the type names of result columns. */
 export async function oidNames(projectId: string): Promise<Map<number, string>> {
   const entry = entryFor(projectId)
   if (entry.oids) return entry.oids

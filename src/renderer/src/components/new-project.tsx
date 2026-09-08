@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { Project } from '@shared/types'
 import { sanitizeProjectId } from '@shared/naming'
 import { call, useQuery } from '../lib/ipc'
+import { useT } from '../i18n'
 import { Button, ErrorNote, Input, Modal, Row } from './ui'
 
 /** `553` → 55321 (api), 55322 (db), 55323 (studio) */
@@ -14,8 +15,9 @@ function baseName(path: string): string {
 }
 
 /**
- * «+» seçimi: sıfırdan qurmaq, yoxsa mövcud qovluğu əlavə etmək. Sidebar-da
- * açılan menyu siyahının üstünə düşüb oxunmurdu — seçim mərkəzi dialoqdadır.
+ * The «+» choice: set one up from scratch, or add an existing folder. A menu
+ * dropping open in the sidebar landed on top of the list and was hard to read —
+ * so the choice lives in a centered dialog.
  */
 export function AddProjectModal({
   onClose,
@@ -26,24 +28,25 @@ export function AddProjectModal({
   onNew: () => void
   onOpen: () => void
 }): ReactNode {
+  const t = useT()
   return (
     <Modal
-      title="Layihə əlavə et"
+      title={t('newProject.addTitle')}
       onClose={onClose}
-      footer={<Button onClick={onClose}>Ləğv et</Button>}
+      footer={<Button onClick={onClose}>{t('common.cancel')}</Button>}
     >
       <div className="flex flex-col gap-2">
         <Choice
-          label="Yeni layihə"
-          hint="Seçilən qovluqda `supabase init` işlədilir, portlar boş bloka salınır."
+          label={t('newProject.choiceNew.label')}
+          hint={t('newProject.choiceNew.hint')}
           onClick={() => {
             onClose()
             onNew()
           }}
         />
         <Choice
-          label="Mövcud layihəni aç"
-          hint="İçində `supabase/config.toml` olan qovluq. Heç nə dəyişdirilmir."
+          label={t('newProject.choiceOpen.label')}
+          hint={t('newProject.choiceOpen.hint')}
           onClick={() => {
             onClose()
             onOpen()
@@ -75,8 +78,8 @@ function Choice({
 }
 
 /**
- * «Yeni layihə»: seçilmiş qovluqda `supabase init` işlədilir. Qovluqda artıq
- * layihə varsa qurmaq əvəzinə sadəcə əlavə etmək təklif olunur.
+ * «New project»: runs `supabase init` in the chosen folder. When the folder
+ * already holds a project, it offers to simply add it instead of setting one up.
  */
 export function NewProjectModal({
   dir,
@@ -87,6 +90,7 @@ export function NewProjectModal({
   onClose: () => void
   onDone: (project: Project) => void
 }): ReactNode {
+  const t = useT()
   const suggested = useQuery('ports:suggestRange', undefined)
   const existing = useQuery('projects:inspect', { path: dir }, [dir])
   const [name, setName] = useState(() => baseName(dir))
@@ -128,50 +132,50 @@ export function NewProjectModal({
 
   return (
     <Modal
-      title="Yeni layihə"
+      title={t('newProject.title')}
       onClose={onClose}
       footer={
         <>
           <Button onClick={onClose} disabled={busy}>
-            Ləğv et
+            {t('common.cancel')}
           </Button>
           {occupied ? (
             <Button variant="primary" onClick={() => void addExisting()} loading={busy}>
-              Mövcud layihə kimi əlavə et
+              {t('newProject.addExisting')}
             </Button>
           ) : (
             <Button variant="primary" onClick={() => void submit()} loading={busy} disabled={!ready}>
-              Qur
+              {t('newProject.build')}
             </Button>
           )}
         </>
       }
     >
       <div className="divide-y divide-line-soft rounded-md border border-line">
-        <Row label="Qovluq" hint="`supabase/` bunun içində yaranacaq">
+        <Row label={t('newProject.folder.label')} hint={t('newProject.folder.hint')}>
           <div className="pt-1 font-mono text-[11.5px] break-all text-muted">{dir}</div>
         </Row>
         <Row
-          label="Ad"
+          label={t('newProject.name.label')}
           hint={
             projectId ? (
               <>
-                project_id: <code className="text-accent">{projectId}</code> — konteyner adları
-                bundan törəyir
+                project_id: <code className="text-accent">{projectId}</code>{' '}
+                {t('newProject.name.hintSuffix')}
               </>
             ) : (
-              'Ən azı bir hərf və ya rəqəm lazımdır'
+              t('newProject.name.hintEmpty')
             )
           }
         >
           <Input value={name} onChange={(e) => setName(e.target.value)} disabled={busy || occupied} />
         </Row>
         <Row
-          label="Port bloku"
+          label={t('newProject.portBase.label')}
           hint={
             base === null
-              ? 'Boş blok axtarılır…'
-              : `api · db · studio → ${portsFor(base)} (digər layihələrlə toqquşmasın deyə)`
+              ? t('newProject.portBase.searching')
+              : t('newProject.portBase.hint', { ports: portsFor(base) })
           }
         >
           <Input
@@ -188,15 +192,15 @@ export function NewProjectModal({
       <div className="mt-3 space-y-2">
         {occupied && (
           <ErrorNote>
-            Bu qovluqda artıq <code>supabase/config.toml</code> var. Üstündən yazmırıq — layihəni
-            olduğu kimi əlavə edə bilərsən.
+            {t('newProject.occupiedBefore')} <code>supabase/config.toml</code>{' '}
+            {t('newProject.occupiedAfter')}
           </ErrorNote>
         )}
         {error && <ErrorNote>{error}</ErrorNote>}
         {!occupied && (
           <p className="text-[11.5px] leading-relaxed text-muted">
-            <code className="text-accent">supabase init</code> işlədiləcək, sonra{' '}
-            <code>project_id</code> və portlar yazılacaq. Loglar aşağıdakı panelə düşür.
+            <code className="text-accent">supabase init</code> {t('newProject.willRunBefore')}{' '}
+            <code>project_id</code> {t('newProject.willRunAfter')}
           </p>
         )}
       </div>

@@ -1,9 +1,9 @@
 /**
- * Domain tipləri — main və renderer arasında paylaşılır.
- * Burada Electron/Node importu OLMAMALIDIR: fayl brauzer tərəfə də girir.
+ * Domain types — shared between main and renderer.
+ * There must be NO Electron/Node import here: this file also reaches the browser side.
  */
 
-/* ---------------------------------------------------------------- layihə */
+/* --------------------------------------------------------------- project */
 
 export type RemoteKind = 'managed' | 'self-hosted'
 
@@ -11,9 +11,9 @@ export interface ManagedEnv {
   id: string
   name: string
   kind: 'managed'
-  /** supabase.co layihə referensi, məs. `odbyilfpdvzaccrfzsfw` */
+  /** the supabase.co project ref, e.g. `abcdefghijklmnopqrst` */
   projectRef: string
-  /** Access token safeStorage-dədir; burada yalnız onun mövcudluğu saxlanılır. */
+  /** The access token lives in safeStorage; only its presence is stored here. */
   hasToken: boolean
 }
 
@@ -21,16 +21,16 @@ export interface SelfHostedEnv {
   id: string
   name: string
   kind: 'self-hosted'
-  /** `root@host` formatında */
+  /** in `root@host` form */
   sshHost: string
   sshPort: number
-  /** Boşdursa ssh-agent / default açarlar sınanır. */
+  /** When empty, ssh-agent / the default keys are tried. */
   sshKeyPath: string
-  /** `docker ps` ilə tapılan Postgres konteynerinin adı */
+  /** Name of the Postgres container as found by `docker ps` */
   dbContainer: string
-  /** Coolify servis qovluğu — funksiyalar bura rsync olunur */
+  /** The Coolify service folder — functions are rsynced here */
   remoteDir: string
-  /** Edge runtime konteyneri; boşdursa funksiya deploy-u söndürülür */
+  /** Edge runtime container; when empty, function deploys are disabled */
   functionsContainer: string
   apiUrl: string
   siteUrl: string
@@ -42,13 +42,13 @@ export type RemoteEnv = ManagedEnv | SelfHostedEnv
 
 export interface Project {
   id: string
-  /** UI-da görünən ad */
+  /** the name shown in the UI */
   name: string
-  /** repo kökü — içində `supabase/` qovluğu var */
+  /** repo root — it contains the `supabase/` folder */
   path: string
-  /** `config.toml`-dakı `project_id`; konteyner adlarının şəkilçisi budur */
+  /** the `project_id` from `config.toml`; the suffix of the container names */
   projectId: string
-  /** `env()` referenslərinin oxunduğu fayl, repo kökünə nisbətən. Default: `.env` */
+  /** the file `env()` references are read from, relative to the repo root. Default: `.env` */
   envFile: string
   environments: RemoteEnv[]
   addedAt: string
@@ -64,16 +64,16 @@ export interface ServiceStatus {
   state: string
   /** healthcheck varsa: healthy / unhealthy / starting */
   health: string | null
-  /** bayt; ölçülməyibsə null */
+  /** bytes; null when not measured */
   memory: number | null
-  /** host-un ümumi yaddaşı — faiz hesablamaq üçün */
+  /** the host's total memory — for computing a percentage */
   memoryLimit: number | null
 }
 
-/** Uzaq serverdəki bir konteyner. */
+/** A single container on the remote server. */
 export interface RemoteService {
   container: string
-  /** `supabase-db-xxxx` → `db`; tanınmasa konteyner adı */
+  /** `supabase-db-xxxx` → `db`; the container name when unrecognized */
   key: string
   state: string
   health: string | null
@@ -83,10 +83,10 @@ export interface RemoteService {
 
 export interface StackStatus {
   projectId: string
-  /** ən azı bir konteyner işləyir */
+  /** at least one container is running */
   running: boolean
   services: ServiceStatus[]
-  /** `supabase status -o json` çıxışı — stack qalxmayıbsa boş */
+  /** the output of `supabase status -o json` — empty when the stack is down */
   vars: Record<string, string>
   error: string | null
   checkedAt: string
@@ -108,22 +108,22 @@ export interface PortConflict {
 
 export type ConfigValue = string | number | boolean | string[]
 
-/** `config.toml`-un bir açarının UI metadata-sı. Formalar bundan doğulur. */
+/** The UI metadata of one `config.toml` key. Forms are generated from this. */
 export interface ConfigField {
-  /** nöqtəli yol, məs. `auth.jwt_expiry` */
+  /** dotted path, e.g. `auth.jwt_expiry` */
   path: string
   type: 'string' | 'number' | 'boolean' | 'string[]' | 'enum'
   group: ConfigGroup
   label: string
   help?: string
-  /** `type: 'enum'` üçün */
+  /** for `type: 'enum'` */
   options?: string[]
   default?: ConfigValue
-  /** dəyişiklik `supabase stop && start` tələb edir */
+  /** a change requires `supabase stop && start` */
   restartRequired?: boolean
-  /** dəyər `env(VAR)` ola bilər */
+  /** the value may be `env(VAR)` */
   envAllowed?: boolean
-  /** bu açar sirrdir — UI-da maskalanır */
+  /** this key is a secret — masked in the UI */
   secret?: boolean
   placeholder?: string
   docs?: string
@@ -145,12 +145,12 @@ export type ConfigGroup =
   | 'Analytics'
   | 'Experimental'
 
-/** UI-a verilən dəyər: ya literal, ya da `env(VAR)` referensi. */
+/** The value handed to the UI: either a literal or an `env(VAR)` reference. */
 export interface FieldValue {
   kind: 'literal' | 'env'
-  /** kind === 'literal' üçün dəyər; 'env' üçün dəyişənin adı */
+  /** the value when kind === 'literal'; the variable name when 'env' */
   value: ConfigValue
-  /** kind === 'env' olduqda `.env`-dəki hazırkı dəyər (maskalana bilər) */
+  /** when kind === 'env', the current value in `.env` (may be masked) */
   envValue?: string | null
   present: boolean
 }
@@ -161,7 +161,7 @@ export interface ConfigDocument {
   values: Record<string, FieldValue>
 }
 
-/** Bir yamaq əməliyyatı: `undefined` value = açarı sil. */
+/** One patch operation: an `undefined` value deletes the key. */
 export interface ConfigPatch {
   path: string
   value: ConfigValue | { env: string } | undefined
@@ -170,7 +170,7 @@ export interface ConfigPatch {
 export interface PatchPreview {
   before: string
   after: string
-  /** dəyişən sətirlərin sayı */
+  /** number of changed lines */
   changedLines: number
   restartRequired: boolean
 }
@@ -178,12 +178,12 @@ export interface PatchPreview {
 /* ---------------------------------------------------------------- auth */
 
 export interface AuthProviderMeta {
-  /** `config.toml`-dakı ad, məs. `linkedin_oidc` */
+  /** the name in `config.toml`, e.g. `linkedin_oidc` */
   id: string
   label: string
-  /** hansı sahələr göstərilsin */
+  /** which fields to show */
   fields: Array<'client_id' | 'secret' | 'url' | 'redirect_uri' | 'skip_nonce_check' | 'email_optional'>
-  /** provider konsolunda callback URL-in harada yazıldığını izah edir */
+  /** explains where the callback URL goes in the provider's console */
   hint?: string
   docs?: string
 }
@@ -198,10 +198,10 @@ export interface AuthProviderState {
 
 export interface EnvEntry {
   key: string
-  /** `secret: true` olan sahələr üçün UI-a maskalanmış gəlir */
+  /** fields with `secret: true` reach the UI masked */
   value: string
   masked: boolean
-  /** `config.toml`-da bu dəyişənə istinad edən açarlar */
+  /** the keys in `config.toml` that reference this variable */
   referencedBy: string[]
 }
 
@@ -217,11 +217,11 @@ export type MigrationState =
 export interface MigrationRow {
   version: string
   name: string
-  /** fayl yolu — yoxdursa ledger-də olub faylı olmayan sətirdir */
+  /** file path — when absent, the row exists in the ledger but has no file */
   file: string | null
   inFiles: boolean
   appliedLocal: boolean
-  /** null = remote konfiqurasiya olunmayıb və ya əlçatmazdır */
+  /** null = the remote is not configured or is unreachable */
   appliedRemote: boolean | null
   state: MigrationState
 }
@@ -239,29 +239,29 @@ export interface FunctionInfo {
   name: string
   path: string
   entrypoint: string
-  /** qovluğun bütün fayllarının sha256-sı */
+  /** sha256 of every file in the folder */
   hash: string
   verifyJwt: boolean
   files: number
   remote: RemoteFunctionInfo | null
   /**
-   * Lokal ilə uzağın **məzmun** fərqi. `unknown` — uzaq tərəf fayl siyahısı
-   * vermir (managed: yalnız versiya nömrəsi var), ona görə fərq yalnız
-   * «Fərqə bax» ilə, tələb üzərinə hesablanır.
+   * The **content** difference between local and remote. `unknown` means the
+   * remote gives no file listing (managed: only a version number), so the diff is
+   * computed on demand through "View diff".
    */
   drift: FunctionDrift
 }
 
 export type FunctionDrift = 'same' | 'changed' | 'local-only' | 'remote-only' | 'unknown'
 
-/** Uzaqdan gətirilmiş fayl. `content` null — binar və ya çox böyük. */
+/** A file fetched from the remote. `content` null — binary or too large. */
 export interface RemoteFile {
   path: string
   content: string | null
   binary: boolean
 }
 
-/** Uzaq fayl və onun md5-i — fərqin ucuz (bir çağırışlıq) hesablanması üçün. */
+/** A remote file and its md5 — for computing the diff cheaply, in one call. */
 export interface RemoteFileChecksum {
   path: string
   md5: string
@@ -273,16 +273,16 @@ export interface RemoteFunctionInfo {
   status: string | null
   updatedAt: string | null
   verifyJwt: boolean | null
-  /** null — uzaq nəqliyyat fayl siyahısı vermir */
+  /** null — the remote transport gives no file listing */
   files: RemoteFileChecksum[] | null
 }
 
-/* ------------------------------------------------------- funksiya fərqi */
+/* -------------------------------------------------------- function diff */
 
 export interface FunctionFileDiff {
   path: string
   status: 'same' | 'changed' | 'local-only' | 'remote-only'
-  /** mətn məzmunu; binar və ya çox böyük fayllarda null */
+  /** text content; null for binary or very large files */
   local: string | null
   remote: string | null
   binary: boolean
@@ -291,7 +291,7 @@ export interface FunctionFileDiff {
 export interface FunctionDiff {
   name: string
   files: FunctionFileDiff[]
-  /** dəyişən/əlavə/silinən fayl sayı */
+  /** number of changed/added/removed files */
   changed: number
 }
 
@@ -317,7 +317,7 @@ export interface VerifyReport {
 /* ---------------------------------------------------------------- sync */
 
 export interface SyncAxis<T> {
-  /** bu ox üzrə fərq varmı */
+  /** whether this axis has any difference */
   dirty: boolean
   items: T[]
   error: string | null
@@ -354,7 +354,7 @@ export interface DeployPlan {
 export type LogLevel = 'info' | 'warn' | 'error' | 'stdout' | 'stderr'
 
 export interface LogLine {
-  /** hansı iş axını — `stack:next-cv`, `deploy:prod`, `fn:serve:notify-message` */
+  /** which workflow — `stack:my-app`, `deploy:prod`, `fn:serve:notify-message` */
   stream: string
   level: LogLevel
   text: string
@@ -364,22 +364,22 @@ export interface LogLine {
 export interface TaskResult {
   ok: boolean
   code: number | null
-  /** birləşdirilmiş stdout+stderr, sonuncu 200 sətir */
+  /** combined stdout+stderr, the last 200 lines */
   output: string
   error: string | null
 }
 
 /* ---------------------------------------------------------------- sql */
 
-/** Bir sətir — bütün xanalar mətndir (bax: `sql/build.ts` TEXT_TYPES). */
+/** One row — every cell is text (see `TEXT_TYPES` in `sql/build.ts`). */
 export type DbRow = Array<string | null>
-/** Sütun adı → dəyər. `null` = SQL NULL; açar yoxdursa = «default». */
+/** Column name → value. `null` = SQL NULL; a missing key = "default". */
 export type DbCells = Record<string, string | null>
 
 export interface SqlColumn {
   name: string
   typeOid: number
-  /** `pg_type.typname`; tanınmasa `oid:<n>` */
+  /** `pg_type.typname`; `oid:<n>` when unrecognized */
   typeName: string
 }
 
@@ -389,7 +389,7 @@ export interface SqlResult {
   columns: SqlColumn[]
   rows: DbRow[]
   rowCount: number | null
-  /** `maxRows` limitinə görə kəsilib */
+  /** truncated because of the `maxRows` limit */
   truncated: boolean
 }
 
@@ -399,7 +399,7 @@ export interface SqlErrorInfo {
   severity: string | null
   detail: string | null
   hint: string | null
-  /** 0-əsaslı simvol ofseti — redaktorda səhv tokeni işarələmək üçün */
+  /** 0-based character offset — to mark the offending token in the editor */
   position: number | null
   where: string | null
   table: string | null
@@ -409,7 +409,7 @@ export interface SqlErrorInfo {
 
 export interface SqlRun {
   ok: boolean
-  /** Çoxifadəli skript üçün hər ifadəyə bir nəticə */
+  /** one result per statement, for a multi-statement script */
   results: SqlResult[]
   durationMs: number
   readOnly: boolean
@@ -429,24 +429,24 @@ export interface DbSchema {
   name: string
   owner: string
   comment: string | null
-  /** `pg_*`, `information_schema` və Supabase-in daxili sxemləri */
+  /** `pg_*`, `information_schema` and Supabase's internal schemas */
   system: boolean
 }
 
-/** r=cədvəl p=partisiyalı v=görünüş m=materializə f=xarici */
+/** r=table p=partitioned v=view m=materialized f=foreign */
 export type DbRelKind = 'r' | 'p' | 'v' | 'm' | 'f'
 
 export interface DbTable {
   schema: string
   name: string
   kind: DbRelKind
-  /** `reltuples` təxmini; PG14+ analiz olunmayıbsa -1 */
+  /** the `reltuples` estimate; -1 on PG14+ when never analyzed */
   estimate: number
   bytes: number
   rls: boolean
   comment: string | null
   editable: boolean
-  /** `editable: false` olduqda səbəb, məs. «PK yoxdur» */
+  /** the reason when `editable: false`, e.g. «No PK» */
   editableReason: string | null
 }
 
@@ -459,7 +459,7 @@ export interface DbColumn {
   defaultExpr: string | null
   isIdentity: boolean
   isGenerated: boolean
-  /** null = PK-nın hissəsi deyil; rəqəm = PK-dakı sırası */
+  /** null = not part of the PK; a number = its position in the PK */
   pkOrd: number | null
   refSchema: string | null
   refTable: string | null
@@ -482,7 +482,7 @@ export type DbOp =
 export interface DbFilter {
   column: string
   op: DbOp
-  /** `isnull`/`notnull` üçün nəzərə alınmır */
+  /** ignored for `isnull`/`notnull` */
   value: string | null
 }
 
@@ -494,7 +494,7 @@ export interface DbOrder {
 export interface DbRowsPage {
   columns: DbColumn[]
   rows: DbRow[]
-  /** null = dəqiq say hesablanmadı (cədvəl böyükdür) */
+  /** null = no exact count was computed (the table is large) */
   total: number | null
   editable: boolean
   editableReason: string | null

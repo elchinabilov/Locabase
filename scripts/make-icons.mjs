@@ -1,12 +1,12 @@
 /**
- * SVG → PNG. Sistemdə rsvg/inkscape olmadığına görə rasterləşdirməni Electron-un
- * öz Chromium-u edir: SVG ekrandan kənarda bir pəncərədə açılır və `capturePage`
- * ilə yazılır.
+ * SVG → PNG. With no rsvg/inkscape on the machine, Electron's own Chromium does
+ * the rasterizing: the SVG is opened in an off-screen window and written out
+ * with `capturePage`.
  *
  *   npx electron scripts/make-icons.mjs
  *
- * Nəticə: resources/icon.png (1024 — electron-builder buradan .icns/.ico düzəldir)
- * və resources/logo-{256,128,64}.png.
+ * Output: resources/icon.png (1024 — electron-builder makes the .icns/.ico from it)
+ * and resources/logo-{256,128,64}.png.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -17,7 +17,7 @@ import { app, BrowserWindow } from 'electron'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const work = mkdtempSync(join(tmpdir(), 'locabase-icons-'))
 
-/** Bütün işlər üçün tək pəncərə: hər dəfə yeni pəncərə açmaq yarışa səbəb olur. */
+/** One window for every job: opening a new window each time causes a race. */
 let win = null
 
 async function render(svgPath, size) {
@@ -31,8 +31,8 @@ async function render(svgPath, size) {
   )
 
   if (!win) {
-    // Pəncərə göstərilir, amma ekrandan kənarda: heç vaxt göstərilməyən pəncərə
-    // kompozisiya olunmur və `capturePage` sonsuz gözləyir.
+    // The window is shown, but off-screen: a window that is never shown is not
+    // composited and `capturePage` waits forever.
     win = new BrowserWindow({
       width: 1024,
       height: 1024,
@@ -67,7 +67,7 @@ app.whenReady().then(async () => {
       process.stdout.write(`${out}  ${size}x${size}  ${Math.round(png.length / 1024)} KB\n`)
     }
   } catch (err) {
-    process.stderr.write(`XƏTA: ${err.stack ?? err}\n`)
+    process.stderr.write(`ERROR: ${err.stack ?? err}\n`)
     process.exitCode = 1
   } finally {
     win?.destroy()

@@ -16,7 +16,7 @@ function dump(files: Array<[string, string | null]>): string {
 }
 
 describe('decodeDump', () => {
-  it('base64 blokları fayllara çevrilir və sıralanır', () => {
+  it('turns base64 blocks into files and sorts them', () => {
     const out = decodeDump(
       dump([
         ['index.ts', 'export const a = 1\n'],
@@ -29,7 +29,7 @@ describe('decodeDump', () => {
     expect(out.every((f) => !f.binary)).toBe(true)
   })
 
-  it('çox sətirli base64 (wrap) bir faylda birləşir', () => {
+  it('joins wrapped multi-line base64 into one file', () => {
     const body = 'x'.repeat(200)
     const wrapped = b64(body).replace(/(.{40})/g, '$1\n')
     const out = decodeDump(`${TOKEN}big.txt\n${wrapped}`, TOKEN)
@@ -37,7 +37,7 @@ describe('decodeDump', () => {
     expect(out[0]!.content).toBe(body)
   })
 
-  it('`!` markeri faylı binar/böyük kimi qeyd edir — siyahıdan düşmür', () => {
+  it('the `!` marker flags a file as binary/large — it stays in the listing', () => {
     const out = decodeDump(dump([['bundle.wasm', null], ['index.ts', 'ok\n']]), TOKEN)
     expect(out.map((f) => [f.path, f.binary, f.content])).toEqual([
       ['bundle.wasm', true, null],
@@ -45,13 +45,13 @@ describe('decodeDump', () => {
     ])
   })
 
-  it('NUL baytı olan məzmun binar sayılır', () => {
+  it('content with a NUL byte counts as binary', () => {
     const raw = Buffer.from([0x61, 0x00, 0x62]).toString('base64')
     const out = decodeDump(`${TOKEN}bin\n${raw}`, TOKEN)
     expect(out[0]).toEqual({ path: 'bin', content: null, binary: true })
   })
 
-  it('boş çıxış boş siyahı verir', () => {
+  it('empty output gives an empty list', () => {
     expect(decodeDump('', TOKEN)).toEqual([])
   })
 })
@@ -62,7 +62,7 @@ describe('envMergeScript', () => {
     return execFileSync('bash', ['-c', script], { input }).toString().trim()
   }
 
-  it('mövcud açarı əvəzləyir, yenisini sona əlavə edir', () => {
+  it('replaces an existing key and appends a new one at the end', () => {
     const dir = mkdtempSync(join(tmpdir(), 'locabase-env-'))
     const file = join(dir, '.env')
     writeFileSync(file, 'A=1\nB=2\nC=3\n')
@@ -74,7 +74,7 @@ describe('envMergeScript', () => {
     }
   })
 
-  it('fayl yoxdursa yaradır', () => {
+  it('creates the file when it does not exist', () => {
     const dir = mkdtempSync(join(tmpdir(), 'locabase-env-'))
     const file = join(dir, '.env')
     try {
@@ -85,7 +85,7 @@ describe('envMergeScript', () => {
     }
   })
 
-  it('boşluqlu yolda da işləyir', () => {
+  it('works with a path containing spaces', () => {
     const dir = mkdtempSync(join(tmpdir(), 'locabase env '))
     const file = join(dir, '.env')
     writeFileSync(file, 'A=1\n')
@@ -99,7 +99,7 @@ describe('envMergeScript', () => {
 })
 
 describe('dumpScript', () => {
-  it('həqiqi qovluğu base64 axınına çevirir və decodeDump onu geri qurur', () => {
+  it('turns a real folder into a base64 stream that decodeDump restores', () => {
     const dir = mkdtempSync(join(tmpdir(), 'locabase-fn-'))
     mkdirSync(join(dir, 'lib'))
     writeFileSync(join(dir, 'index.ts'), 'export const a = 1\n')

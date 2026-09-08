@@ -1,212 +1,214 @@
-<img src="resources/logo-128.png" width="64" alt="Locabase">
+<div align="center">
+
+<img src="resources/logo-128.png" width="72" alt="Locabase">
 
 # Locabase
 
-Lokal Supabase stack-ini idarə etmək, `config.toml`-u forma üzərindən redaktə
-etmək və lokal ilə remote (managed **və** self-hosted) arasındakı fərqi görüb
-deploy etmək üçün masaüstü alət.
+**A desktop control room for Supabase.** Run the local stack, edit
+`config.toml` through a real UI, and see — then deploy — the difference between
+local and your managed or self-hosted project.
 
-Self-hosted Supabase Studio auth provider, secret və funksiya ekranlarını
-vermir — həmin ayarlar yalnız `supabase/config.toml`-da yaşayır. Bu alət həmin
-boşluğu doldurur: **hər şey UI-dan, faylı əl ilə açmadan.**
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![CI](https://github.com/elchinabilov/Locabase/actions/workflows/ci.yml/badge.svg)](https://github.com/elchinabilov/Locabase/actions/workflows/ci.yml)
+![Platform](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-lightgrey)
 
-## Nə edir
+[English](README.md) · [Azərbaycanca](README.az.md)
 
-| Ekran | Nə verir |
+</div>
+
+<img src="docs/screenshots/overview.png" alt="The Overview screen: service toggles with per-container RAM, quick links, and stack controls">
+
+## Why Locabase exists
+
+Self-hosted Supabase Studio doesn't give you screens for auth providers, secrets,
+or edge functions. Those settings live in `supabase/config.toml` — a 400-line
+file you edit by hand, restart the stack, and hope you got right.
+
+Locabase turns that file into a form, and adds the thing the CLI can't show you:
+**what is actually different between your laptop and your server**, across
+migrations, schema, functions, secrets and auth — with a per-file diff and a
+selective deploy.
+
+It manages any number of projects, and each project can have any number of
+remote environments — managed (supabase.com) or self-hosted over SSH.
+
+## What each screen does
+
+| Screen | What it gives you |
 | --- | --- |
-| **Ümumi** | Servis keçidləri (on/off) + **konteyner başına RAM**, start/stop/restart/`db reset`, Studio·Mailpit·API·DB linkləri, port toqquşması xəbərdarlığı |
-| **Konfiqurasiya** | `config.toml`-un 108 sahəsi forma kimi, 14 qrupda; diff önizləməsi, restart banneri |
-| **Auth** | 19 OAuth provider, callback URL-in avtomatik hesablanması, `env()` bağlantısı |
-| **Secrets** | Kök `.env` redaktoru, maskalama, `config.toml`-un gözlədiyi boş referenslərin siyahısı |
-| **Cədvəllər** | Sxem/cədvəl siyahısı, sətirlərə baxış (filtr, sıralama, səhifələmə), sətir əlavə/redaktə/sil, struktur (tip, PK, FK, default) |
-| **SQL** | CodeMirror redaktoru (sxem avtotamamlaması, ⌘↵), yalnız-oxu rejimi, çoxifadəli skript nəticələri, sorğuların repo-da saxlanması, «miqrasiya kimi saxla» |
-| **Miqrasiyalar** | Fayllar · lokal ledger · remote ledger yan-yana; new/up/diff/repair |
-| **Funksiyalar** | Siyahı, şablondan yaratma, lokal serve, `verify_jwt`, tək-tək və ya toplu deploy |
-| **Sync / Deploy** | Beş ox üzrə fərq (miqrasiya, sxem, funksiya, secret, auth), **funksiyaların fayl-fayl məzmun diffi**, seçmə deploy, quru rejim, **remote konteynerlərin on/off və RAM-ı** |
+| **Overview** | Service toggles (on/off) with **per-container RAM**, start/stop/restart/`db reset`, links to Studio · Mailpit · API · DB, and port-collision warnings |
+| **Configuration** | 108 `config.toml` fields as a form in 14 groups, with a diff preview before writing and a restart banner when one is needed |
+| **Auth** | 19 OAuth providers, the callback URL computed for you, `env()` wiring to your `.env` |
+| **Secrets** | A root `.env` editor with masking, plus the list of references `config.toml` expects but `.env` doesn't have |
+| **Tables** | Schema/table browser, row viewing (filter, sort, paginate), row create/edit/delete, and structure (type, PK, FK, default) |
+| **SQL** | CodeMirror with schema autocompletion and ⌘↵, read-only enforced server-side, multi-statement results, queries saved into the repo, "save as migration" |
+| **Migrations** | Files · local ledger · remote ledger side by side, with new/up/diff/repair |
+| **Functions** | List, create from a template, serve locally, `verify_jwt`, deploy one or all |
+| **Sync / Deploy** | The diff across five axes, **file-by-file content diffs for functions**, selective deploy, dry run, and on/off plus RAM for remote containers |
 
-## Layihə əlavə etmək
+### Configuration — the file as a form
 
-Sol paneldəki **+** iki yol verir:
+<img src="docs/screenshots/configuration.png" alt="The Configuration screen: config.toml fields grouped into a form, each showing its dotted path">
 
-- **Yeni layihə** — seçilmiş qovluqda `supabase init` işlədilir (`supabase/`
-  qovluğu orada yaranır), sonra `project_id` verdiyin addan törədilir və
-  portlar **boş 100-lük bloka** köçürülür (543xx tutulubsa 553xx, 563xx…), ona
-  görə yeni stack köhnələrlə toqquşmur. Ardınca `migrations/`, `functions/`,
-  `seed.sql` və `supabase/.gitignore` tamamlanır.
-- **Mövcud layihəni aç** — içində `supabase/config.toml` olan qovluq registry-yə
-  yazılır. Heç nə kopyalanmır və heç nə dəyişdirilmir.
+Every field shows the `config.toml` path it writes, whether the value is a
+literal or an `env()` reference, and whether changing it needs a restart. You see
+the diff before anything touches the file — and the write itself is surgical:
+only the value's byte range changes, so comments and ordering survive.
 
-Qovluqda artıq `config.toml` varsa, «Yeni layihə» üstündən yazmır — sadəcə onu
-olduğu kimi əlavə etməyi təklif edir.
+### Auth — the screen self-hosted Studio doesn't have
 
-## SQL və cədvəl redaktoru
+<img src="docs/screenshots/auth.png" alt="The Auth screen: 19 OAuth providers with toggles and the computed callback URL">
 
-Hər iki ekranın yuxarısında **mühit seçimi** var. Default **lokal**-dır
-(`127.0.0.1:<config.toml db.port>`) və elə qalır — uzaq mühit yalnız açıq
-seçimlə işə düşür.
+19 providers, each with the fields it actually needs. The callback URL is derived
+from your local API port, so you can copy it straight into the provider console.
+Secrets are stored as `env()` references, never inline.
 
-Nəqliyyat mühitə görə dəyişir, sorğu mətnləri isə eynidir:
+### Tables and SQL — one environment picker, two tools
 
-| Mühit | Necə gedir | Məhdudiyyət |
-| --- | --- | --- |
-| Lokal | `pg` sürücüsü, `$n` parametrləri | — |
-| Managed | Management API `database/query` | Sütun tipləri yoxdur, eyniadlı sütunlar birləşir, `read_only` API tərəfindən tətbiq olunur |
-| Self-hosted | SSH + `docker exec psql -q --csv` | Bir nəticə bloku, xəta mövqeyi yoxdur |
+<img src="docs/screenshots/tables.png" alt="The Tables screen: the posts table with its rows, column types and PK markers">
 
-Uzaq nəqliyyatda `$n` bağlana bilmədiyinə görə **bizim qurduğumuz** sorğularda
-dəyər `quoteLiteral()` ilə yapışdırılır (istifadəçinin SQL-i heç vaxt buradan
-keçmir). Sorğunu ləğv etmək (`pg_cancel_backend`) yalnız lokalda mümkündür.
+The table editor is guided: row CRUD, no DDL. Schema changes belong in a
+migration file, otherwise your ledger and your database drift apart. Tables
+without a primary key are read-only (no `ctid` fallback — `ctid` changes after
+every `UPDATE` and every `VACUUM FULL`, so it can update the wrong row).
 
-Uzaq mühitdə sətir yazmaq `json_agg` sarğısından yox, birbaşa yuxarı səviyyəli
-ifadədən keçir — Postgres datanı dəyişən CTE-nin alt sorğuda olmasına icazə
-vermir.
+<img src="docs/screenshots/sql.png" alt="The SQL screen: a saved query, its results, timing and read-only badge">
 
-**Yalnız oxu default açıqdır** və hər açılışda sıfırlanır. Yazma server tərəfdə
-bloklanır (lokal və self-hosted: `begin read only`; managed: API-nin
-`read_only` bayrağı), SQL-i regex ilə yoxlamaqla yox — çünki
-`with x as (delete … returning *) select * from x` istənilən regex-i keçir.
+The SQL editor is the power tool: full SQL, schema autocompletion, per-statement
+results, a row limit and a statement timeout. **Read-only is on by default** and
+resets every time you open it — and it's enforced by the server, not by
+inspecting your SQL. Saved queries are ordinary `.sql` files under
+`supabase/.locabase/queries/`, committed so your team shares them.
 
-Əhatə qəsdən asimmetrikdir: **cədvəl redaktorunda DDL yoxdur** (yalnız sətir
-CRUD-u), **SQL redaktorunda isə tam SQL var** — biri bələdçili UI, digəri güc
-alətidir. Sxemi SQL redaktorundan dəyişirsənsə, «Miqrasiya kimi saxla» ilə
-faylı da yarat: əks halda ledger ilə baza arasında drift yaranır.
+Both screens default to **local** and stay there; a remote environment is only
+used when you explicitly pick one.
 
-PK-sı olmayan cədvəlin sətirləri redaktə olunmur (Studio-nun `ctid` fallback-i
-qəsdən tətbiq edilməyib — `ctid` hər `UPDATE`-dən və `VACUUM FULL`-dan sonra
-dəyişir, ona görə səhv sətri yeniləmək riski var). Görünüşlər də yalnız oxunur.
+### Migrations and functions — drift, made visible
 
-Saxlanmış sorğular `supabase/.locabase/queries/<ad>.sql` faylıdır — commit
-olunur ki, komanda paylaşsın. Şəxsi saxlamaq üçün `.gitignore`-a
-`supabase/.locabase/` əlavə et.
+<img src="docs/screenshots/migrations.png" alt="The Migrations screen: files, local ledger and remote ledger with one pending migration">
 
-## Funksiya fərqi
+Three sources are read separately — the files on disk, the local ledger, the
+remote ledger — and none is inferred from another. That's how you see a migration
+that exists as a file but was never applied, or a ledger row whose file is gone.
 
-Self-hosted mühitdə uzaq faylların md5-i **bir** ssh çağırışı ilə oxunur, ona
-görə siyahı «üst-üstə düşür / məzmun fərqlidir / remote-da yoxdur» kimi dəqiq
-vəziyyət göstərir — versiya nömrəsi ilə təxmin etmir. Managed tərəfdə
-Management API fayl siyahısı vermir, vəziyyət `bilinmir` qalır.
+<img src="docs/screenshots/functions.png" alt="The Functions screen: edge functions with their file count, content hash and verify_jwt toggle">
 
-«Fərqə bax» uzaq mənbəni **tələb üzərinə** gətirir (self-hosted: ssh + base64;
-managed: `functions download` müvəqqəti iş qovluğuna — layihənin öz
-`supabase/functions/` qovluğu heç vaxt üstündən yazılmır) və fayl-fayl diff
-göstərir: `−` uzaqdakı, `+` lokaldakı sətir. 512 KB-dan böyük və binar fayllar
-siyahıda qalır, məzmunu açılmır.
+Each function shows a content hash, so "does this need deploying?" has a real
+answer. On self-hosted, the md5 of every remote file arrives in **one** ssh call,
+so the state is exact — same / different / missing — not guessed from a version
+number.
 
-## Servis keçidləri və RAM
+### Secrets — the references that aren't filled in
 
-Lokal stack 9 konteynerlə ~1 GiB yeyir. Ən ağır hissələr çox vaxt lazım
-olmur — `Logflare + Vector`, `Studio + pg-meta`, `Realtime`, `Imgproxy`.
+<img src="docs/screenshots/secrets.png" alt="The Secrets screen: the root .env editor with masked values and a list of empty references">
 
-**Ümumi** ekranındakı hər keçid `config.toml`-dakı bir `enabled` açarına
-bağlıdır (eyni açarı bölüşən konteynerlər bir sətirdə birləşir: `api.enabled`
-→ Kong + PostgREST). Söndürmək konteyneri dayandırmır — CLI-yə onu
-ümumiyyətlə qaldırmamağı deyir, ona görə dəyişiklik **restartdan sonra**
-qüvvəyə minir və ekran bunu banner kimi göstərir.
+Every `env()` reference in `config.toml` is resolved against your root `.env`,
+and the ones that resolve to nothing are listed at the top — which is usually the
+answer to "why did auth stop working after I restarted?".
 
-Yanında hər servisin RAM istifadəsi var (docker `MEM USAGE` ilə eyni
-hesablama: xam `usage`-dan səhifə keşi çıxılır), başlıqda isə cəmi.
+## Install
 
-Self-hosted mühitdə **Sync / Deploy** ekranı serverin konteynerlərini eyni
-şəkildə göstərir; oradakı keçid isə birbaşa `docker stop` / `docker start`-dır.
-Managed layihədə belə idarəetmə yoxdur — platforma servisləri özü idarə edir və
-kart bunu açıq deyir.
-
-## Qurulma
+**Requirements:** the [`supabase` CLI](https://supabase.com/docs/guides/local-development),
+Docker (or OrbStack), and — for self-hosted environments — `ssh` and `rsync`.
+Locabase checks all of them under **Settings → Environment check**.
 
 ```bash
+git clone https://github.com/elchinabilov/Locabase.git
+cd Locabase
 npm install
 npm run dev
 ```
 
-macOS `.dmg` üçün:
+Build an installer:
 
 ```bash
-npm run dist:mac
+npm run dist:mac   # arm64 .dmg
+npm run dist:win   # x64 NSIS installer
 ```
 
-İkonlar `resources/*.svg`-dən doğulur; SVG dəyişəndə yenidən çək:
+> **Builds are unsigned and not notarized**, and there is no auto-update.
+> On macOS, Gatekeeper will complain the first time; open it from the context
+> menu, or build from source.
+
+## Adding a project
+
+The **+** in the sidebar offers two paths:
+
+- **New project** — runs `supabase init` in the folder you choose, derives
+  `project_id` from the name you give, and moves the ports into a **free block of
+  100** (543xx taken? then 553xx, 563xx…), so a new stack never collides with an
+  existing one. `migrations/`, `functions/`, `seed.sql` and `supabase/.gitignore`
+  are filled in afterwards.
+- **Open existing project** — registers a folder that already has
+  `supabase/config.toml`. Nothing is copied and nothing is changed.
+
+If the folder already holds a project, "New project" refuses to overwrite it and
+offers to add it as-is instead.
+
+## How it works
+
+Three design decisions are worth knowing before you read the code.
+
+**The `config.toml` patcher never re-serializes.** The file is scanned once to
+find where each key's *value* starts and ends; a change replaces only that byte
+range. Before writing, the result is re-parsed and every patch verified against
+its expected value — on a mismatch, nothing is written. Every write leaves a
+`.bak`.
+
+**Remote work goes through one adapter interface.** Managed uses the CLI plus the
+Management API; self-hosted uses the system `ssh` binary with `docker exec` and
+`rsync`, so your `~/.ssh/config`, ssh-agent and `known_hosts` behave exactly as
+they do in your terminal.
+
+**Secrets never become command-line arguments** — they travel over stdin, or a
+0600 temporary file. Every log line passes through `redact()`. Tokens live in the
+OS keychain via Electron `safeStorage`.
+
+More detail: [architecture](docs/architecture.md) · [security model](docs/security.md) ·
+[translation](docs/i18n.md).
+
+## Interface language
+
+English by default, Azerbaijani available in Settings. The choice is stored in
+`localStorage`. See [docs/i18n.md](docs/i18n.md) to add a language.
+
+## Tests
 
 ```bash
-npm run icons
-```
-
-## Tələblər
-
-`supabase` CLI, Docker (və ya OrbStack), self-hosted mühitlər üçün `ssh` və
-`rsync`. Hamısını **Ayarlar → Mühit yoxlaması** ekranı göstərir.
-
-## Arxitektura
-
-```
-src/
-  shared/            # main ↔ renderer paylaşılan tiplər, IPC kontraktı,
-                     # config sahə metadata-sı, provider siyahısı
-  main/core/
-    toml/            # şərh qoruyan config.toml yamaqlayıcısı (scan + patch)
-    remote/          # RemoteAdapter: managed.ts (CLI + Management API),
-                     # selfhosted.ts (ssh + docker exec + rsync)
-    ...              # projects, stack, docker, ports, config, envfile,
-                     # migrations, functions, sync, secrets, log, cli
-  renderer/src/      # React 19 + Tailwind 4, öz kiçik UI primitivləri
-```
-
-### Şərh qoruyan TOML yamaqlayıcısı
-
-Layihələrin `config.toml` faylları sıx şərhlərlə doludur, yenidən-serializasiya
-edən heç bir JS TOML kitabxanası isə onları saxlamır. Buradakı yanaşma
-**cərrahidir**: fayl bir dəfə skan olunur, hər açarın dəyərinin offset aralığı
-tapılır, dəyişən açarda **yalnız o aralıq** əvəz olunur.
-
-Yazmazdan əvvəl nəticə `smol-toml` ilə yenidən parse olunur və hər yamağın
-gözlənilən dəyəri verdiyi yoxlanılır — uyğunsuzluqda heç nə yazılmır. Hər
-yazımda `config.toml.bak` nüsxəsi qalır.
-
-Testlər üç real layihənin `config.toml` faylı (1085 sətir) üzərində işləyir:
-yamaqsız keçid bayt-bayt eyni nəticə verməli, `auth.jwt_expiry` dəyişikliyi isə
-**tam bir sətir** fərq yaratmalıdır.
-
-### Təhlükəsizlik qaydaları
-
-- Secret dəyərləri **heç vaxt** CLI arqumenti deyil: managed tərəfdə
-  `secrets set --env-file` (0600, müvəqqəti), self-hosted tərəfdə stdin.
-- Bütün log sətirləri `redact()`-dən keçir: JWT, `sb_secret_`, `sbp_`,
-  `KEY=dəyər` və Postgres URL-indəki parol gizlədilir.
-- Remote access token-lər `safeStorage`-də (Keychain / DPAPI / libsecret).
-- `db reset` və remote deploy layihə adının yazılması ilə təsdiqlənir.
-- Remote sxem dəyişikliyindən əvvəl **həmişə** yedək alınır.
-
-## Testlər
-
-```bash
+npm run typecheck
 npm test
 ```
 
-45 test: TOML yamaqlayıcısı (19), `.env` redaktoru (12), servis kataloqu və
-RAM formatı (8), log redaksiyası (6).
+145 tests, run against three real `config.toml` files: the TOML patcher, the
+`.env` editor, the SQL builders and CSV parsing, identifier quoting, log
+redaction, saved-query path safety, the service catalog and the translation
+dictionaries.
 
-## Ad və ikon
+## Known limitations
 
-Tətbiq əvvəl «Supabase GUI» adlanırdı. Electron istifadəçi qovluğunu ad
-üzərindən qurduğuna görə ilk açılışda köhnə registry avtomatik köçürülür
-(`src/main/core/userdata.ts`) — köhnə qovluq silinmir.
+- **No selective migration apply on managed projects** — `supabase db push`
+  applies everything pending. The deploy confirmation warns you.
+- **No remote comparison for auth configuration yet.** Managed uses
+  `supabase config push`; self-hosted reads the server's `.env`.
+- **A multi-statement script is one implicit transaction** (unlike `psql`): if
+  the third statement fails, the first two roll back too.
+- **The row limit is applied after the result reaches the main process**; on a
+  very large `select`, the statement timeout hits first.
+- **The table editor uses offset pagination**, so far pages of a large table are
+  slow. Keyset pagination is future work.
+- **Builds are unsigned**, not notarized, and there is no auto-update.
 
-İşarə iki yumru primitivdən qurulan «L»-dir: şaquli sap (*local*) və onun
-oturduğu geniş plita (*base*). İkisi ayrı tonda olduğuna görə birləşmə
-nöqtəsində tikiş görünür — forma bütöv oxunsa da, konstruksiya seçilir.
-Rasterləşdirməni `scripts/make-icons.mjs` Electron-un Chromium-u ilə edir,
-sistemdə əlavə alət tələb olunmur.
+## Contributing
 
-## Bilinən məhdudiyyətlər
+Issues and pull requests are welcome — start with
+[CONTRIBUTING.md](CONTRIBUTING.md). Comments, identifiers and tests are English;
+user-facing strings go through `t()`. Security problems go to
+[SECURITY.md](SECURITY.md), not a public issue.
 
-- Managed mühitdə seçmə miqrasiya tətbiqi yoxdur — `supabase db push` gözləyən
-  bütün miqrasiyaları tətbiq edir. UI bunu deploy təsdiqində xəbərdarlıq kimi
-  göstərir.
-- Auth konfiqurasiyasının remote ilə müqayisəsi hələ yoxdur; managed tərəfdə
-  `supabase config push`, self-hosted tərəfdə serverin `.env`-i işlədilir.
-- SQL redaktorunda çoxifadəli skript **bir implicit tranzaksiyadır** (psql-dən
-  fərqli): üçüncü ifadə xəta versə, birinci ikisi də geri qaytarılır.
-- Sətir limiti nəticə main prosesə yığıldıqdan sonra tətbiq olunur; çox böyük
-  `select`-də əvvəlcə `statement_timeout` kəsir.
-- Cədvəl redaktorunda offset paginasiya işlədilir — böyük cədvəldə uzaq
-  səhifələr yavaşdır (keyset paginasiya sonraya).
-- İmzalama, notarization və auto-update daxil edilməyib (şəxsi build).
+## License
+
+[Apache License 2.0](LICENSE) © 2025 Elchin Abilov.
+
+Locabase is an independent project. It is not affiliated with, endorsed by, or
+sponsored by Supabase Inc.; "Supabase" is their trademark and is used here only
+to describe compatibility.

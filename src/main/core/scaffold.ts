@@ -1,10 +1,10 @@
 /**
- * Sıfırdan lokal Supabase layihəsi qurur.
+ * Creates a local Supabase project from scratch.
  *
- * Seçilmiş qovluqda `supabase init` işlədilir — yəni fayl skeletini CLI-nin
- * özü yaradır, biz şablon saxlamırıq. Sonra iki şey düzəldilir:
- *  - `project_id` istifadəçinin verdiyi ada gətirilir (konteyner adları bundan);
- *  - portlar boş 100-lük bloka köçürülür ki, digər stack-lərlə toqquşmasın.
+ * `supabase init` is run in the chosen folder — the CLI creates the file skeleton
+ * itself, we keep no template of our own. Two things are then adjusted:
+ *  - `project_id` is set from the name the user gave (container names derive from it);
+ *  - ports are moved into a free block of 100 so the stack won't clash with others.
  */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
@@ -20,12 +20,12 @@ import type { ConfigPatch, Project } from '@shared/types.js'
 const STREAM = 'new-project'
 const INIT_TIMEOUT = 3 * 60 * 1000
 
-/** `supabase init`-dən sonra olması gözlənilən, amma CLI yaratmaya bilən qovluqlar. */
+/** Folders expected after `supabase init` that the CLI may not create. */
 const SUBDIRS = ['migrations', 'functions']
 
-const SEED_HEADER = '-- Lokal baza üçün seed. `supabase db reset` bu faylı tətbiq edir.\n'
+const SEED_HEADER = '-- Seed for the local database. `supabase db reset` applies this file.\n'
 
-/** CLI 2.x artıq bunu yaratmır — `.temp` və lokal env faylları repo-ya düşməsin. */
+/** CLI 2.x no longer creates this — keeps `.temp` and local env files out of the repo. */
 const GITIGNORE = [
   '# Supabase',
   '.branches',
@@ -39,37 +39,37 @@ const GITIGNORE = [
 ].join('\n')
 
 export interface CreateInput {
-  /** repo kökü — `supabase/` bunun içində yaranır */
+  /** repo root — `supabase/` is created inside it */
   path: string
-  /** UI adı; `project_id` bundan törəyir. Default: qovluq adı */
+  /** display name; `project_id` derives from it. Defaults to the folder name */
   name?: string
-  /** 100-lük port bloku, məs. 553 → 553xx. Default: boş blok təklifi */
+  /** port block of 100, e.g. 553 → 553xx. Defaults to the suggested free block */
   portBase?: number
 }
 
 export async function create({ path, name, portBase }: CreateInput): Promise<Project> {
   const dir = resolve(path)
   if (!existsSync(dir) || !statSync(dir).isDirectory()) {
-    throw new ProjectError(`Qovluq tapılmadı: ${dir}`)
+    throw new ProjectError(`Folder not found: ${dir}`)
   }
   const configPath = join(dir, 'supabase', 'config.toml')
   if (existsSync(configPath)) {
     throw new ProjectError(
-      'Bu qovluqda artıq Supabase layihəsi var — «Mövcud layihəni aç» ilə əlavə et.'
+      'This folder already contains a Supabase project — add it with «Open existing project».'
     )
   }
 
   const label = name?.trim() || basename(dir)
   const projectId = sanitizeProjectId(label)
-  if (!projectId) throw new ProjectError('Layihə adında ən azı bir hərf və ya rəqəm olmalıdır')
+  if (!projectId) throw new ProjectError('The project name needs at least one letter or digit')
 
-  logBus.push(STREAM, 'info', `Yeni layihə qurulur: ${dir}`)
+  logBus.push(STREAM, 'info', `Setting up a new project: ${dir}`)
   const res = await supabase(['init'], { cwd: dir, stream: STREAM, timeoutMs: INIT_TIMEOUT })
   if (!res.ok) {
-    throw new ProjectError(res.error ?? `\`supabase init\` uğursuz oldu:\n${res.output.trim()}`)
+    throw new ProjectError(res.error ?? `\`supabase init\` failed:\n${res.output.trim()}`)
   }
   if (!existsSync(configPath)) {
-    throw new ProjectError('`supabase init` bitdi, amma supabase/config.toml yaranmadı')
+    throw new ProjectError('`supabase init` finished but supabase/config.toml was not created')
   }
 
   const base = portBase ?? suggestRange()
@@ -92,6 +92,6 @@ export async function create({ path, name, portBase }: CreateInput): Promise<Pro
   }
 
   const project = addProject(dir)
-  logBus.push(STREAM, 'info', 'Hazırdır — `supabase start` ilə qaldıra bilərsən.')
+  logBus.push(STREAM, 'info', 'Ready — you can bring it up with `supabase start`.')
   return label === project.name ? project : updateProject(project.id, { name: label })
 }

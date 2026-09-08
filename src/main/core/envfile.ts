@@ -1,16 +1,16 @@
 /**
- * Kök `.env` faylı — `config.toml`-dakı hər `env(...)` referensi buradan
- * oxunur. Yamaq TOML-dakı kimi cərrahidir: mövcud sətrin yalnız dəyər hissəsi
- * əvəz olunur, şərhlər və sıra qalır.
+ * The root `.env` file — every `env(...)` reference in `config.toml` is
+ * resolved from here. Patching is as surgical as it is for TOML: only the value
+ * part of an existing line is replaced, comments and ordering survive.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 
 export interface RawEntry {
   key: string
   value: string
-  /** sətirin fayldakı indeksi */
+  /** the line's index in the file */
   line: number
-  /** dırnaq üslubu: '', '"' və ya "'" */
+  /** quote style: '', '"' or "'" */
   quote: string
 }
 
@@ -25,7 +25,7 @@ function unquote(raw: string): { value: string; quote: string } {
       return { value: q === '"' ? inner.replace(/\\n/g, '\n').replace(/\\"/g, '"') : inner, quote: q }
     }
   }
-  // dırnaqsız dəyərdə inline şərh mümkündür: `KEY=value # şərh`
+  // an unquoted value may carry an inline comment: `KEY=value # comment`
   const hash = trimmed.indexOf(' #')
   return { value: (hash === -1 ? trimmed : trimmed.slice(0, hash)).trim(), quote: '' }
 }
@@ -55,7 +55,7 @@ export function readMap(path: string): Map<string, string> {
   return out
 }
 
-/** Açarları yaz/yenilə. Olmayan açar faylın sonuna əlavə olunur. */
+/** Write/update keys. A key that doesn't exist is appended to the file. */
 export function writeKeys(path: string, kv: Array<{ key: string; value: string }>): void {
   const { text, entries } = readRaw(path)
   const lines = text === '' ? [] : text.split('\n')
@@ -91,7 +91,7 @@ export function deleteKey(path: string, key: string): void {
   writeFileSync(path, lines.join('\n'), { mode: 0o600 })
 }
 
-/** UI-a göndərilən maskalanmış görünüş. */
+/** The masked view sent to the UI. */
 export function mask(value: string): string {
   if (value.length === 0) return ''
   if (value.length <= 8) return '•'.repeat(value.length)

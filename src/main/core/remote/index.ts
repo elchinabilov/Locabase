@@ -1,6 +1,6 @@
 /**
- * Managed (supabase.com) və self-hosted (SSH) mühitləri bir interfeys altında
- * birləşdirir — Sync və Deploy ekranları hansı növlə işlədiyini bilmir.
+ * Unifies managed (supabase.com) and self-hosted (SSH) environments behind one
+ * interface — the Sync and Deploy screens never know which kind they're talking to.
  */
 import type {
   BackupInfo,
@@ -40,32 +40,32 @@ export interface RemoteAdapter {
   setSecrets(kv: Record<string, string>, log: LogFn): Promise<void>
   listFunctions(): Promise<RemoteFunctionInfo[]>
   /**
-   * Bir funksiyanın uzaqdakı **fayl məzmunu** — «Fərqə bax» üçün. Tələb
-   * üzərinə çağırılır, `report()` axınında yox.
+   * The remote **file contents** of one function — for "View diff". Called on
+   * demand, not as part of the `report()` flow.
    */
   readFunction(name: string): Promise<RemoteFile[]>
   deployFunctions(names: string[], log: LogFn): Promise<void>
-  /** Ledger sətrini əlavə et / sil — fayllarla ledger uyğunsuzluğunu düzəltmək üçün. */
+  /** Add/remove a ledger row — for repairing a mismatch between files and ledger. */
   repairLedger(version: string, status: 'applied' | 'reverted', log: LogFn): Promise<void>
-  /** Uzaq konteynerlər: vəziyyət və RAM. Managed-də idarə oluna bilmir. */
+  /** Remote containers: state and RAM. Not controllable on managed. */
   listServices(): Promise<RemoteService[]>
-  /** Konteyneri dayandır / başlat. */
+  /** Stop / start a container. */
   setServiceState(container: string, on: boolean, log: LogFn): Promise<void>
   verify(): Promise<VerifyReport>
 
   /**
-   * Sərbəst SQL — SQL redaktoru üçün. Lokal `execute()` kimi İSTİSNA ATMIR:
-   * SQL xətası `SqlRun.error`-da qayıdır.
+   * Free-form SQL — for the SQL editor. Unlike the local `execute()` it DOES NOT
+   * THROW: a SQL error comes back in `SqlRun.error`.
    */
   runSql(sql: string, opts: RemoteSqlOpts): Promise<SqlRun>
 
   /**
-   * Daxili sorğu (introspeksiya, sətir CRUD). Nəticə JSON obyektləri kimi
-   * qayıdır — tiplər (bool, ədəd, null) qorunur.
+   * An internal query (introspection, row CRUD). Results come back as JSON
+   * objects — types (bool, number, null) are preserved.
    *
-   * DİQQƏT: uzaq nəqliyyat `$n` parametri bağlaya bilmir, ona görə çağıran
-   * tərəf `inlineParams()` ilə literal yapışdırır. Bu YALNIZ bizim qurduğumuz
-   * mətnlərə tətbiq olunur — istifadəçi SQL-i heç vaxt buradan keçmir.
+   * NOTE: the remote transports cannot bind `$n` parameters, so the caller pastes
+   * literals with `inlineParams()`. This applies ONLY to text we build ourselves —
+   * user SQL never passes through here.
    */
   queryJson<T>(sql: string): Promise<T[]>
 }

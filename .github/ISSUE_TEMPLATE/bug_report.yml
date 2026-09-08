@@ -1,0 +1,85 @@
+name: Bug report
+description: Something in Locabase does not work as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not report security vulnerabilities here — see [SECURITY.md](../blob/main/SECURITY.md).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: |
+        1. Opened the Configuration screen for a self-hosted project
+        2. Changed `auth.jwt_expiry` and pressed Save
+        3. Expected the diff preview to show one line; it showed the whole file
+    validations:
+      required: true
+  - type: dropdown
+    id: environment-kind
+    attributes:
+      label: Which environment
+      options:
+        - Local stack
+        - Managed (Supabase cloud)
+        - Self-hosted
+        - Not environment-specific
+    validations:
+      required: true
+  - type: dropdown
+    id: screen
+    attributes:
+      label: Which screen
+      options:
+        - Overview
+        - Configuration
+        - Auth
+        - Tables
+        - SQL
+        - Secrets
+        - Migrations
+        - Functions
+        - Sync / Deploy
+        - Settings
+        - Other / not screen-specific
+    validations:
+      required: true
+  - type: input
+    id: locabase-version
+    attributes:
+      label: Locabase version
+      placeholder: "0.2.0, or the commit SHA if you run from source"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15.6 (Apple Silicon), Windows 11, Ubuntu 24.04"
+    validations:
+      required: true
+  - type: input
+    id: supabase-cli
+    attributes:
+      label: supabase CLI version
+      description: Output of `supabase --version`
+      placeholder: "2.34.3"
+    validations:
+      required: true
+  - type: input
+    id: docker
+    attributes:
+      label: Container runtime
+      placeholder: "Docker Desktop 4.44, OrbStack 1.12, colima"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log panel output
+      description: >
+        Open the log drawer at the bottom of the window and paste the relevant lines.
+        Log lines are already redacted, but please re-check before pasting.
+      render: shell
