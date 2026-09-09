@@ -73,6 +73,12 @@ minor number moves and the major stays put (semver).
   database, so it asks for the target's name typed out — the same guard the stack
   reset uses. When the local copy is gone (a job with "keep local" off), the dump
   is pulled back down from the bucket first and the temp file is removed after.
+- **Settings is now a section with pages.** Appearance (theme and typography),
+  Language, Storage, and System (the CLI/Docker check and the port picture) each
+  get their own page behind a resizable sidebar, the way Authentication is split
+  — four unrelated groups stacked in one scroll meant the last of them was never
+  seen. Backups links straight into the Storage page rather than to Settings at
+  large.
 
 ## Changed
 

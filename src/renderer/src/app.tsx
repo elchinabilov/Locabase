@@ -17,7 +17,7 @@ import { MigrationsRoute } from './routes/migrations'
 import { FunctionsRoute } from './routes/functions'
 import { SyncRoute } from './routes/sync'
 import { BackupsRoute } from './routes/backups'
-import { SettingsRoute } from './routes/settings'
+import { SettingsRoute, type SettingsSection } from './routes/settings'
 
 export type RouteId =
   | 'dashboard'
@@ -50,6 +50,8 @@ export function App(): ReactNode {
   const projects = useQuery('projects:list', undefined)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [route, setRoute] = useState<RouteId>('dashboard')
+  /** Which Settings page is open — kept here so other screens can link into one. */
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('appearance')
   const [logOpen, setLogOpen] = useState(false)
   /** «+» → the new/existing choice */
   const [addOpen, setAddOpen] = useState(false)
@@ -103,6 +105,8 @@ export function App(): ReactNode {
               onOpen={() => void openProject()}
               onNew={() => void newProject()}
               onRoute={setRoute}
+              settingsSection={settingsSection}
+              onSettingsSection={setSettingsSection}
             />
           </div>
           <LogDrawer open={logOpen} onToggle={() => setLogOpen((v) => !v)} />
@@ -136,7 +140,9 @@ function Content({
   onProjectsChanged,
   onOpen,
   onNew,
-  onRoute
+  onRoute,
+  settingsSection,
+  onSettingsSection
 }: {
   route: RouteId
   project: Project | null
@@ -144,8 +150,12 @@ function Content({
   onOpen: () => void
   onNew: () => void
   onRoute: (r: RouteId) => void
+  settingsSection: SettingsSection
+  onSettingsSection: (s: SettingsSection) => void
 }): ReactNode {
-  if (route === 'settings') return <SettingsRoute />
+  if (route === 'settings') {
+    return <SettingsRoute section={settingsSection} onSection={onSettingsSection} />
+  }
   if (route === 'dashboard') {
     return (
       <Dashboard
@@ -184,7 +194,11 @@ function Content({
         <BackupsRoute
           key={project.id}
           project={project}
-          onOpenSettings={() => onRoute('settings')}
+          // Straight to the page that holds the connections, not to Settings at large.
+          onOpenSettings={() => {
+            onSettingsSection('storage')
+            onRoute('settings')
+          }}
         />
       )
     default:

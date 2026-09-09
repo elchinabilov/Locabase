@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '../lib/ipc'
 import { Badge, Button, Card, Row, Select, Skeleton } from '../components/ui'
-import { LOCALES, useI18n } from '../i18n'
+import { LOCALES, useI18n, useT, type TranslationKey } from '../i18n'
 import { cx } from '../lib/format'
+import { Splitter, useStoredSize } from '../components/splitter'
 import { THEMES, useTheme, type ThemePreference } from '../theme'
 import { StorageCard } from '../components/storage-form'
 import {
@@ -199,38 +200,126 @@ function TypographyCard(): ReactNode {
   )
 }
 
-export function SettingsRoute(): ReactNode {
-  const { t, locale, setLocale } = useI18n()
-  const doctor = useQuery('system:doctor', undefined)
-  const range = useQuery('ports:suggestRange', undefined)
-  const conflicts = useQuery('ports:conflicts', undefined)
+/**
+ * Settings is a section with its own pages, the way Authentication is: the four
+ * groups have nothing to do with one another — a colour scheme, a language, a
+ * bucket's credentials, the state of the machine — and stacking them in one
+ * scroll made the last of them invisible.
+ *
+ * Which page is showing lives in `App`, so another screen can send the user
+ * straight to the one it means (Backups → Storage).
+ */
+export type SettingsSection = 'appearance' | 'language' | 'storage' | 'system'
+
+const SECTIONS: Array<{ id: SettingsSection; key: TranslationKey; icon: string }> = [
+  { id: 'appearance', key: 'settings.section.appearance', icon: '◐' },
+  { id: 'language', key: 'settings.section.language', icon: '⌨' },
+  { id: 'storage', key: 'settings.section.storage', icon: '☁' },
+  { id: 'system', key: 'settings.section.system', icon: '⚕' }
+]
+
+const SIDEBAR = { default: 200, min: 160, max: 360 }
+
+export function SettingsRoute({
+  section,
+  onSection
+}: {
+  section: SettingsSection
+  onSection: (s: SettingsSection) => void
+}): ReactNode {
+  const t = useT()
+  const [width, setWidth] = useStoredSize('locabase.settings.sidebarWidth', SIDEBAR.default)
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4">
-      <h1 className="text-h1 font-medium">{t('settings.title')}</h1>
+    <div className="flex h-full min-h-0">
+      <aside className="flex shrink-0 flex-col bg-panel" style={{ width: `${width}px` }}>
+        <div className="border-b border-line-soft px-3 py-2">
+          <span className="text-badge font-semibold tracking-[0.09em] text-muted uppercase">
+            {t('settings.title')}
+          </span>
+        </div>
+        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto p-1.5">
+          {SECTIONS.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onSection(item.id)}
+              aria-current={section === item.id ? 'page' : undefined}
+              className={cx(
+                'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-ui transition-colors',
+                section === item.id ? 'bg-panel-2 text-text' : 'text-muted hover:bg-hover'
+              )}
+            >
+              <span aria-hidden className="w-4 shrink-0 text-center opacity-70">
+                {item.icon}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{t(item.key)}</span>
+            </button>
+          ))}
+        </nav>
+      </aside>
 
+      <Splitter
+        axis="x"
+        value={width}
+        min={SIDEBAR.min}
+        max={SIDEBAR.max}
+        defaultValue={SIDEBAR.default}
+        onChange={setWidth}
+        label={t('settings.resizeSidebar')}
+      />
+
+      <section className="min-w-0 flex-1 overflow-auto">
+        <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4">
+          {section === 'appearance' && <AppearanceSection />}
+          {section === 'language' && <LanguageSection />}
+          {section === 'storage' && <StorageCard />}
+          {section === 'system' && <SystemSection />}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function AppearanceSection(): ReactNode {
+  const t = useT()
+  return (
+    <>
       <Card title={t('settings.appearance.title')} subtitle={t('settings.appearance.subtitle')}>
         <div className="px-3.5 py-3">
           <ThemePicker />
         </div>
       </Card>
-
       <TypographyCard />
+    </>
+  )
+}
 
-      <Card title={t('settings.language.title')}>
-        <div className="px-3.5 py-3">
-          <div className="w-56">
-            <Select
-              value={locale}
-              onChange={(v) => setLocale(v as (typeof LOCALES)[number]['id'])}
-              options={LOCALES.map((l) => ({ value: l.id, label: l.label }))}
-            />
-          </div>
+function LanguageSection(): ReactNode {
+  const { t, locale, setLocale } = useI18n()
+  return (
+    <Card title={t('settings.language.title')}>
+      <div className="px-3.5 py-3">
+        <div className="w-56">
+          <Select
+            value={locale}
+            onChange={(v) => setLocale(v as (typeof LOCALES)[number]['id'])}
+            options={LOCALES.map((l) => ({ value: l.id, label: l.label }))}
+          />
         </div>
-      </Card>
+      </div>
+    </Card>
+  )
+}
 
-      <StorageCard />
+/** What the machine has to offer: the CLI/Docker check and the port picture. */
+function SystemSection(): ReactNode {
+  const t = useT()
+  const doctor = useQuery('system:doctor', undefined)
+  const range = useQuery('ports:suggestRange', undefined)
+  const conflicts = useQuery('ports:conflicts', undefined)
 
+  return (
+    <>
       <Card title={t('settings.doctor.title')} subtitle={t('settings.doctor.subtitle')}>
         {doctor.loading && (
           <ul className="divide-y divide-line-soft" role="status" aria-label={t('common.checking')}>
@@ -278,6 +367,6 @@ export function SettingsRoute(): ReactNode {
           )}
         </div>
       </Card>
-    </div>
+    </>
   )
 }

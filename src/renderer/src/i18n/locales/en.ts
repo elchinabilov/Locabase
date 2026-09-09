@@ -75,6 +75,13 @@ const en = {
     willRunAfter: 'and ports will be written. Logs show up in the panel below.'
   },
   settings: {
+    section: {
+      appearance: 'Appearance',
+      language: 'Language',
+      storage: 'Storage',
+      system: 'System'
+    },
+    resizeSidebar: 'Resize the section list',
     title: 'Settings',
     appearance: {
       title: 'Appearance',

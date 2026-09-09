@@ -72,6 +72,13 @@ const az = {
     willRunAfter: 'və portlar yazılacaq. Loglar aşağıdakı panelə düşür.'
   },
   settings: {
+    section: {
+      appearance: 'Görünüş',
+      language: 'Dil',
+      storage: 'Storage',
+      system: 'Sistem'
+    },
+    resizeSidebar: 'Bölmə siyahısının enini dəyiş',
     title: 'Ayarlar',
     appearance: {
       title: 'Görünüş',
