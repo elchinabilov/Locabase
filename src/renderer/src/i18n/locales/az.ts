@@ -24,6 +24,7 @@ const az = {
       secrets: 'Secrets',
       migrations: 'Miqrasiyalar',
       functions: 'Funksiyalar',
+      edgeFunctions: 'Edge Functions',
       sync: 'Sync / Deploy',
       backups: 'Backuplar',
       settings: 'Ayarlar'
@@ -765,6 +766,9 @@ const az = {
     default: 'default',
     deleteConfirmTitle: '{count} sətir silinsin?',
     irreversible: 'Bu əməliyyat geri qaytarılmır.'
+  },
+  edgeFunctions: {
+    resizeSidebar: 'Bölmə siyahısının enini dəyiş'
   },
   backups: {
     title: 'Backuplar',

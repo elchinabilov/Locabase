@@ -27,6 +27,7 @@ const en = {
       secrets: 'Secrets',
       migrations: 'Migrations',
       functions: 'Functions',
+      edgeFunctions: 'Edge Functions',
       sync: 'Sync / Deploy',
       backups: 'Backups',
       settings: 'Settings'
@@ -768,6 +769,9 @@ const en = {
     default: 'default',
     deleteConfirmTitle: 'Delete {count} row(s)?',
     irreversible: 'This action can’t be undone.'
+  },
+  edgeFunctions: {
+    resizeSidebar: 'Resize the section list'
   },
   backups: {
     title: 'Backups',

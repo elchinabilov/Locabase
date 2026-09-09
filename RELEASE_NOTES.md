@@ -79,6 +79,11 @@ minor number moves and the major stays put (semver).
   — four unrelated groups stacked in one scroll meant the last of them was never
   seen. Backups links straight into the Storage page rather than to Settings at
   large.
+- **Edge Functions is a section, and Secrets moved inside it.** The root sidebar
+  item is now «Edge Functions», with two pages behind a resizable list:
+  **Functions** (the folders and their drift against a remote) and **Secrets**
+  (the variables those functions read). Deploying a function and setting the key
+  it needs is one task; they no longer sit a list apart.
 
 ## Changed
 
