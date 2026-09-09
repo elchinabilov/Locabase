@@ -283,7 +283,38 @@ function Sidebar({
           )
         })}
       </nav>
+
+      <SidebarFooter />
     </aside>
+  )
+}
+
+/**
+ * Version strip at the very bottom of the sidebar — gives the nav some air
+ * above the window edge and keeps the build number one glance away.
+ */
+function SidebarFooter(): ReactNode {
+  const t = useT()
+  return (
+    <div className="relative px-3 pt-3 pb-3.5">
+      {/* A hairline that fades out at both ends — quieter than a full border. */}
+      <span
+        aria-hidden
+        className="absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-line to-transparent"
+      />
+      <div
+        className="flex items-center gap-2"
+        title={`${t('app.sidebar.version')} ${__APP_VERSION__}`}
+      >
+        <Mark size={13} />
+        <span className="text-badge font-medium tracking-[0.02em] text-faint select-none">
+          Locabase
+        </span>
+        <span className="ml-auto rounded-full border border-line-soft bg-panel-2 px-1.5 py-px font-mono text-micro text-dim tabular-nums">
+          v{__APP_VERSION__}
+        </span>
+      </div>
+    </div>
   )
 }
 

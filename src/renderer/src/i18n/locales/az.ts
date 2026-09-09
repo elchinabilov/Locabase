@@ -33,7 +33,8 @@ const az = {
       projects: 'Layihələr',
       addProject: 'Layihə əlavə et',
       emptyBeforePlus: 'Hələ layihə yoxdur.',
-      emptyAfterPlus: 'ilə yeni layihə qur və ya `supabase/` qovluğu olan repo-nu aç.'
+      emptyAfterPlus: 'ilə yeni layihə qur və ya `supabase/` qovluğu olan repo-nu aç.',
+      version: 'Versiya'
     },
     selectProject: {
       title: 'Əvvəlcə layihə seç',

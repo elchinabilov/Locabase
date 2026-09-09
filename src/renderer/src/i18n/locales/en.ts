@@ -36,7 +36,8 @@ const en = {
       projects: 'Projects',
       addProject: 'Add project',
       emptyBeforePlus: 'No projects yet.',
-      emptyAfterPlus: 'to set up a new project or open a repo with a `supabase/` folder.'
+      emptyAfterPlus: 'to set up a new project or open a repo with a `supabase/` folder.',
+      version: 'Version'
     },
     selectProject: {
       title: 'No project selected',
