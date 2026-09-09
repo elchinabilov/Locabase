@@ -139,17 +139,22 @@ export function Splitter({
       onKeyDown={onKeyDown}
       onDoubleClick={() => defaultValue !== undefined && onChange(defaultValue)}
       className={cx(
-        'group relative z-10 shrink-0 touch-none',
-        axis === 'x' ? 'w-[5px] cursor-col-resize' : 'h-[5px] cursor-row-resize'
+        // Exactly as wide as the border it replaces. A thicker element would
+        // take up layout, and its own background would read as a gap between
+        // the two panes — so the grab area is the overlay below, not this.
+        'relative z-10 shrink-0 touch-none transition-colors',
+        axis === 'x' ? 'w-px' : 'h-px',
+        dragging ? 'bg-accent' : 'bg-line hover:bg-accent-dim'
       )}
     >
+      {/* A hairline is unusable as a pointer target, so the grab area reaches
+          3px into each neighbour — overhanging rather than displacing them. */}
       <span
         className={cx(
-          'absolute transition-colors',
+          'absolute',
           axis === 'x'
-            ? 'inset-y-0 left-1/2 w-px -translate-x-1/2'
-            : 'inset-x-0 top-1/2 h-px -translate-y-1/2',
-          dragging ? 'bg-accent' : 'bg-line group-hover:bg-accent-dim'
+            ? 'inset-y-0 -right-[3px] -left-[3px] cursor-col-resize'
+            : 'inset-x-0 -top-[3px] -bottom-[3px] cursor-row-resize'
         )}
       />
     </div>
