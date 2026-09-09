@@ -99,13 +99,13 @@ function ProjectView({
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-[17px] font-medium">{project.name}</h1>
+            <h1 className="truncate text-h1 font-medium">{project.name}</h1>
             <Badge tone={running ? 'ok' : 'muted'}>
               {running ? t('dashboard.status.running') : t('dashboard.status.stopped')}
             </Badge>
             <Badge tone="muted">{project.projectId}</Badge>
           </div>
-          <p className="mt-1 truncate font-mono text-[11.5px] text-muted">{project.path}</p>
+          <p className="mt-1 truncate font-mono text-small text-muted">{project.path}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {running ? (
@@ -132,13 +132,13 @@ function ProjectView({
       {s?.error && !status.error && <ErrorNote>{s.error}</ErrorNote>}
 
       {mine.length > 0 && (
-        <div className="rounded-md border border-warn-border bg-warn-bg px-3 py-2 text-[12px] text-warn">
+        <div className="rounded-md border border-warn-border bg-warn-bg px-3 py-2 text-note text-warn">
           {t('dashboard.portConflict', { ports: mine.map((c) => c.port).join(', ') })}
         </div>
       )}
 
       {needsRestart && (
-        <div className="flex items-center gap-3 rounded-md border border-warn-border bg-warn-bg px-3.5 py-2 text-[12px] text-warn">
+        <div className="flex items-center gap-3 rounded-md border border-warn-border bg-warn-bg px-3.5 py-2 text-note text-warn">
           {t('dashboard.needsRestart.message')}
           <Button onClick={() => void act('restart')} loading={busy === 'restart'}>
             {t('dashboard.needsRestart.now')}
@@ -171,7 +171,7 @@ function ProjectView({
       </div>
 
       {s && (
-        <p className="px-1 text-[11px] text-muted">
+        <p className="px-1 text-meta text-muted">
           {t('dashboard.lastCheck', { time: timeAgo(s.checkedAt, locale) })}
         </p>
       )}
@@ -327,20 +327,20 @@ function Services({
                 <button
                   onClick={() => setExpanded(open ? null : group.label)}
                   disabled={members.length < 2}
-                  className="min-w-0 flex-1 truncate text-left text-[12.5px] disabled:cursor-default"
+                  className="min-w-0 flex-1 truncate text-left text-ui disabled:cursor-default"
                   title={noteFor(group.configPath)}
                 >
                   {group.label}
                   {members.length > 1 && (
-                    <span className="ml-1.5 text-[10px] text-muted">{open ? '▾' : '▸'}</span>
+                    <span className="ml-1.5 text-micro text-muted">{open ? '▾' : '▸'}</span>
                   )}
                 </button>
-                <span className="w-[68px] shrink-0 text-right font-mono text-[11px] text-muted">
+                <span className="w-[68px] shrink-0 text-right font-mono text-meta text-muted">
                   {mem > 0 ? formatBytes(mem) : ''}
                 </span>
                 <span
                   className={cx(
-                    'w-[74px] shrink-0 text-right text-[10.5px]',
+                    'w-[74px] shrink-0 text-right text-badge',
                     pending ? 'text-warn' : 'text-muted'
                   )}
                 >
@@ -362,10 +362,10 @@ function Services({
                     className="flex items-center gap-2.5 border-t border-line-soft bg-sunken py-1.5 pr-3.5 pl-[52px]"
                   >
                     <Dot tone={m.state === 'running' ? 'ok' : 'muted'} />
-                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted">
+                    <span className="min-w-0 flex-1 truncate font-mono text-meta text-muted">
                       {m.container}
                     </span>
-                    <span className="w-[68px] shrink-0 text-right font-mono text-[11px] text-muted">
+                    <span className="w-[68px] shrink-0 text-right font-mono text-meta text-muted">
                       {m.memory ? formatBytes(m.memory) : ''}
                     </span>
                     <LogButton
@@ -379,7 +379,7 @@ function Services({
         })}
       </ul>
       {services.length === 0 && (
-        <p className="px-3.5 py-3 text-center text-[11.5px] text-muted">
+        <p className="px-3.5 py-3 text-center text-small text-muted">
           {t('dashboard.services.noContainers')}
         </p>
       )}
@@ -393,7 +393,7 @@ function LogButton({ active, onClick }: { active: boolean; onClick: () => void }
     <button
       onClick={onClick}
       className={cx(
-        'w-[26px] shrink-0 rounded px-1 py-0.5 text-[10.5px]',
+        'w-[26px] shrink-0 rounded px-1 py-0.5 text-badge',
         active ? 'bg-accent-dim text-accent' : 'text-muted hover:bg-panel-2 hover:text-text'
       )}
     >
@@ -442,27 +442,27 @@ function QuickLinks({
           ))}
         </ul>
       ) : !running ? (
-        <p className="px-3.5 py-6 text-center text-[12px] text-muted">
+        <p className="px-3.5 py-6 text-center text-note text-muted">
           {t('dashboard.quickLinks.empty')}
         </p>
       ) : (
         <ul className="divide-y divide-line-soft">
           {LINKS.filter((l) => vars[l.key]).map((l) => (
             <li key={l.key} className="flex items-center gap-2 px-3.5 py-1.5">
-              <span className="w-[104px] shrink-0 text-[12px] text-muted">{l.label}</span>
-              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-soft">
+              <span className="w-[104px] shrink-0 text-note text-muted">{l.label}</span>
+              <span className="min-w-0 flex-1 truncate font-mono text-meta text-text-soft">
                 {l.key.endsWith('KEY') ? `${vars[l.key]!.slice(0, 18)}…` : vars[l.key]}
               </span>
               <button
                 onClick={() => copy(l.key, vars[l.key]!)}
-                className="text-[10.5px] text-muted hover:text-accent"
+                className="text-badge text-muted hover:text-accent"
               >
                 {copied === l.key ? '✓' : t('dashboard.quickLinks.copy')}
               </button>
               {l.open && (
                 <button
                   onClick={() => void call('stack:openUrl', { url: vars[l.key]! })}
-                  className="text-[10.5px] text-muted hover:text-accent"
+                  className="text-badge text-muted hover:text-accent"
                 >
                   {t('dashboard.quickLinks.open')}
                 </button>
@@ -496,7 +496,7 @@ function Environments({
       }
     >
       {project.environments.length === 0 ? (
-        <p className="px-3.5 py-4 text-[11.5px] leading-relaxed text-muted">
+        <p className="px-3.5 py-4 text-small leading-relaxed text-muted">
           {t('dashboard.environments.empty')}
         </p>
       ) : (
@@ -508,8 +508,8 @@ function Environments({
                   ? t('dashboard.environments.managed')
                   : t('dashboard.environments.selfHosted')}
               </Badge>
-              <span className="flex-1 truncate text-[12.5px]">{e.name}</span>
-              <span className="truncate font-mono text-[10.5px] text-muted">
+              <span className="flex-1 truncate text-ui">{e.name}</span>
+              <span className="truncate font-mono text-badge text-muted">
                 {e.kind === 'managed' ? e.projectRef : e.sshHost}
               </span>
             </li>
@@ -567,7 +567,7 @@ function ResetModal({
         </>
       }
     >
-      <p className="mb-3 text-[12.5px] leading-relaxed">
+      <p className="mb-3 text-ui leading-relaxed">
         {t('dashboard.reset.body')} <span className="text-danger">{t('dashboard.reset.dataLoss')}</span>
       </p>
       <Row label={t('dashboard.reset.confirmLabel', { name: project.name })}>

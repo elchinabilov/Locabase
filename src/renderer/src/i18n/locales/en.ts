@@ -81,6 +81,24 @@ const en = {
       light: 'Light',
       dark: 'Dark'
     },
+    typography: {
+      title: 'Typography',
+      subtitle: 'Interface and SQL editor',
+      interfaceFont: 'Interface font',
+      textSize: 'Text size',
+      editorFont: 'SQL editor font',
+      editorSize: 'SQL editor size',
+      unavailable: 'not installed',
+      previewText: 'The quick brown fox jumps over the lazy dog — 0123456789',
+      previewCode: 'select * from public.posts where id = 42;',
+      reset: 'Reset to defaults',
+      scale: {
+        small: 'Small',
+        default: 'Default',
+        large: 'Large',
+        larger: 'Larger'
+      }
+    },
     language: {
       title: 'Language'
     },

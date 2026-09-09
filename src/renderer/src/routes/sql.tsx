@@ -135,13 +135,13 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
     <div className="flex h-full min-h-0">
       <aside className="flex w-[200px] shrink-0 flex-col border-r border-line bg-panel">
         <div className="flex items-center justify-between border-b border-line-soft px-3 py-2">
-          <span className="text-[10.5px] font-semibold tracking-[0.09em] text-muted uppercase">
+          <span className="text-badge font-semibold tracking-[0.09em] text-muted uppercase">
             {t('sql.queries')}
           </span>
           <button
             onClick={() => setDialog('save')}
             title={t('common.save')}
-            className="rounded px-1.5 text-[15px] leading-none text-muted hover:bg-panel-2 hover:text-accent"
+            className="rounded px-1.5 text-h2 leading-none text-muted hover:bg-panel-2 hover:text-accent"
           >
             +
           </button>
@@ -149,14 +149,14 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
         <div className="min-h-0 flex-1 overflow-auto p-1.5">
           {saved.loading && saved.data === null && <SkeletonRows rows={5} />}
           {saved.data !== null && saved.data.length === 0 && (
-            <p className="px-2 py-3 text-[11.5px] leading-relaxed text-muted">{t('sql.noSaved')}</p>
+            <p className="px-2 py-3 text-small leading-relaxed text-muted">{t('sql.noSaved')}</p>
           )}
           {(saved.data ?? []).map((q) => (
             <button
               key={q.name}
               onClick={() => void load(q.name)}
               className={cx(
-                'mb-0.5 flex w-full items-center gap-1.5 rounded-md px-2.5 py-1.5 text-left text-[12px]',
+                'mb-0.5 flex w-full items-center gap-1.5 rounded-md px-2.5 py-1.5 text-left text-note',
                 q.name === activeName ? 'bg-panel-2 text-text' : 'text-muted hover:bg-hover'
               )}
             >
@@ -165,21 +165,21 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
             </button>
           ))}
         </div>
-        <p className="border-t border-line-soft px-3 py-2 text-[10.5px] leading-relaxed text-muted">
+        <p className="border-t border-line-soft px-3 py-2 text-badge leading-relaxed text-muted">
           <code>supabase/.locabase/queries/</code> {t('sql.sharedViaGit')}
         </p>
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-          <h1 className="text-[14px] font-medium">
+          <h1 className="text-h3 font-medium">
             {activeName ?? t('sql.untitled')}
             {dirty && <span className="ml-1 text-accent">•</span>}
           </h1>
 
           <EnvPicker project={project} envId={envId} onChange={setEnvId} />
 
-          <label className="ml-1 flex items-center gap-1.5 text-[11.5px] text-muted">
+          <label className="ml-1 flex items-center gap-1.5 text-small text-muted">
             <input
               type="checkbox"
               checked={readOnly}
@@ -226,7 +226,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
 
         {env && <RemoteNote env={env} />}
         {!readOnly && (
-          <p className="border-b border-line-soft bg-warn-bg px-3 py-1.5 text-[11.5px] text-warn">
+          <p className="border-b border-line-soft bg-warn-bg px-3 py-1.5 text-small text-warn">
             {t('sql.writeModeOn', { target: env ? t('sql.writeModeTarget', { name: env.name }) : '' })}
           </p>
         )}
@@ -250,7 +250,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
             </div>
 
             <div className="flex h-[46%] min-h-[140px] flex-col">
-              <div className="flex items-center gap-2 border-b border-line-soft px-3 py-1.5 text-[11.5px]">
+              <div className="flex items-center gap-2 border-b border-line-soft px-3 py-1.5 text-small">
                 {busy && <span className="text-muted">{t('sql.running')}</span>}
                 {!busy && run === null && (
                   <span className="text-muted">
@@ -278,7 +278,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
                         key={i}
                         onClick={() => setTab(i)}
                         className={cx(
-                          'rounded px-1.5 py-0.5 text-[11px]',
+                          'rounded px-1.5 py-0.5 text-meta',
                           i === tab ? 'bg-panel-2 text-text' : 'text-muted hover:text-text'
                         )}
                       >
@@ -308,7 +308,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
                   />
                 )}
                 {!busy && run?.ok && current && current.columns.length === 0 && (
-                  <p className="px-3.5 py-6 text-center text-[12px] text-muted">
+                  <p className="px-3.5 py-6 text-center text-note text-muted">
                     {t('sql.rowsAffected', { command: current.command ?? 'OK', count: current.rowCount ?? 0 })}
                   </p>
                 )}
@@ -317,7 +317,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
           </>
         )}
 
-        <p className="border-t border-line-soft px-3 py-1.5 text-[11px] text-muted">
+        <p className="border-t border-line-soft px-3 py-1.5 text-meta text-muted">
           {t('sql.notInLedger')}
         </p>
       </section>
@@ -377,7 +377,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
             </>
           }
         >
-          <p className="text-[12.5px] text-muted">{t('sql.fileDeletedFromDisk')}</p>
+          <p className="text-ui text-muted">{t('sql.fileDeletedFromDisk')}</p>
         </Modal>
       )}
     </div>
@@ -411,7 +411,7 @@ function SqlError({
         {rows
           .filter(([, v]) => v)
           .map(([k, v]) => (
-            <div key={k} className="grid grid-cols-[90px_1fr] gap-2 text-[11.5px]">
+            <div key={k} className="grid grid-cols-[90px_1fr] gap-2 text-small">
               <span className="text-muted">{k}</span>
               <span className="font-mono break-words text-text">{v}</span>
             </div>
@@ -472,7 +472,7 @@ function NameModal({
         </>
       }
     >
-      <label className="mb-1 block text-[12px] text-muted">{t('newProject.name.label')}</label>
+      <label className="mb-1 block text-note text-muted">{t('newProject.name.label')}</label>
       <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -480,7 +480,7 @@ function NameModal({
         className="font-mono"
         autoFocus
       />
-      <p className="mt-2 text-[11.5px] leading-relaxed text-muted">{hint}</p>
+      <p className="mt-2 text-small leading-relaxed text-muted">{hint}</p>
       {error && (
         <div className="mt-3">
           <ErrorNote>{error}</ErrorNote>

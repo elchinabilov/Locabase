@@ -110,7 +110,7 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <h1 className="text-[15px] font-medium">{t('auth.title')}</h1>
+        <h1 className="text-h2 font-medium">{t('auth.title')}</h1>
         <div className="flex-1" />
         {patches.length > 0 && (
           <>
@@ -140,8 +140,8 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
       <div className="min-h-0 flex-1 overflow-auto p-4">
         <div className="mx-auto flex max-w-4xl flex-col gap-3">
           <div className="flex items-center gap-3 rounded-lg border border-line bg-panel px-3.5 py-2.5">
-            <span className="text-[12px] text-muted">Callback URL</span>
-            <code className="min-w-0 flex-1 truncate font-mono text-[12px] text-accent">{cb}</code>
+            <span className="text-note text-muted">Callback URL</span>
+            <code className="min-w-0 flex-1 truncate font-mono text-note text-accent">{cb}</code>
             <Button
               onClick={() => {
                 void navigator.clipboard.writeText(cb)
@@ -152,7 +152,7 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
               {copied ? t('auth.copied') : t('dashboard.quickLinks.copy')}
             </Button>
           </div>
-          <p className="-mt-1 px-1 text-[11.5px] leading-relaxed text-muted">{t('auth.callbackHint')}</p>
+          <p className="-mt-1 px-1 text-small leading-relaxed text-muted">{t('auth.callbackHint')}</p>
 
           {doc.loading && (
             <Card title={t('auth.providers')}>
@@ -190,15 +190,15 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
                           onClick={() => setOpen(expanded ? null : meta.id)}
                           className="flex min-w-0 flex-1 items-center gap-2 text-left"
                         >
-                          <span className={cx('text-[12.5px]', on ? 'text-text' : 'text-muted')}>
+                          <span className={cx('text-ui', on ? 'text-text' : 'text-muted')}>
                             {meta.label}
                           </span>
-                          <code className="font-mono text-[10.5px] text-faint">{meta.id}</code>
+                          <code className="font-mono text-badge text-faint">{meta.id}</code>
                           {on && !configured && <Badge tone="warn">{t('auth.noKey')}</Badge>}
                         </button>
                         <button
                           onClick={() => setOpen(expanded ? null : meta.id)}
-                          className="text-[11px] text-muted hover:text-text"
+                          className="text-meta text-muted hover:text-text"
                         >
                           {expanded ? t('auth.collapse') : t('auth.settings')}
                         </button>
@@ -207,7 +207,7 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
                       {expanded && (
                         <div className="border-t border-line-soft bg-sunken pb-2">
                           {PROVIDER_HINT_KEY[meta.id] && (
-                            <p className="px-3.5 pt-2.5 text-[11.5px] leading-relaxed text-muted">
+                            <p className="px-3.5 pt-2.5 text-small leading-relaxed text-muted">
                               {t(PROVIDER_HINT_KEY[meta.id]!)}
                             </p>
                           )}
@@ -238,7 +238,7 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
                                         }
                                       }))
                                     }
-                                    className="mt-3 mr-3 shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] text-muted hover:text-accent"
+                                    className="mt-3 mr-3 shrink-0 rounded border border-line px-1.5 py-0.5 text-micro text-muted hover:text-accent"
                                   >
                                     {t('auth.defaultName')}
                                   </button>
@@ -271,7 +271,7 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
             </>
           }
         >
-          <p className="mb-3 text-[12px] text-muted">
+          <p className="mb-3 text-note text-muted">
             {t('auth.diffChangedLines', { count: preview.changedLines })}
             {preview.restartRequired && <span className="text-warn"> {t('auth.restartRequired')}</span>}
           </p>

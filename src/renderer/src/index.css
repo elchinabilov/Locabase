@@ -51,8 +51,38 @@
   --color-info-bg: var(--lb-info-bg);
   --color-info-border: var(--lb-info-border);
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --font-sans: var(--lb-font-sans);
+  --font-mono: var(--lb-font-mono);
+
+  /* --------------------------------------------------------------- text size
+     The app's own ten steps, replacing Tailwind's default scale — the names are
+     roles, not sizes, so nothing collides with `text-sm` and friends (a
+     collision would drag Tailwind's paired line-height in with it).
+
+     Each step is a count of `--lb-text-unit`, which is 1px at 100%; the text
+     size setting moves that one variable and the whole ladder follows. The
+     comment after each line is its size at 100%. */
+  --text-micro: calc(10 * var(--lb-text-unit)); /* 10px — the smallest meta */
+  --text-badge: calc(10.5 * var(--lb-text-unit)); /* 10.5px — badges, tiny labels */
+  --text-meta: calc(11 * var(--lb-text-unit)); /* 11px — monospace meta, table cells */
+  --text-small: calc(11.5 * var(--lb-text-unit)); /* 11.5px — subtitles, side notes */
+  --text-note: calc(12 * var(--lb-text-unit)); /* 12px — notes and hints */
+  --text-ui: calc(12.5 * var(--lb-text-unit)); /* 12.5px — buttons, inputs, rows */
+  --text-card: calc(13 * var(--lb-text-unit)); /* 13px — body, card and modal headings */
+  --text-h3: calc(14 * var(--lb-text-unit)); /* 14px — compact screen heading */
+  --text-h2: calc(15 * var(--lb-text-unit)); /* 15px — screen heading */
+  --text-h1: calc(17 * var(--lb-text-unit)); /* 17px — page title */
+}
+
+/* ------------------------------------------------------------------- fonts
+   Independent of the theme — light and dark share them — so they sit on their
+   own `:root` block, and `FontProvider` overwrites them inline on <html>. */
+:root {
+  --lb-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --lb-font-mono: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --lb-text-unit: 1px;
+  /* The SQL editor is sized on its own — code is read differently from labels. */
+  --lb-editor-size: 12.5px;
 }
 
 /* ---------------------------------------------------------- dark (default) */
@@ -183,7 +213,7 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--text-card);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }

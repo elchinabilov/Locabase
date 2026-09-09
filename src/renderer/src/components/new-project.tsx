@@ -71,8 +71,8 @@ function Choice({
       onClick={onClick}
       className="rounded-md border border-line bg-sunken px-3.5 py-3 text-left transition-colors hover:border-accent-dim hover:bg-panel-2"
     >
-      <span className="block text-[12.5px] text-text">{label}</span>
-      <span className="mt-1 block text-[11.5px] leading-snug text-muted">{hint}</span>
+      <span className="block text-ui text-text">{label}</span>
+      <span className="mt-1 block text-small leading-snug text-muted">{hint}</span>
     </button>
   )
 }
@@ -153,7 +153,7 @@ export function NewProjectModal({
     >
       <div className="divide-y divide-line-soft rounded-md border border-line">
         <Row label={t('newProject.folder.label')} hint={t('newProject.folder.hint')}>
-          <div className="pt-1 font-mono text-[11.5px] break-all text-muted">{dir}</div>
+          <div className="pt-1 font-mono text-small break-all text-muted">{dir}</div>
         </Row>
         <Row
           label={t('newProject.name.label')}
@@ -198,7 +198,7 @@ export function NewProjectModal({
         )}
         {error && <ErrorNote>{error}</ErrorNote>}
         {!occupied && (
-          <p className="text-[11.5px] leading-relaxed text-muted">
+          <p className="text-small leading-relaxed text-muted">
             <code className="text-accent">supabase init</code> {t('newProject.willRunBefore')}{' '}
             <code>project_id</code> {t('newProject.willRunAfter')}
           </p>

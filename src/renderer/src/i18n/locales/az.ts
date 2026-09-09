@@ -78,6 +78,24 @@ const az = {
       light: 'İşıqlı',
       dark: 'Qaranlıq'
     },
+    typography: {
+      title: 'Şrift',
+      subtitle: 'İnterfeys və SQL redaktoru',
+      interfaceFont: 'İnterfeys şrifti',
+      textSize: 'Mətn ölçüsü',
+      editorFont: 'SQL redaktoru şrifti',
+      editorSize: 'SQL redaktoru ölçüsü',
+      unavailable: 'quraşdırılmayıb',
+      previewText: 'Qırmızı ağacın altında sakit axşam — 0123456789',
+      previewCode: 'select * from public.posts where id = 42;',
+      reset: 'Standarta qaytar',
+      scale: {
+        small: 'Kiçik',
+        default: 'Standart',
+        large: 'Böyük',
+        larger: 'Daha böyük'
+      }
+    },
     language: {
       title: 'Dil'
     },

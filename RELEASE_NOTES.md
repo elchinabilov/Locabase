@@ -12,6 +12,10 @@ minor number moves and the major stays put (semver).
 - **Light theme.** The interface is no longer dark-only: Settings → Appearance
   offers Light, Dark, or Match system, which follows the OS appearance live and
   is the new default. The choice is remembered between launches.
+- **Font settings.** Settings → Typography sets the interface font and text size
+  (Small to Larger, 92–115%), and the SQL editor's font and size (11–16px)
+  separately. A font the machine doesn't have is labelled as such instead of
+  silently falling back, and a live sample shows both before you leave the page.
 
 ## Changed
 
@@ -26,3 +30,7 @@ minor number moves and the major stays put (semver).
   lights follow the theme too.
 - **The SQL editor follows the theme.** CodeMirror is reconfigured in place on a
   switch, so the document, the undo history and the cursor all survive it.
+- **Text sizes are a named ladder.** The ~200 one-off pixel sizes scattered
+  through the components are now ten named steps (`text-micro` … `text-h1`),
+  each a multiple of one variable — which is what makes a single text-size
+  setting move the whole interface at once.

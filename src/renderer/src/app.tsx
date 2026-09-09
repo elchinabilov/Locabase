@@ -209,13 +209,13 @@ function Sidebar({
       </div>
 
       <div className="flex items-center justify-between px-3 pt-3 pb-1.5">
-        <span className="text-[10.5px] font-semibold tracking-[0.09em] text-muted uppercase">
+        <span className="text-badge font-semibold tracking-[0.09em] text-muted uppercase">
           {t('app.sidebar.projects')}
         </span>
         <button
           onClick={onAdd}
           title={t('app.sidebar.addProject')}
-          className="rounded px-1.5 text-[15px] leading-none text-muted hover:bg-panel-2 hover:text-accent"
+          className="rounded px-1.5 text-h2 leading-none text-muted hover:bg-panel-2 hover:text-accent"
         >
           +
         </button>
@@ -225,7 +225,7 @@ function Sidebar({
         {loading && <SkeletonRows rows={4} className="px-0.5 py-1" />}
         {error && <ErrorNote>{error}</ErrorNote>}
         {!loading && projects.length === 0 && (
-          <p className="px-2 py-3 text-[11.5px] leading-relaxed text-muted">
+          <p className="px-2 py-3 text-small leading-relaxed text-muted">
             {t('app.sidebar.emptyBeforePlus')} <span className="text-accent">+</span>{' '}
             {t('app.sidebar.emptyAfterPlus')}
           </p>
@@ -250,14 +250,14 @@ function Sidebar({
               disabled={disabled}
               onClick={() => onRoute(item.id)}
               className={cx(
-                'flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition-colors',
+                'flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-ui transition-colors',
                 route === item.id
                   ? 'bg-panel-2 text-text'
                   : 'text-muted hover:bg-panel-2 hover:text-text',
                 disabled && 'cursor-not-allowed opacity-35 hover:bg-transparent'
               )}
             >
-              <span className="w-3.5 text-center text-[12px] opacity-80">{item.icon}</span>
+              <span className="w-3.5 text-center text-note opacity-80">{item.icon}</span>
               {t(item.labelKey)}
             </button>
           )
@@ -291,8 +291,8 @@ function ProjectItem({
     >
       <Dot tone={unhealthy ? 'warn' : running ? 'ok' : 'muted'} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12.5px] text-text">{project.name}</span>
-        <span className="block truncate text-[10.5px] text-muted">{shortPath(project.path, 1)}</span>
+        <span className="block truncate text-ui text-text">{project.name}</span>
+        <span className="block truncate text-badge text-muted">{shortPath(project.path, 1)}</span>
       </span>
       {project.environments.length > 0 && (
         <Badge tone="muted">{project.environments.length}</Badge>

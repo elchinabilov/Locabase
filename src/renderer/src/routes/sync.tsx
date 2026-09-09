@@ -55,13 +55,13 @@ export function SyncRoute({
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-2 border-b border-line px-4 py-2.5">
-        <h1 className="mr-2 text-[15px] font-medium">{t('app.nav.sync')}</h1>
+        <h1 className="mr-2 text-h2 font-medium">{t('app.nav.sync')}</h1>
         {project.environments.map((e) => (
           <button
             key={e.id}
             onClick={() => setEnvId(e.id)}
             className={cx(
-              'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px]',
+              'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-note',
               e.id === envId
                 ? 'border-line bg-panel-2 text-text'
                 : 'border-transparent text-muted hover:text-text'
@@ -78,7 +78,7 @@ export function SyncRoute({
         ))}
         <button
           onClick={() => setEditing('new')}
-          className="rounded px-1.5 text-[15px] leading-none text-muted hover:text-accent"
+          className="rounded px-1.5 text-h2 leading-none text-muted hover:text-accent"
           title={t('sync.addEnv')}
         >
           +
@@ -171,7 +171,7 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
             {t('sync.computeDiff')}
           </Button>
           {report && (
-            <span className="text-[11.5px] text-muted">
+            <span className="text-small text-muted">
               {t('sync.computedAt', { time: timeAgo(report.generatedAt, locale) })}
             </span>
           )}
@@ -199,7 +199,7 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
         {error && <ErrorNote>{error}</ErrorNote>}
 
         {!report && !loading && (
-          <p className="px-1 py-6 text-center text-[12px] text-muted">{t('sync.beforeReport')}</p>
+          <p className="px-1 py-6 text-center text-note text-muted">{t('sync.beforeReport')}</p>
         )}
 
         {report && (
@@ -227,7 +227,7 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
                     }
                     label={<code className="font-mono">{m.version}</code>}
                     right={
-                      <span className="text-[11px] text-muted">
+                      <span className="text-meta text-muted">
                         {m.name} · {m.state}
                       </span>
                     }
@@ -238,7 +238,7 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
 
             <Axis title={t('sync.schema')} dirty={report.schema.dirty} error={report.schema.error}>
               {report.schema.dirty ? (
-                <pre className="max-h-56 overflow-auto px-3.5 py-2 font-mono text-[11px] whitespace-pre-wrap text-text-soft">
+                <pre className="max-h-56 overflow-auto px-3.5 py-2 font-mono text-meta whitespace-pre-wrap text-text-soft">
                   {report.schema.items[0]?.sql.trim().slice(0, 4000)}
                 </pre>
               ) : (
@@ -269,7 +269,7 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
                   right={
                     <span className="flex items-center gap-2">
                       {f.remote?.version != null && (
-                        <span className="text-[11px] text-muted">v{f.remote.version}</span>
+                        <span className="text-meta text-muted">v{f.remote.version}</span>
                       )}
                       <Badge tone={DRIFT[f.drift].tone}>{t(DRIFT[f.drift].labelKey)}</Badge>
                       <button
@@ -279,7 +279,7 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
                           e.stopPropagation()
                           setDiffFn(f.name)
                         }}
-                        className="rounded border border-line px-1.5 py-0.5 text-[11px] text-muted hover:border-accent-dim hover:text-accent"
+                        className="rounded border border-line px-1.5 py-0.5 text-meta text-muted hover:border-accent-dim hover:text-accent"
                       >
                         {t('sync.viewDiff')}
                       </button>
@@ -390,8 +390,8 @@ function Health({
           {report.details.map((d) => (
             <li key={d.label} className="flex items-center gap-2.5 px-3.5 py-1.5">
               <Dot tone={d.ok ? 'ok' : 'danger'} />
-              <span className="w-[110px] shrink-0 text-[12px]">{d.label}</span>
-              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted">
+              <span className="w-[110px] shrink-0 text-note">{d.label}</span>
+              <span className="min-w-0 flex-1 truncate font-mono text-meta text-muted">
                 {d.info}
               </span>
             </li>
@@ -431,7 +431,7 @@ function Axis({
       }
     >
       {error && (
-        <p className="px-3.5 py-2 text-[11.5px] leading-relaxed text-muted">{error}</p>
+        <p className="px-3.5 py-2 text-small leading-relaxed text-muted">{error}</p>
       )}
       {children}
     </Card>
@@ -440,7 +440,7 @@ function Axis({
 
 function Clean({ text }: { text?: string }): ReactNode {
   const t = useT()
-  return <p className="px-3.5 py-3 text-[12px] text-muted">{text ?? t('diffView.noDiff')}</p>
+  return <p className="px-3.5 py-3 text-note text-muted">{text ?? t('diffView.noDiff')}</p>
 }
 
 function Pick({
@@ -470,7 +470,7 @@ function Pick({
         onChange={(e) => onChange(e.target.checked)}
         className="accent-accent"
       />
-      <span className="min-w-0 flex-1 truncate text-[12px]">{label}</span>
+      <span className="min-w-0 flex-1 truncate text-note">{label}</span>
       {right}
     </label>
   )
@@ -538,7 +538,7 @@ function DeployModal({
         </>
       }
     >
-      <ol className="mb-3 space-y-1 text-[12.5px]">
+      <ol className="mb-3 space-y-1 text-ui">
         {plan.steps.map((s) => (
           <li key={s} className="flex items-center gap-2">
             <span className="text-muted">•</span>
@@ -554,18 +554,18 @@ function DeployModal({
       </ol>
 
       {env.kind === 'managed' && plan.migrations.length > 0 && (
-        <p className="mb-3 rounded-md border border-warn-border bg-warn-bg px-3 py-2 text-[11.5px] text-warn">
+        <p className="mb-3 rounded-md border border-warn-border bg-warn-bg px-3 py-2 text-small text-warn">
           {t('sync.managedMigrationWarning')}
         </p>
       )}
 
-      <label className="mb-1 block text-[12px] text-muted">
+      <label className="mb-1 block text-note text-muted">
         {t('dashboard.reset.confirmLabel', { name: project.name })}
       </label>
       <Input value={text} onChange={(e) => setText(e.target.value)} autoFocus />
 
       {result && (
-        <p className="mt-3 rounded-md border border-accent-border bg-accent-bg px-3 py-2 text-[12px] text-accent">
+        <p className="mt-3 rounded-md border border-accent-border bg-accent-bg px-3 py-2 text-note text-accent">
           {result}
         </p>
       )}

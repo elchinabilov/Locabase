@@ -118,14 +118,14 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <h1 className="text-[15px] font-medium">{t('config.title')}</h1>
-        <span className="font-mono text-[11px] text-muted">supabase/config.toml</span>
+        <h1 className="text-h2 font-medium">{t('config.title')}</h1>
+        <span className="font-mono text-meta text-muted">supabase/config.toml</span>
         <div className="flex-1" />
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder={t('config.searchPlaceholder')}
-          className="w-52 rounded border border-line bg-sunken px-2 py-1 text-[11.5px] outline-none focus:border-accent-dim"
+          className="w-52 rounded border border-line bg-sunken px-2 py-1 text-small outline-none focus:border-accent-dim"
         />
         {patches.length > 0 && (
           <>
@@ -139,7 +139,7 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
       </header>
 
       {savedRestart && (
-        <div className="flex items-center gap-3 border-b border-warn-border bg-warn-bg px-4 py-2 text-[12px] text-warn">
+        <div className="flex items-center gap-3 border-b border-warn-border bg-warn-bg px-4 py-2 text-note text-warn">
           {t('config.savedRestartMessage')}
           <Button onClick={() => void restart()} loading={restarting}>
             {t('dashboard.needsRestart.now')}
@@ -166,7 +166,7 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
                 setFilter('')
               }}
               className={cx(
-                'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-[12px]',
+                'flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-note',
                 !filter && group === g
                   ? 'bg-panel-2 text-text'
                   : 'text-muted hover:bg-panel-2 hover:text-text'
@@ -174,7 +174,7 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
             >
               {g}
               {dirtyByGroup[g] && (
-                <span className="rounded bg-accent-dim px-1 text-[10px] text-accent">
+                <span className="rounded bg-accent-dim px-1 text-micro text-accent">
                   {dirtyByGroup[g]}
                 </span>
               )}
@@ -218,7 +218,7 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
                   />
                 ))}
                 {shown.length === 0 && (
-                  <p className="px-3.5 py-6 text-center text-[12px] text-muted">
+                  <p className="px-3.5 py-6 text-center text-note text-muted">
                     {t('config.fieldNotFound')}
                   </p>
                 )}
@@ -242,7 +242,7 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
             </>
           }
         >
-          <p className="mb-3 text-[12px] text-muted">
+          <p className="mb-3 text-note text-muted">
             {t('config.previewChangedLines', { count: preview.changedLines })}{' '}
             <code>config.toml.bak</code> {t('config.previewBackupSuffix')}
             {preview.restartRequired && (

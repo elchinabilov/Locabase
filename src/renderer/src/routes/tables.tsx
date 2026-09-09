@@ -132,7 +132,7 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
           {tables.loading && <SkeletonRows rows={7} />}
           {tables.error && <ErrorNote>{tables.error}</ErrorNote>}
           {!tables.loading && list.length === 0 && (
-            <p className="px-2 py-3 text-[11.5px] text-muted">{t('tables.noTablesInSchema')}</p>
+            <p className="px-2 py-3 text-small text-muted">{t('tables.noTablesInSchema')}</p>
           )}
           {list.map((tb) => (
             <TableItem
@@ -145,7 +145,7 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
         </div>
 
         <div className="flex items-center justify-between border-t border-line-soft px-3 py-2">
-          <span className="text-[11px] text-muted">{t('tables.systemSchemas')}</span>
+          <span className="text-meta text-muted">{t('tables.systemSchemas')}</span>
           <Toggle checked={includeSystem} onChange={setIncludeSystem} />
         </div>
       </aside>
@@ -159,7 +159,7 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
         {ready && active && (
           <>
             <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-              <h1 className="text-[14px] font-medium">
+              <h1 className="text-h3 font-medium">
                 <span className="text-muted">{schema}.</span>
                 {active.name}
               </h1>
@@ -173,7 +173,7 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
                     key={tabId}
                     onClick={() => setTab(tabId)}
                     className={cx(
-                      'rounded px-2.5 py-1 text-[12px]',
+                      'rounded px-2.5 py-1 text-note',
                       tab === tabId ? 'bg-panel-2 text-text' : 'text-muted hover:text-text'
                     )}
                   >
@@ -219,8 +219,8 @@ function TableItem({
       )}
     >
       <Dot tone={table.editable ? 'ok' : 'muted'} />
-      <span className="min-w-0 flex-1 truncate text-[12.5px] text-text">{table.name}</span>
-      <span className="shrink-0 text-[10.5px] text-muted">
+      <span className="min-w-0 flex-1 truncate text-ui text-text">{table.name}</span>
+      <span className="shrink-0 text-badge text-muted">
         {table.estimate < 0 ? '—' : `~${formatCount(table.estimate, locale)}`}
       </span>
     </button>
@@ -334,7 +334,7 @@ function RowsPane({
         </div>
       )}
       {!editable && rows.data && (
-        <p className="border-b border-line-soft bg-warn-bg px-3 py-1.5 text-[11.5px] text-warn">
+        <p className="border-b border-line-soft bg-warn-bg px-3 py-1.5 text-small text-warn">
           {t('tables.notEditable', { reason: rows.data.editableReason ?? '' })}
         </p>
       )}
@@ -353,7 +353,7 @@ function RowsPane({
               ? (i) => (
                   <button
                     onClick={() => setEditing(i)}
-                    className="text-[11px] text-muted hover:text-accent"
+                    className="text-meta text-muted hover:text-accent"
                   >
                     {t('tables.edit')}
                   </button>
@@ -458,7 +458,7 @@ function Pager({
   const to = page * pageSize + count
   const last = total !== null && to >= total
   return (
-    <div className="flex items-center gap-1.5 text-[11.5px] text-muted">
+    <div className="flex items-center gap-1.5 text-small text-muted">
       <Button disabled={page === 0} onClick={() => onPage(page - 1)}>
         ‹
       </Button>
@@ -498,7 +498,7 @@ function FilterBar({
           key={`${f.column}-${f.op}-${i}`}
           onClick={() => onChange(filters.filter((_, j) => j !== i))}
           title={t('tables.removeFilter')}
-          className="rounded border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[10.5px] text-muted hover:text-danger"
+          className="rounded border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-badge text-muted hover:text-danger"
         >
           {f.column} {opLabel(f.op)} {f.value ?? ''} ✕
         </button>
@@ -580,9 +580,9 @@ function StructurePane({
     <div className="min-h-0 flex-1 overflow-auto p-4">
       <div className="mx-auto max-w-4xl">
         {cols.error && <ErrorNote>{cols.error}</ErrorNote>}
-        <table className="w-full text-[12px]">
+        <table className="w-full text-note">
           <thead>
-            <tr className="border-b border-line text-[10.5px] tracking-wide text-muted uppercase">
+            <tr className="border-b border-line text-badge tracking-wide text-muted uppercase">
               <th className="px-2 py-1.5 text-left font-medium">{t('tables.col.column')}</th>
               <th className="px-2 py-1.5 text-left font-medium">{t('tables.col.type')}</th>
               <th className="px-2 py-1.5 text-left font-medium">{t('tables.col.default')}</th>
@@ -599,9 +599,9 @@ function StructurePane({
             )}
             {(cols.data ?? []).map((c) => (
               <tr key={c.name} className="border-b border-line-soft last:border-0">
-                <td className="px-2 py-1.5 font-mono text-[11.5px] text-text">{c.name}</td>
+                <td className="px-2 py-1.5 font-mono text-small text-text">{c.name}</td>
                 <td className="px-2 py-1.5 text-muted">{c.dataType}</td>
-                <td className="max-w-[220px] truncate px-2 py-1.5 font-mono text-[11px] text-muted">
+                <td className="max-w-[220px] truncate px-2 py-1.5 font-mono text-meta text-muted">
                   {c.defaultExpr ?? '—'}
                 </td>
                 <td className="px-2 py-1.5 text-right">
@@ -613,7 +613,7 @@ function StructurePane({
                     {c.refTable && (
                       <button
                         onClick={() => onNavigate(c.refSchema ?? 'public', c.refTable ?? '')}
-                        className="text-[10.5px] text-info hover:underline"
+                        className="text-badge text-info hover:underline"
                       >
                         → {c.refSchema}.{c.refTable}.{c.refColumn}
                       </button>
@@ -624,7 +624,7 @@ function StructurePane({
             ))}
           </tbody>
         </table>
-        <p className="mt-4 text-[11.5px] leading-relaxed text-muted">{t('tables.ddlHint')}</p>
+        <p className="mt-4 text-small leading-relaxed text-muted">{t('tables.ddlHint')}</p>
       </div>
     </div>
   )
@@ -701,8 +701,8 @@ function RowModal({
               className="grid grid-cols-[minmax(160px,220px)_1fr] items-start gap-3"
             >
               <div className="pt-1.5">
-                <div className="font-mono text-[12px] text-text">{c.name}</div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted">
+                <div className="font-mono text-note text-text">{c.name}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1 text-meta text-muted">
                   <span>{c.dataType}</span>
                   {c.pkOrd !== null && <Badge tone="ok">PK</Badge>}
                   {!c.nullable && <Badge tone="muted">not null</Badge>}
@@ -715,7 +715,7 @@ function RowModal({
                     disabled={f.mode !== 'value'}
                     onChange={(e) => set(c.name, { text: e.target.value })}
                     rows={3}
-                    className="w-full rounded-md border border-line bg-sunken px-2 py-1.5 font-mono text-[12px] text-text focus:border-accent-dim focus:outline-none disabled:opacity-40"
+                    className="w-full rounded-md border border-line bg-sunken px-2 py-1.5 font-mono text-note text-text focus:border-accent-dim focus:outline-none disabled:opacity-40"
                   />
                 ) : (
                   <Input
@@ -725,7 +725,7 @@ function RowModal({
                     className="font-mono"
                   />
                 )}
-                <div className="mt-1 flex items-center gap-3 text-[11px] text-muted">
+                <div className="mt-1 flex items-center gap-3 text-meta text-muted">
                   <label className="flex items-center gap-1.5">
                     <input
                       type="checkbox"
@@ -791,8 +791,8 @@ function DeleteModal({
         </>
       }
     >
-      <p className="mb-3 text-[12.5px] text-muted">{t('tables.irreversible')}</p>
-      <ul className="max-h-64 overflow-auto rounded-md border border-line bg-sunken p-2 font-mono text-[11.5px]">
+      <p className="mb-3 text-ui text-muted">{t('tables.irreversible')}</p>
+      <ul className="max-h-64 overflow-auto rounded-md border border-line bg-sunken p-2 font-mono text-small">
         {rows.map((r, i) => (
           <li key={i} className="truncate py-0.5 text-muted">
             {JSON.stringify(pkCells(columns, r))}

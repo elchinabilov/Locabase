@@ -26,7 +26,12 @@ import { useTheme } from '../theme'
  */
 function editorTheme(dark: boolean): Extension {
   return EditorView.theme({
-    '&': { backgroundColor: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '12.5px', height: '100%' },
+    '&': {
+      backgroundColor: 'var(--color-bg)',
+      color: 'var(--color-text)',
+      fontSize: 'var(--lb-editor-size)',
+      height: '100%'
+    },
     '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6' },
     '.cm-content': { padding: '10px 0' },
     '.cm-gutters': {

@@ -57,7 +57,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <h1 className="text-[15px] font-medium">{t('app.nav.migrations')}</h1>
+        <h1 className="text-h2 font-medium">{t('app.nav.migrations')}</h1>
         <div className="w-56">
           <Select
             value={envId}
@@ -97,7 +97,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
           {report.error && <ErrorNote>{report.error}</ErrorNote>}
           {report.data?.error && <ErrorNote>{report.data.error}</ErrorNote>}
 
-          <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
+          <div className="flex flex-wrap items-center gap-2 text-small">
             <Badge tone={report.data?.localReachable ? 'ok' : 'muted'}>
               {t('migrations.localLedger', {
                 status: report.data?.localReachable ? t('migrations.read') : t('migrations.unreachable')
@@ -125,12 +125,12 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
               <SkeletonTable rows={6} cols={5} widths={['26%', '30%', 42, 42, 42]} />
             )}
             {!report.loading && rows.length === 0 && (
-              <p className="px-3.5 py-6 text-center text-[12px] text-muted">{t('migrations.empty')}</p>
+              <p className="px-3.5 py-6 text-center text-note text-muted">{t('migrations.empty')}</p>
             )}
             {rows.length > 0 && (
-              <table className="w-full text-[12px]">
+              <table className="w-full text-note">
                 <thead>
-                  <tr className="border-b border-line-soft text-[10.5px] tracking-wide text-muted uppercase">
+                  <tr className="border-b border-line-soft text-badge tracking-wide text-muted uppercase">
                     <th className="px-3.5 py-1.5 text-left font-medium">{t('migrations.col.version')}</th>
                     <th className="px-2 py-1.5 text-left font-medium">{t('migrations.col.name')}</th>
                     <th className="px-2 py-1.5 text-center font-medium">{t('migrations.col.file')}</th>
@@ -148,14 +148,14 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
                         r.state !== 'synced' && 'bg-accent-tint/40'
                       )}
                     >
-                      <td className="px-3.5 py-1.5 font-mono text-[11.5px]">{r.version}</td>
+                      <td className="px-3.5 py-1.5 font-mono text-small">{r.version}</td>
                       <td className="max-w-[280px] truncate px-2 py-1.5 text-muted">{r.name || '—'}</td>
                       <Cell on={r.inFiles} />
                       <Cell on={r.appliedLocal} />
                       <Cell on={r.appliedRemote} />
                       <td className="px-3.5 py-1.5 text-right">
                         {r.state === 'synced' ? (
-                          <span className="text-[11px] text-muted">{t('migrations.state.synced')}</span>
+                          <span className="text-meta text-muted">{t('migrations.state.synced')}</span>
                         ) : (
                           <button
                             onClick={() => setRepairRow(r)}
@@ -175,7 +175,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
             )}
           </Card>
 
-          <p className="px-1 text-[11.5px] leading-relaxed text-muted">{t('migrations.footerHint')}</p>
+          <p className="px-1 text-small leading-relaxed text-muted">{t('migrations.footerHint')}</p>
         </div>
       </div>
 
@@ -193,7 +193,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
 
       {diff !== null && (
         <Modal wide title={t('migrations.diffTitle')} onClose={() => setDiff(null)}>
-          <pre className="overflow-auto rounded-md border border-line bg-sunken p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap">
+          <pre className="overflow-auto rounded-md border border-line bg-sunken p-3 font-mono text-small leading-relaxed whitespace-pre-wrap">
             {diff.trim() || t('diffView.noDiff')}
           </pre>
         </Modal>
@@ -272,7 +272,7 @@ function NewMigration({
         </>
       }
     >
-      <label className="mb-1 block text-[12px] text-muted">{t('newProject.name.label')}</label>
+      <label className="mb-1 block text-note text-muted">{t('newProject.name.label')}</label>
       <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -280,7 +280,7 @@ function NewMigration({
         className="font-mono"
         autoFocus
       />
-      <p className="mt-2 text-[11.5px] text-muted">
+      <p className="mt-2 text-small text-muted">
         {t('migrations.nameHint', { name: name || t('functions.namePlaceholder') })}
       </p>
       {error && (
@@ -312,7 +312,7 @@ function RepairModal({
 
   return (
     <Modal title={t('migrations.repairTitle', { version: row.version })} onClose={onClose}>
-      <p className="mb-3 text-[12.5px] leading-relaxed">
+      <p className="mb-3 text-ui leading-relaxed">
         {t('migrations.repairBodyBefore', { env: envName })} <b>{t('migrations.repairBodyBold')}</b>{' '}
         {t('migrations.repairBodyAfter')}
       </p>

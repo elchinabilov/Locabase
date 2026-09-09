@@ -1,9 +1,19 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '../lib/ipc'
-import { Badge, Card, Select, Skeleton } from '../components/ui'
+import { Badge, Button, Card, Row, Select, Skeleton } from '../components/ui'
 import { LOCALES, useI18n } from '../i18n'
 import { cx } from '../lib/format'
 import { THEMES, useTheme, type ThemePreference } from '../theme'
+import {
+  available,
+  EDITOR_SIZES,
+  MONO_FONTS,
+  SANS_FONTS,
+  TEXT_SCALES,
+  useFonts,
+  type FontOption,
+  type TextScaleId
+} from '../fonts'
 
 /**
  * A segmented control rather than a dropdown: there are only three options, and
@@ -37,7 +47,7 @@ function ThemePicker(): ReactNode {
             )}
           >
             <Swatch theme={id} />
-            <span className={cx('text-[12px]', active ? 'text-text' : 'text-muted')}>
+            <span className={cx('text-note', active ? 'text-text' : 'text-muted')}>
               {label[id]}
             </span>
           </button>
@@ -91,6 +101,103 @@ function Swatch({ theme }: { theme: ThemePreference }): ReactNode {
   )
 }
 
+/* ----------------------------------------------------------------- fonts */
+
+/**
+ * Font family, text size, and the same pair again for the SQL editor.
+ *
+ * Every change lands immediately, so the page itself is the interface preview;
+ * the code line at the bottom is the second one, in the editor's exact font and
+ * size — the SQL screen is otherwise a click away. Fonts the machine doesn't
+ * have are labelled, because choosing one would otherwise appear to do nothing.
+ */
+function TypographyCard(): ReactNode {
+  const { t } = useI18n()
+  const fonts = useFonts()
+
+  // Spelled out rather than built from the id: `t()` takes literal keys, which
+  // is what keeps a renamed translation key a compile error.
+  const scaleLabel: Record<TextScaleId, string> = {
+    small: t('settings.typography.scale.small'),
+    default: t('settings.typography.scale.default'),
+    large: t('settings.typography.scale.large'),
+    larger: t('settings.typography.scale.larger')
+  }
+
+  const familyOptions = (list: FontOption[]): Array<{ value: string; label: string }> =>
+    list.map((f) => ({
+      value: f.id,
+      label: available(f) ? f.label : `${f.label} — ${t('settings.typography.unavailable')}`
+    }))
+
+  return (
+    <Card
+      title={t('settings.typography.title')}
+      subtitle={t('settings.typography.subtitle')}
+      actions={
+        <Button variant="ghost" onClick={fonts.reset}>
+          {t('settings.typography.reset')}
+        </Button>
+      }
+    >
+      <div className="divide-y divide-line-soft">
+        <Row label={t('settings.typography.interfaceFont')}>
+          <div className="w-64">
+            <Select
+              value={fonts.sans}
+              options={familyOptions(SANS_FONTS)}
+              onChange={(v) => fonts.set({ sans: v })}
+            />
+          </div>
+        </Row>
+
+        <Row label={t('settings.typography.textSize')}>
+          <div className="w-64">
+            <Select
+              value={fonts.textScale}
+              options={TEXT_SCALES.map((s) => ({
+                value: s.id,
+                label: `${scaleLabel[s.id]} · ${Math.round(s.scale * 100)}%`
+              }))}
+              onChange={(v) => fonts.set({ textScale: v as typeof fonts.textScale })}
+            />
+          </div>
+        </Row>
+
+        <Row label={t('settings.typography.editorFont')}>
+          <div className="w-64">
+            <Select
+              value={fonts.mono}
+              options={familyOptions(MONO_FONTS)}
+              onChange={(v) => fonts.set({ mono: v })}
+            />
+          </div>
+        </Row>
+
+        <Row label={t('settings.typography.editorSize')}>
+          <div className="w-64">
+            <Select
+              value={String(fonts.editorSize)}
+              options={EDITOR_SIZES.map((n) => ({ value: String(n), label: `${n} px` }))}
+              onChange={(v) => fonts.set({ editorSize: Number(v) })}
+            />
+          </div>
+        </Row>
+
+        <div className="flex flex-col gap-2 px-3.5 py-3">
+          <p className="text-ui">{t('settings.typography.previewText')}</p>
+          <pre
+            className="overflow-x-auto rounded-md border border-line bg-sunken px-3 py-2 font-mono text-accent"
+            style={{ fontSize: 'var(--lb-editor-size)' }}
+          >
+            {t('settings.typography.previewCode')}
+          </pre>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 export function SettingsRoute(): ReactNode {
   const { t, locale, setLocale } = useI18n()
   const doctor = useQuery('system:doctor', undefined)
@@ -99,13 +206,15 @@ export function SettingsRoute(): ReactNode {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4">
-      <h1 className="text-[17px] font-medium">{t('settings.title')}</h1>
+      <h1 className="text-h1 font-medium">{t('settings.title')}</h1>
 
       <Card title={t('settings.appearance.title')} subtitle={t('settings.appearance.subtitle')}>
         <div className="px-3.5 py-3">
           <ThemePicker />
         </div>
       </Card>
+
+      <TypographyCard />
 
       <Card title={t('settings.language.title')}>
         <div className="px-3.5 py-3">
@@ -134,11 +243,11 @@ export function SettingsRoute(): ReactNode {
         <ul className="divide-y divide-line-soft">
           {(doctor.data ?? []).map((c) => (
             <li key={c.label} className="flex items-center gap-3 px-3.5 py-2">
-              <span className="w-[110px] shrink-0 text-[12.5px]">{c.label}</span>
+              <span className="w-[110px] shrink-0 text-ui">{c.label}</span>
               <Badge tone={c.ok ? 'ok' : 'danger'}>
                 {c.ok ? t('settings.doctor.present') : t('settings.doctor.absent')}
               </Badge>
-              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted">
+              <span className="min-w-0 flex-1 truncate font-mono text-meta text-muted">
                 {c.info}
               </span>
             </li>
@@ -147,7 +256,7 @@ export function SettingsRoute(): ReactNode {
       </Card>
 
       <Card title={t('settings.ports.title')}>
-        <div className="px-3.5 py-3 text-[12.5px] leading-relaxed">
+        <div className="px-3.5 py-3 text-ui leading-relaxed">
           <p>
             {t('settings.ports.nextFreeBefore')}{' '}
             <span className="font-mono text-accent">{range.data ?? '…'}xx</span>{' '}

@@ -26,7 +26,7 @@ export function Button({
       {...rest}
       disabled={rest.disabled || loading}
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12.5px] leading-none',
+        'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-ui leading-none',
         'transition-colors disabled:cursor-not-allowed disabled:opacity-45',
         VARIANTS[variant],
         className
@@ -64,8 +64,8 @@ export function Card({
       {(title || actions) && (
         <header className="flex items-center justify-between gap-3 border-b border-line-soft px-3.5 py-2.5">
           <div className="min-w-0">
-            {title && <h2 className="truncate text-[13px] font-medium text-text">{title}</h2>}
-            {subtitle && <p className="mt-0.5 truncate text-[11.5px] text-muted">{subtitle}</p>}
+            {title && <h2 className="truncate text-card font-medium text-text">{title}</h2>}
+            {subtitle && <p className="mt-0.5 truncate text-small text-muted">{subtitle}</p>}
           </div>
           {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
         </header>
@@ -94,7 +94,7 @@ export function Badge({
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10.5px] font-medium tracking-wide whitespace-nowrap',
+        'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-badge font-medium tracking-wide whitespace-nowrap',
         tones[tone]
       )}
     >
@@ -123,7 +123,7 @@ export function Input({
     <input
       {...rest}
       className={cx(
-        'w-full rounded-md border border-line bg-sunken px-2 py-1.5 text-[12.5px] text-text',
+        'w-full rounded-md border border-line bg-sunken px-2 py-1.5 text-ui text-text',
         'placeholder:text-faint focus:border-accent-dim focus:outline-none disabled:opacity-50',
         className
       )}
@@ -193,7 +193,7 @@ export function Select({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={cx(
-        'w-full rounded-md border border-line bg-sunken px-2 py-1.5 text-[12.5px] text-text',
+        'w-full rounded-md border border-line bg-sunken px-2 py-1.5 text-ui text-text',
         'focus:border-accent-dim focus:outline-none',
         className
       )}
@@ -249,7 +249,7 @@ export function Modal({
         )}
       >
         <header className="flex items-center justify-between border-b border-line-soft px-4 py-3">
-          <h2 className="text-[13px] font-medium">{title}</h2>
+          <h2 className="text-card font-medium">{title}</h2>
           <button onClick={onClose} className="text-muted hover:text-text" aria-label={t('common.close')}>
             ✕
           </button>
@@ -270,15 +270,15 @@ export function Modal({
 export function Empty({ title, hint }: { title: string; hint?: ReactNode }): ReactNode {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
-      <p className="text-[13px] text-muted">{title}</p>
-      {hint && <div className="max-w-md text-[12px] text-faint">{hint}</div>}
+      <p className="text-card text-muted">{title}</p>
+      {hint && <div className="max-w-md text-note text-faint">{hint}</div>}
     </div>
   )
 }
 
 export function ErrorNote({ children }: { children: ReactNode }): ReactNode {
   return (
-    <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger-soft">
+    <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-note text-danger-soft">
       {children}
     </div>
   )
@@ -296,8 +296,8 @@ export function Row({
   return (
     <div className="grid grid-cols-[minmax(180px,260px)_1fr] items-start gap-4 px-3.5 py-2.5">
       <div className="pt-1">
-        <div className="text-[12.5px] text-text">{label}</div>
-        {hint && <div className="mt-1 text-[11.5px] leading-snug text-muted">{hint}</div>}
+        <div className="text-ui text-text">{label}</div>
+        {hint && <div className="mt-1 text-small leading-snug text-muted">{hint}</div>}
       </div>
       <div className="min-w-0">{children}</div>
     </div>

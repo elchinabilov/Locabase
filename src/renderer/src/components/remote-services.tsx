@@ -51,7 +51,7 @@ export function RemoteServices({
   if (env.kind === 'managed') {
     return (
       <Card title={t('remoteServices.title')}>
-        <p className="px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
+        <p className="px-3.5 py-3 text-small leading-relaxed text-muted">
           {t('remoteServices.managedHint')}
         </p>
       </Card>
@@ -113,7 +113,7 @@ export function RemoteServices({
                 onChange={(v) => void toggle(svc.container, v)}
               />
               <Dot tone={on ? (svc.health === 'unhealthy' ? 'danger' : 'ok') : 'muted'} />
-              <span className="min-w-0 flex-1 truncate text-[12.5px]">
+              <span className="min-w-0 flex-1 truncate text-ui">
                 {svc.key}
                 {isDb && (
                   <span className="ml-1.5">
@@ -121,10 +121,10 @@ export function RemoteServices({
                   </span>
                 )}
               </span>
-              <span className="w-[70px] shrink-0 text-right font-mono text-[11px] text-muted">
+              <span className="w-[70px] shrink-0 text-right font-mono text-meta text-muted">
                 {svc.memory ? formatBytes(svc.memory) : ''}
               </span>
-              <span className="w-[64px] shrink-0 text-right text-[10.5px] text-muted">
+              <span className="w-[64px] shrink-0 text-right text-badge text-muted">
                 {svc.health ?? svc.state}
               </span>
             </li>
@@ -133,7 +133,7 @@ export function RemoteServices({
       </ul>
 
       {items.length > 0 && (
-        <p className="border-t border-line-soft px-3.5 py-2 text-[11px] leading-relaxed text-muted">
+        <p className="border-t border-line-soft px-3.5 py-2 text-meta leading-relaxed text-muted">
           {t('remoteServices.stopHint')}
         </p>
       )}

@@ -54,7 +54,7 @@ export function RemoteNote({ env }: { env: RemoteEnv }): ReactNode {
       ? [t('envPicker.managedLine1'), t('envPicker.managedLine2')]
       : [t('envPicker.selfHostedLine1'), t('envPicker.selfHostedLine2')]
   return (
-    <p className="border-b border-line-soft bg-info-bg px-3 py-1.5 text-[11px] leading-relaxed text-info">
+    <p className="border-b border-line-soft bg-info-bg px-3 py-1.5 text-meta leading-relaxed text-info">
       <b>{env.name}</b> — {lines.join(' ')} {t('envPicker.cancelHint')}
     </p>
   )
@@ -82,7 +82,7 @@ export function useDbGate(
     return {
       ready: false,
       blocked: (
-        <div className="flex h-full items-center justify-center text-[12px] text-muted">
+        <div className="flex h-full items-center justify-center text-note text-muted">
           <Spinner /> <span className="ml-2">{t('envPicker.checkingDb')}</span>
         </div>
       )

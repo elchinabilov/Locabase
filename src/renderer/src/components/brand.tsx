@@ -33,7 +33,7 @@ export function Mark({ size = 20 }: { size?: number }): ReactNode {
 
 export function Wordmark(): ReactNode {
   return (
-    <span className="text-[13px] font-semibold tracking-[-0.01em] text-text select-none">
+    <span className="text-card font-semibold tracking-[-0.01em] text-text select-none">
       Loca<span className="font-normal text-muted">base</span>
     </span>
   )

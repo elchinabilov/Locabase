@@ -16,11 +16,11 @@ export function DiffView({
   const lines = useMemo(() => diffLines(before, after, context), [before, after, context])
 
   if (lines.length === 0) {
-    return <p className="py-4 text-center text-[12px] text-muted">{t('diffView.noDiff')}</p>
+    return <p className="py-4 text-center text-note text-muted">{t('diffView.noDiff')}</p>
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-line bg-sunken py-1 font-mono text-[11.5px] leading-[1.6]">
+    <div className="overflow-x-auto rounded-md border border-line bg-sunken py-1 font-mono text-small leading-[1.6]">
       {lines.map((l, i) => (
         <div
           key={i}

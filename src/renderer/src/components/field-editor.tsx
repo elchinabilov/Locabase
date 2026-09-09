@@ -67,14 +67,14 @@ export function FieldEditor({
     if (draft.kind === 'env') {
       return (
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[11.5px] text-muted">env(</span>
+          <span className="font-mono text-small text-muted">env(</span>
           <Input
             value={String(draft.value)}
             onChange={(e) => onChange({ kind: 'env', value: e.target.value })}
             className="font-mono"
             placeholder={t('fieldEditor.varNamePlaceholder')}
           />
-          <span className="font-mono text-[11.5px] text-muted">)</span>
+          <span className="font-mono text-small text-muted">)</span>
         </div>
       )
     }
@@ -145,18 +145,18 @@ export function FieldEditor({
     >
       <div className="pt-1">
         <div className="flex items-center gap-1.5">
-          <span className="text-[12.5px] text-text">{field.label}</span>
+          <span className="text-ui text-text">{field.label}</span>
           {dirty && (
             <span className="size-1.5 rounded-full bg-accent" title={t('fieldEditor.changed')} />
           )}
           {absent && !dirty && (
-            <span className="text-[10px] text-faint" title={t('fieldEditor.defaultTitle')}>
+            <span className="text-micro text-faint" title={t('fieldEditor.defaultTitle')}>
               {t('fieldEditor.default')}
             </span>
           )}
         </div>
-        <div className="mt-0.5 font-mono text-[10.5px] text-faint">{field.path}</div>
-        {field.help && <p className="mt-1 text-[11.5px] leading-snug text-muted">{field.help}</p>}
+        <div className="mt-0.5 font-mono text-badge text-faint">{field.path}</div>
+        {field.help && <p className="mt-1 text-small leading-snug text-muted">{field.help}</p>}
       </div>
 
       <div className="min-w-0">
@@ -165,7 +165,7 @@ export function FieldEditor({
           {field.secret && draft.kind === 'literal' && (
             <button
               onClick={() => setRevealed((v) => !v)}
-              className="mt-1.5 text-[10.5px] text-muted hover:text-text"
+              className="mt-1.5 text-badge text-muted hover:text-text"
             >
               {revealed ? t('fieldEditor.hide') : t('fieldEditor.reveal')}
             </button>
@@ -180,7 +180,7 @@ export function FieldEditor({
                 )
               }
               className={cx(
-                'mt-1 rounded border px-1.5 py-0.5 text-[10.5px] whitespace-nowrap',
+                'mt-1 rounded border px-1.5 py-0.5 text-badge whitespace-nowrap',
                 draft.kind === 'env'
                   ? 'border-accent-dim bg-accent-bg text-accent'
                   : 'border-line text-muted hover:text-text'
@@ -192,7 +192,7 @@ export function FieldEditor({
           )}
         </div>
         {draft.kind === 'env' && original?.kind === 'env' && (
-          <p className="mt-1 font-mono text-[10.5px] text-muted">
+          <p className="mt-1 font-mono text-badge text-muted">
             {t('fieldEditor.currentValue')}{' '}
             {original.envValue === null ? (
               <span className="text-warn">{t('fieldEditor.missingInEnv')}</span>

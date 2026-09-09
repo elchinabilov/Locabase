@@ -43,7 +43,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <h1 className="text-[15px] font-medium">{t('functions.title')}</h1>
+        <h1 className="text-h2 font-medium">{t('functions.title')}</h1>
         <div className="w-56">
           <Select
             value={envId}
@@ -72,7 +72,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
           {list.error && <ErrorNote>{list.error}</ErrorNote>}
 
           {envId && stale.length > 0 && (
-            <div className="rounded-md border border-info-border bg-info-bg px-3.5 py-2 text-[12px] text-info">
+            <div className="rounded-md border border-info-border bg-info-bg px-3.5 py-2 text-note text-info">
               {t('functions.staleWarning', { count: stale.length, names: stale.map((f) => f.name).join(', ') })}
             </div>
           )}
@@ -80,14 +80,14 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
           <Card title={t('functions.count', { count: items.length })} subtitle="supabase/functions">
             {list.loading && <SkeletonList rows={4} trailing />}
             {!list.loading && items.length === 0 && (
-              <p className="px-3.5 py-6 text-center text-[12px] text-muted">{t('functions.empty')}</p>
+              <p className="px-3.5 py-6 text-center text-note text-muted">{t('functions.empty')}</p>
             )}
             <ul className="divide-y divide-line-soft">
               {items.map((fn) => (
                 <li key={fn.name} className="flex items-center gap-3 px-3.5 py-2.5">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <code className="text-[12.5px] text-text">{fn.name}</code>
+                      <code className="text-ui text-text">{fn.name}</code>
                       {envId ? (
                         <Badge tone={DRIFT[fn.drift].tone}>{t(DRIFT[fn.drift].labelKey)}</Badge>
                       ) : (
@@ -95,7 +95,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
                       )}
                       {fn.remote?.version && <Badge tone="muted">v{fn.remote.version}</Badge>}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-3 font-mono text-[10.5px] text-faint">
+                    <div className="mt-0.5 flex items-center gap-3 font-mono text-badge text-faint">
                       {fn.path !== '' && (
                         <>
                           <span>{fn.entrypoint}</span>
@@ -111,7 +111,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
 
                   <div className="flex shrink-0 items-center gap-2">
                     <span
-                      className={cx('text-[11px]', fn.verifyJwt ? 'text-muted' : 'text-warn')}
+                      className={cx('text-meta', fn.verifyJwt ? 'text-muted' : 'text-warn')}
                       title={t('functions.verifyJwtTitle')}
                     >
                       verify_jwt
@@ -136,7 +136,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
             </ul>
           </Card>
 
-          <p className="px-1 text-[11.5px] leading-relaxed text-muted">{t('functions.verifyJwtHint')}</p>
+          <p className="px-1 text-small leading-relaxed text-muted">{t('functions.verifyJwtHint')}</p>
         </div>
       </div>
 
@@ -206,7 +206,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
             </>
           }
         >
-          <p className="text-[12.5px] leading-relaxed">
+          <p className="text-ui leading-relaxed">
             {t('functions.deployConfirm', {
               names: confirmDeploy.join(', '),
               env: project.environments.find((e) => e.id === envId)?.name ?? ''
@@ -233,7 +233,7 @@ function NewFunction({
 
   return (
     <div>
-      <label className="mb-1 block text-[12px] text-muted">{t('newProject.name.label')}</label>
+      <label className="mb-1 block text-note text-muted">{t('newProject.name.label')}</label>
       <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -241,7 +241,7 @@ function NewFunction({
         className="font-mono"
         autoFocus
       />
-      <p className="mt-2 text-[11.5px] text-muted">
+      <p className="mt-2 text-small text-muted">
         {t('functions.templateHint', { name: name || t('functions.namePlaceholder') })}
       </p>
       {error && (

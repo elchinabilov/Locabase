@@ -56,13 +56,13 @@ export function LogDrawer({
       <div className="flex items-center gap-2 px-3 py-1.5">
         <button
           onClick={onToggle}
-          className="flex items-center gap-1.5 text-[11.5px] text-muted hover:text-text"
+          className="flex items-center gap-1.5 text-small text-muted hover:text-text"
         >
           <span className={cx('transition-transform', open && 'rotate-90')}>▸</span>
           {t('logDrawer.title')}
         </button>
         {!open && unseen > 0 && (
-          <span className="rounded bg-chip px-1.5 py-0.5 text-[10px] text-accent">
+          <span className="rounded bg-chip px-1.5 py-0.5 text-micro text-accent">
             {unseen}
           </span>
         )}
@@ -73,11 +73,11 @@ export function LogDrawer({
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder={t('logDrawer.filterPlaceholder')}
-              className="w-40 rounded border border-line bg-sunken px-2 py-1 text-[11.5px] outline-none focus:border-accent-dim"
+              className="w-40 rounded border border-line bg-sunken px-2 py-1 text-small outline-none focus:border-accent-dim"
             />
             <button
               onClick={() => setLines([])}
-              className="text-[11.5px] text-muted hover:text-text"
+              className="text-small text-muted hover:text-text"
             >
               {t('logDrawer.clear')}
             </button>
@@ -92,7 +92,7 @@ export function LogDrawer({
             const el = e.currentTarget
             stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
           }}
-          className="h-[220px] overflow-auto px-3 pb-2 font-mono text-[11px] leading-[1.55]"
+          className="h-[220px] overflow-auto px-3 pb-2 font-mono text-meta leading-[1.55]"
         >
           {shown.length === 0 && <p className="py-4 text-muted">{t('logDrawer.empty')}</p>}
           {shown.map((l, i) => (

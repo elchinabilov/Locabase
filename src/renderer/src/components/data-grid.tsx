@@ -102,7 +102,7 @@ export function DataGrid({
   // Without columns even the header can't be drawn — a full skeleton table.
   if (columns.length === 0) {
     if (loading) return <SkeletonTable rows={10} cols={5} className="p-1" />
-    return <p className="px-3.5 py-6 text-center text-[12px] text-muted">{shownEmptyText}</p>
+    return <p className="px-3.5 py-6 text-center text-note text-muted">{shownEmptyText}</p>
   }
 
   const skeletonCols = columns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)
@@ -110,9 +110,9 @@ export function DataGrid({
   return (
     <>
       <div ref={scroller} className="h-full overflow-auto" onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
-        <table className="w-max min-w-full border-collapse text-[12px]">
+        <table className="w-max min-w-full border-collapse text-note">
           <thead className="sticky top-0 z-10 bg-panel">
-            <tr className="border-b border-line text-[10.5px] tracking-wide text-muted uppercase">
+            <tr className="border-b border-line text-badge tracking-wide text-muted uppercase">
               {selectable && (
                 <th className="w-8 px-2 py-1.5">
                   <input
@@ -166,7 +166,7 @@ export function DataGrid({
               <tr>
                 <td
                   colSpan={columns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)}
-                  className="px-3.5 py-8 text-center text-[12px] text-muted"
+                  className="px-3.5 py-8 text-center text-note text-muted"
                 >
                   {shownEmptyText}
                 </td>
@@ -216,7 +216,7 @@ export function DataGrid({
 
       {zoom && (
         <Modal wide title={zoom.column} onClose={() => setZoom(null)}>
-          <pre className="overflow-auto rounded-md border border-line bg-sunken p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap">
+          <pre className="overflow-auto rounded-md border border-line bg-sunken p-3 font-mono text-small leading-relaxed whitespace-pre-wrap">
             {pretty(zoom.value)}
           </pre>
         </Modal>
@@ -233,7 +233,7 @@ function Cell({ value, onZoom }: { value: string | null; onZoom: (v: string) => 
   const t = useT()
   if (value === null) {
     return (
-      <td className="px-2.5 font-mono text-[11.5px] whitespace-nowrap">
+      <td className="px-2.5 font-mono text-small whitespace-nowrap">
         <span className="text-faint italic">NULL</span>
       </td>
     )
@@ -241,7 +241,7 @@ function Cell({ value, onZoom }: { value: string | null; onZoom: (v: string) => 
   if (value === '') {
     return (
       <td className="px-2.5 whitespace-nowrap">
-        <span className="rounded border border-line px-1 py-px font-mono text-[10.5px] text-muted">
+        <span className="rounded border border-line px-1 py-px font-mono text-badge text-muted">
           &apos;&apos;
         </span>
       </td>
@@ -254,7 +254,7 @@ function Cell({ value, onZoom }: { value: string | null; onZoom: (v: string) => 
       title={long ? t('dataGrid.clickForFullValue') : value}
       onClick={long ? () => onZoom(value) : undefined}
       className={cx(
-        'px-2.5 font-mono text-[11.5px] whitespace-nowrap',
+        'px-2.5 font-mono text-small whitespace-nowrap',
         long && 'cursor-pointer text-text hover:text-accent'
       )}
     >

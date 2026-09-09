@@ -50,14 +50,14 @@ export function FunctionDiffModal({
     <Modal wide title={t('functionDiff.title', { name })} onClose={onClose}>
       {diff.loading && (
         <div className="flex flex-col gap-2">
-          <p className="text-[12px] text-muted">{t('functionDiff.fetching')}</p>
+          <p className="text-note text-muted">{t('functionDiff.fetching')}</p>
           <SkeletonRows rows={4} />
         </div>
       )}
       {diff.error && <ErrorNote>{diff.error}</ErrorNote>}
       {diff.data && (
         <>
-          <p className="mb-2.5 text-[12px] text-muted">
+          <p className="mb-2.5 text-note text-muted">
             {t('functionDiff.summary', {
               fileCount: diff.data.files.length,
               changed:
@@ -71,7 +71,7 @@ export function FunctionDiffModal({
               <FileBlock key={f.path} file={f} />
             ))}
             {diff.data.files.length === 0 && (
-              <p className="py-6 text-center text-[12px] text-muted">{t('functionDiff.fileNotFound')}</p>
+              <p className="py-6 text-center text-note text-muted">{t('functionDiff.fileNotFound')}</p>
             )}
           </div>
         </>
@@ -91,14 +91,14 @@ function FileBlock({ file }: { file: FunctionFileDiff }): ReactNode {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-panel-2"
       >
-        <span className={cx('w-3 shrink-0 text-[10px] text-muted', open && 'rotate-90')}>▸</span>
-        <code className="min-w-0 flex-1 truncate font-mono text-[12px]">{file.path}</code>
+        <span className={cx('w-3 shrink-0 text-micro text-muted', open && 'rotate-90')}>▸</span>
+        <code className="min-w-0 flex-1 truncate font-mono text-note">{file.path}</code>
         <Badge tone={meta.tone}>{t(meta.labelKey)}</Badge>
       </button>
       {open && (
         <div className="border-t border-line-soft p-2">
           {file.binary ? (
-            <p className="py-2 text-center text-[12px] text-muted">{t('functionDiff.binaryFile')}</p>
+            <p className="py-2 text-center text-note text-muted">{t('functionDiff.binaryFile')}</p>
           ) : (
             <DiffView before={file.remote ?? ''} after={file.local ?? ''} context={3} />
           )}

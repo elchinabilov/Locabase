@@ -59,8 +59,8 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <h1 className="text-[15px] font-medium">{t('app.nav.secrets')}</h1>
-        <span className="font-mono text-[11px] text-muted">{project.envFile}</span>
+        <h1 className="text-h2 font-medium">{t('app.nav.secrets')}</h1>
+        <span className="font-mono text-meta text-muted">{project.envFile}</span>
         <div className="flex-1" />
         <Button onClick={() => setReveal((v) => !v)}>
           {reveal ? t('fieldEditor.hide') : t('secrets.showValues')}
@@ -83,9 +83,9 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
           {entries.error && <ErrorNote>{entries.error}</ErrorNote>}
 
           {missing.length > 0 && (
-            <div className="rounded-md border border-warn-border bg-warn-bg px-3.5 py-2.5 text-[12px] text-warn">
+            <div className="rounded-md border border-warn-border bg-warn-bg px-3.5 py-2.5 text-note text-warn">
               <p className="mb-1.5 font-medium">{t('secrets.missingHeading', { count: missing.length })}</p>
-              <ul className="space-y-0.5 font-mono text-[11px]">
+              <ul className="space-y-0.5 font-mono text-meta">
                 {missing.slice(0, 8).map((m) => (
                   <li key={m.path}>
                     {m.varName} <span className="text-warn-dim">← {m.path}</span>
@@ -98,7 +98,7 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
           <Card title={t('secrets.cardTitle')} subtitle={t('secrets.cardSubtitle')}>
             {entries.loading && <SkeletonList rows={5} trailing />}
             {!entries.loading && list.length === 0 && (
-              <p className="px-3.5 py-6 text-center text-[12px] text-muted">
+              <p className="px-3.5 py-6 text-center text-note text-muted">
                 {t('secrets.fileEmpty', { file: project.envFile })}
               </p>
             )}
@@ -112,17 +112,17 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
                     className={cx('grid grid-cols-[minmax(220px,300px)_1fr_auto] items-start gap-3 px-3.5 py-2', changed && 'bg-accent-tint')}
                   >
                     <div className="pt-1.5">
-                      <code className="font-mono text-[12px] text-text">{e.key}</code>
+                      <code className="font-mono text-note text-text">{e.key}</code>
                       {e.referencedBy.length > 0 ? (
                         <div className="mt-1 space-y-0.5">
                           {e.referencedBy.map((p) => (
-                            <div key={p} className="font-mono text-[10px] text-faint">
+                            <div key={p} className="font-mono text-micro text-faint">
                               ← {p}
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="mt-1 text-[10px] text-faint">{t('secrets.unused')}</div>
+                        <div className="mt-1 text-micro text-faint">{t('secrets.unused')}</div>
                       )}
                     </div>
                     <Input
@@ -136,7 +136,7 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
                     />
                     <button
                       onClick={() => void remove(e.key)}
-                      className="mt-1.5 text-[11px] text-muted hover:text-danger"
+                      className="mt-1.5 text-meta text-muted hover:text-danger"
                     >
                       {t('common.delete').toLowerCase()}
                     </button>
@@ -146,7 +146,7 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
             </ul>
           </Card>
 
-          <p className="px-1 text-[11.5px] leading-relaxed text-muted">{t('secrets.footerHint')}</p>
+          <p className="px-1 text-small leading-relaxed text-muted">{t('secrets.footerHint')}</p>
         </div>
       </div>
 
@@ -204,22 +204,22 @@ function AddVar({
     >
       <div className="flex flex-col gap-3">
         <div>
-          <label className="mb-1 block text-[12px] text-muted">{t('newProject.name.label')}</label>
+          <label className="mb-1 block text-note text-muted">{t('newProject.name.label')}</label>
           <Input value={key} onChange={(e) => setKey(e.target.value)} className="font-mono" autoFocus />
         </div>
         <div>
-          <label className="mb-1 block text-[12px] text-muted">{t('secrets.value')}</label>
+          <label className="mb-1 block text-note text-muted">{t('secrets.value')}</label>
           <Input value={value} onChange={(e) => setValue(e.target.value)} className="font-mono" />
         </div>
         {uniq.length > 0 && (
           <div>
-            <p className="mb-1.5 text-[11.5px] text-muted">{t('secrets.expectedNames')}</p>
+            <p className="mb-1.5 text-small text-muted">{t('secrets.expectedNames')}</p>
             <div className="flex flex-wrap gap-1.5">
               {uniq.map((s) => (
                 <button
                   key={s}
                   onClick={() => setKey(s)}
-                  className="rounded border border-line px-1.5 py-0.5 font-mono text-[10.5px] text-muted hover:border-accent-dim hover:text-accent"
+                  className="rounded border border-line px-1.5 py-0.5 font-mono text-badge text-muted hover:border-accent-dim hover:text-accent"
                 >
                   {s}
                 </button>
