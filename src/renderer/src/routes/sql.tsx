@@ -27,8 +27,16 @@ import {
 import { DataGrid } from '../components/data-grid'
 import { SqlEditor, type SqlEditorHandle } from '../components/sql-editor'
 import { EnvPicker, RemoteNote, envOf, useDbGate } from '../components/env-picker'
+import { Splitter, useStoredSize } from '../components/splitter'
 
 const MAX_ROWS = [100, 500, 1000, 5000]
+
+/* The three panes are user-resizable; these are where they start. The queries
+   list is in pixels — a sidebar should keep its width when the window grows —
+   while the results pane is a share of the height, so the editor and the grid
+   keep their proportion instead of one swallowing the other. */
+const QUERIES_WIDTH = { default: 200, min: 150, max: 460 }
+const RESULTS_HEIGHT = { default: 46, min: 15, max: 70 }
 
 function starterDoc(t: (k: TranslationKey) => string): string {
   return `-- ${t('sql.starterComment')}\nselect * from auth.users limit 20;\n`
@@ -61,6 +69,16 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
   const [dialog, setDialog] = useState<'save' | 'migration' | 'delete' | null>(null)
 
   const editor = useRef<SqlEditorHandle | null>(null)
+  // The percentage the results pane is measured against.
+  const paneRef = useRef<HTMLElement | null>(null)
+  const [queriesWidth, setQueriesWidth] = useStoredSize(
+    'locabase.sql.queriesWidth',
+    QUERIES_WIDTH.default
+  )
+  const [resultsHeight, setResultsHeight] = useStoredSize(
+    'locabase.sql.resultsHeight',
+    RESULTS_HEIGHT.default
+  )
   const saved = useQuery('queries:list', { id: project.id }, [project.id])
   const completion = useQuery('db:completion', { id: project.id, envId }, [project.id, envId], {
     enabled: ready
@@ -133,7 +151,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className="flex w-[200px] shrink-0 flex-col border-r border-line bg-panel">
+      <aside className="flex shrink-0 flex-col bg-panel" style={{ width: `${queriesWidth}px` }}>
         <div className="flex items-center justify-between border-b border-line-soft px-3 py-2">
           <span className="text-badge font-semibold tracking-[0.09em] text-muted uppercase">
             {t('sql.queries')}
@@ -170,7 +188,17 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
         </p>
       </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col">
+      <Splitter
+        axis="x"
+        value={queriesWidth}
+        min={QUERIES_WIDTH.min}
+        max={QUERIES_WIDTH.max}
+        defaultValue={QUERIES_WIDTH.default}
+        onChange={setQueriesWidth}
+        label={t('sql.resizeQueries')}
+      />
+
+      <section ref={paneRef} className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
           <h1 className="text-h3 font-medium">
             {activeName ?? t('sql.untitled')}
@@ -234,7 +262,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
 
         {ready && (
           <>
-            <div className="min-h-[180px] flex-1 border-b border-line">
+            <div className="min-h-[120px] flex-1">
               <SqlEditor
                 key={docKey}
                 initialDoc={doc}
@@ -249,7 +277,20 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
               />
             </div>
 
-            <div className="flex h-[46%] min-h-[140px] flex-col">
+            <Splitter
+              axis="y"
+              mode="percent"
+              containerRef={paneRef}
+              value={resultsHeight}
+              min={RESULTS_HEIGHT.min}
+              max={RESULTS_HEIGHT.max}
+              defaultValue={RESULTS_HEIGHT.default}
+              invert
+              onChange={setResultsHeight}
+              label={t('sql.resizeResults')}
+            />
+
+            <div className="flex shrink-0 flex-col" style={{ height: `${resultsHeight}%` }}>
               <div className="flex items-center gap-2 border-b border-line-soft px-3 py-1.5 text-small">
                 {busy && <span className="text-muted">{t('sql.running')}</span>}
                 {!busy && run === null && (

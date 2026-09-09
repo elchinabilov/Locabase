@@ -16,6 +16,13 @@ minor number moves and the major stays put (semver).
   (Small to Larger, 92–115%), and the SQL editor's font and size (11–16px)
   separately. A font the machine doesn't have is labelled as such instead of
   silently falling back, and a live sample shows both before you leave the page.
+- **Resizable panes on the SQL and Tables screens.** On SQL, the seam between
+  the query list and the editor, and the one between the editor and the results;
+  on Tables, the seam between the table list and the grid. All draggable —
+  by pointer, or with the arrow keys once focused; double-click (or Home) puts a
+  seam back where it started. The query list keeps its width in pixels and the
+  results pane keeps its share of the height, so a resized window doesn't undo
+  the layout. Every size is remembered between launches.
 
 ## Changed
 

@@ -616,6 +616,8 @@ const az = {
   sql: {
     starterComment: '⌘↵ / Ctrl+↵ ilə işlət',
     timeout: { '5s': '5 san.', '30s': '30 san.', '2m': '2 dəq.' },
+    resizeQueries: 'Sorğu siyahısının enini dəyiş',
+    resizeResults: 'Nəticə panelinin hündürlüyünü dəyiş',
     queries: 'Sorğular',
     noSaved: 'Hələ saxlanmış sorğu yoxdur.',
     sharedViaGit: '— git ilə paylaşılır.',
@@ -650,6 +652,7 @@ const az = {
     goToError: 'Səhv yerə keç'
   },
   tables: {
+    resizeSidebar: 'Cədvəl siyahısının enini dəyiş',
     op: { isnull: 'boşdur', notnull: 'boş deyil' },
     kind: {
       table: 'cədvəl',

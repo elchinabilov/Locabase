@@ -24,8 +24,13 @@ import {
 } from '../components/ui'
 import { DataGrid, type GridSort } from '../components/data-grid'
 import { EnvPicker, RemoteNote, envOf, useDbGate } from '../components/env-picker'
+import { Splitter, useStoredSize } from '../components/splitter'
 
 const PAGE_SIZES = [25, 50, 100, 500]
+
+/* The table list is resizable; in pixels, so it keeps its width when the window
+   grows — schema names are what decides how wide it wants to be, not the window. */
+const SIDEBAR = { default: 248, min: 180, max: 460 }
 
 const OP_SYMBOLS: Record<DbOp, string> = {
   eq: '=',
@@ -72,6 +77,10 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
   const [table, setTable] = useState<string | null>(null)
   const [tab, setTab] = useState<'rows' | 'structure'>('rows')
   const [filter, setFilter] = useState('')
+  const [sidebarWidth, setSidebarWidth] = useStoredSize(
+    'locabase.tables.sidebarWidth',
+    SIDEBAR.default
+  )
 
   const schemas = useQuery(
     'db:schemas',
@@ -108,7 +117,7 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className="flex w-[248px] shrink-0 flex-col border-r border-line bg-panel">
+      <aside className="flex shrink-0 flex-col bg-panel" style={{ width: `${sidebarWidth}px` }}>
         <div className="border-b border-line-soft p-2.5">
           <EnvPicker project={project} envId={envId} onChange={setEnvId} className="mb-2 w-full" />
           <Select
@@ -149,6 +158,16 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
           <Toggle checked={includeSystem} onChange={setIncludeSystem} />
         </div>
       </aside>
+
+      <Splitter
+        axis="x"
+        value={sidebarWidth}
+        min={SIDEBAR.min}
+        max={SIDEBAR.max}
+        defaultValue={SIDEBAR.default}
+        onChange={setSidebarWidth}
+        label={t('tables.resizeSidebar')}
+      />
 
       <section className="flex min-w-0 flex-1 flex-col">
         {env && <RemoteNote env={env} />}

@@ -619,6 +619,8 @@ const en = {
   sql: {
     starterComment: 'run with ⌘↵ / Ctrl+↵',
     timeout: { '5s': '5 s', '30s': '30 s', '2m': '2 min' },
+    resizeQueries: 'Resize the query list',
+    resizeResults: 'Resize the results pane',
     queries: 'Queries',
     noSaved: 'No saved queries yet.',
     sharedViaGit: '— shared via git.',
@@ -653,6 +655,7 @@ const en = {
     goToError: 'Go to error'
   },
   tables: {
+    resizeSidebar: 'Resize the table list',
     op: { isnull: 'is empty', notnull: 'is not empty' },
     kind: {
       table: 'table',
