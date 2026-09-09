@@ -66,7 +66,9 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
   const [run, setRun] = useState<SqlRun | null>(null)
   const [tab, setTab] = useState(0)
   const [busy, setBusy] = useState<string | null>(null)
-  const [dialog, setDialog] = useState<'save' | 'migration' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'save' | 'migration' | 'rename' | 'delete' | null>(null)
+  /** The saved query a rename/delete dialog acts on — not always the open one. */
+  const [target, setTarget] = useState<string | null>(null)
 
   const editor = useRef<SqlEditorHandle | null>(null)
   // The percentage the results pane is measured against.
@@ -170,17 +172,45 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
             <p className="px-2 py-3 text-small leading-relaxed text-muted">{t('sql.noSaved')}</p>
           )}
           {(saved.data ?? []).map((q) => (
-            <button
+            <div
               key={q.name}
-              onClick={() => void load(q.name)}
               className={cx(
-                'mb-0.5 flex w-full items-center gap-1.5 rounded-md px-2.5 py-1.5 text-left text-note',
+                'group mb-0.5 flex items-center rounded-md pr-1 text-note',
                 q.name === activeName ? 'bg-panel-2 text-text' : 'text-muted hover:bg-hover'
               )}
             >
-              <span className="min-w-0 flex-1 truncate">{q.name}</span>
-              {q.name === activeName && dirty && <span className="text-accent">•</span>}
-            </button>
+              <button
+                onClick={() => void load(q.name)}
+                className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-2.5 text-left"
+              >
+                <span className="min-w-0 flex-1 truncate">{q.name}</span>
+                {q.name === activeName && dirty && <span className="text-accent">•</span>}
+              </button>
+              {/* Row actions stay hidden until the row is hovered or focused —
+                  a list of names should read as names, not as a toolbar. */}
+              <span className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                <button
+                  onClick={() => {
+                    setTarget(q.name)
+                    setDialog('rename')
+                  }}
+                  title={t('common.rename')}
+                  className="rounded px-1 py-0.5 leading-none text-muted hover:bg-panel-3 hover:text-text"
+                >
+                  ✎
+                </button>
+                <button
+                  onClick={() => {
+                    setTarget(q.name)
+                    setDialog('delete')
+                  }}
+                  title={t('common.delete')}
+                  className="rounded px-1 py-0.5 text-card leading-none text-muted hover:bg-panel-3 hover:text-danger"
+                >
+                  ×
+                </button>
+              </span>
+            </div>
           ))}
         </div>
         <p className="border-t border-line-soft px-3 py-2 text-badge leading-relaxed text-muted">
@@ -237,7 +267,13 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
           <Button onClick={() => setDialog('save')}>{t('common.save')}</Button>
           <Button onClick={() => setDialog('migration')}>{t('sql.saveAsMigration')}</Button>
           {activeName && (
-            <Button variant="danger" onClick={() => setDialog('delete')}>
+            <Button
+              variant="danger"
+              onClick={() => {
+                setTarget(activeName)
+                setDialog('delete')
+              }}
+            >
               {t('common.delete')}
             </Button>
           )}
@@ -396,9 +432,26 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
         />
       )}
 
-      {dialog === 'delete' && activeName && (
+      {dialog === 'rename' && target && (
+        <NameModal
+          title={t('sql.renameQueryTitle', { name: target })}
+          initial={target}
+          hint={t('sql.saveQueryHint')}
+          valid={(v) => /^[\wəöğışçüĞÖİŞÇÜƏ -]{1,64}$/.test(v) && v !== target}
+          onClose={() => setDialog(null)}
+          onSubmit={async (to) => {
+            await call('queries:rename', { id: project.id, name: target, to })
+            // The editor keeps its content; only the name it is filed under moves.
+            if (activeName === target) setActiveName(to)
+            setDialog(null)
+            saved.refresh()
+          }}
+        />
+      )}
+
+      {dialog === 'delete' && target && (
         <Modal
-          title={t('sql.deleteConfirmTitle', { name: activeName })}
+          title={t('sql.deleteConfirmTitle', { name: target })}
           onClose={() => setDialog(null)}
           footer={
             <>
@@ -406,8 +459,8 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
               <Button
                 variant="danger"
                 onClick={() => {
-                  void call('queries:remove', { id: project.id, name: activeName }).then(() => {
-                    setActiveName(null)
+                  void call('queries:remove', { id: project.id, name: target }).then(() => {
+                    if (activeName === target) setActiveName(null)
                     setDialog(null)
                     saved.refresh()
                   })

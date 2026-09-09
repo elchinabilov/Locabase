@@ -12,6 +12,7 @@ const en = {
     cancel: 'Cancel',
     save: 'Save',
     delete: 'Delete',
+    rename: 'Rename',
     edit: 'Edit',
     loading: 'loading',
     checking: 'checking',
@@ -716,6 +717,7 @@ const en = {
     notInLedger: 'SQL run here isn’t written to the migration ledger.',
     saveQueryTitle: 'Save query',
     saveQueryHint: 'Letters, digits, spaces, `_` and `-`. The file is created as `supabase/.locabase/queries/<name>.sql`.',
+    renameQueryTitle: 'Rename «{name}»',
     deleteConfirmTitle: 'Delete «{name}»?',
     fileDeletedFromDisk: 'The file is deleted from disk.',
     errorField: {

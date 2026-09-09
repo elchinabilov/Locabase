@@ -9,6 +9,7 @@ const az = {
     cancel: 'Ləğv et',
     save: 'Yadda saxla',
     delete: 'Sil',
+    rename: 'Adını dəyiş',
     edit: 'Redaktə',
     loading: 'yüklənir',
     checking: 'yoxlanılır',
@@ -713,6 +714,7 @@ const az = {
     notInLedger: 'Burada işlədilən SQL miqrasiya ledger-inə yazılmır.',
     saveQueryTitle: 'Sorğunu saxla',
     saveQueryHint: 'Hərf, rəqəm, boşluq, `_` və `-`. Fayl `supabase/.locabase/queries/<ad>.sql` kimi yaranır.',
+    renameQueryTitle: '«{name}» adını dəyiş',
     deleteConfirmTitle: '«{name}» silinsin?',
     fileDeletedFromDisk: 'Fayl diskdən silinir.',
     errorField: {
