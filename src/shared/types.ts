@@ -566,3 +566,214 @@ export interface AuthUserDetail extends AuthUser {
 export interface DbCompletion {
   tables: Array<{ schema: string; table: string; columns: string[] }>
 }
+
+/* --------------------------------------------------------------- storage */
+
+/**
+ * A connected object store. Only Cloudflare R2 for now — the shape is already
+ * S3-flavoured, so another S3-compatible provider is a new id plus an endpoint,
+ * not a new model.
+ */
+export type StorageProviderId = 'r2'
+
+export interface StorageConnection {
+  id: string
+  name: string
+  provider: StorageProviderId
+  /** R2 account id — the endpoint is derived from it */
+  accountId: string
+  bucket: string
+  /** R2 always answers on `auto`; kept for the next provider */
+  region: string
+  /** Key prefix inside the bucket, e.g. `locabase/backups`. May be empty. */
+  prefix: string
+  accessKeyId: string
+  /** The secret key lives in safeStorage; only its presence is stored here. */
+  hasSecret: boolean
+  createdAt: string
+}
+
+/** What the connection form sends; `secretAccessKey` never comes back out. */
+export interface StorageConnectionInput {
+  id?: string
+  name: string
+  provider: StorageProviderId
+  accountId: string
+  bucket: string
+  region?: string
+  prefix?: string
+  accessKeyId: string
+  /** Omitted on edit = keep the stored secret. */
+  secretAccessKey?: string
+}
+
+export interface StorageTestReport {
+  ok: boolean
+  checks: Array<{ label: string; ok: boolean; info: string }>
+}
+
+export interface StorageObject {
+  key: string
+  bytes: number
+  updatedAt: string | null
+}
+
+/* --------------------------------------------------------------- backups */
+
+/** Where the dump came from. `local` is the Docker stack on this machine. */
+export type BackupTargetKind = 'local' | 'managed' | 'self-hosted'
+
+/**
+ * `custom` — `pg_dump -Fc` (compressed, restorable with `pg_restore`);
+ * `plain` — SQL text. Managed environments only produce `plain`: the dump goes
+ * through `supabase db dump`, which has no custom format.
+ */
+export type BackupFormat = 'custom' | 'plain'
+
+/** Managed dumps are assembled from parts; `full` = roles + schema + data. */
+export type BackupScope = 'full' | 'schema' | 'data'
+
+export type BackupTrigger = 'manual' | 'job'
+
+export type BackupStatus = 'running' | 'ok' | 'failed'
+
+export interface BackupRecord {
+  id: string
+  projectId: string
+  /** null = the local stack */
+  envId: string | null
+  /** The environment name as it was at backup time — the env may be gone later. */
+  envName: string
+  kind: BackupTargetKind
+  format: BackupFormat
+  scope: BackupScope
+  trigger: BackupTrigger
+  /** the scheduler job that produced it, when it wasn't manual */
+  jobId: string | null
+  jobName: string | null
+  status: BackupStatus
+  startedAt: string
+  finishedAt: string | null
+  durationMs: number | null
+  /** The file on this machine; null once it has been pruned or was never kept. */
+  path: string | null
+  bytes: number
+  /** Upload destination, when one was configured. */
+  storageId: string | null
+  storageName: string | null
+  storageKey: string | null
+  error: string | null
+}
+
+/** One backup run — the same options for the manual button and for a job. */
+export interface BackupOptions {
+  /** null = the local stack */
+  envId: string | null
+  scope?: BackupScope
+  /** Upload to this connection after the dump; null = keep it local only. */
+  storageId?: string | null
+  /** Delete the local file once the upload succeeded. */
+  keepLocal?: boolean
+  /** Prune this environment's older backups. 0 = no limit. */
+  retentionDays?: number
+  retentionCount?: number
+}
+
+/* --------------------------------------------------------------- restore */
+
+/**
+ * Loading a dump back into a database. The target does **not** have to be where
+ * the dump came from — pulling production into the local stack is the common
+ * case — so it is chosen per restore, and confirmed by name.
+ */
+export interface RestoreOptions {
+  backupId: string
+  /** null = the local stack */
+  envId: string | null
+  /** Custom-format dumps only: drop objects before recreating them. */
+  clean: boolean
+  /** Must equal the target's name — the same guard `stack:reset` uses. */
+  confirm: string
+}
+
+export interface RestoreResult {
+  ok: boolean
+  /** Where it went, as shown in the confirmation. */
+  envName: string
+  /** The tail of the restore output. */
+  output: string
+  error: string | null
+  /**
+   * `psql` does not stop on a failed statement (an existing role, a missing
+   * owner), so a restore can finish and still have errors inside it. This counts
+   * them — `ok: true` with a non-zero count means "loaded, but read the output".
+   */
+  failedStatements: number
+  durationMs: number
+  /** The dump was pulled back from object storage first. */
+  fromStorage: boolean
+}
+
+/* -------------------------------------------------------------- scheduler */
+
+/**
+ * When a job runs. `cron` is the escape hatch (5 fields, standard syntax); the
+ * other three are the shapes a backup schedule actually takes, so the form
+ * doesn't make everyone learn cron.
+ */
+export type ScheduleKind = 'interval' | 'daily' | 'weekly' | 'cron'
+
+export interface ScheduleSpec {
+  kind: ScheduleKind
+  /** `interval`: the gap in minutes */
+  everyMinutes?: number
+  /** `daily` / `weekly`: local wall-clock time, `HH:MM` */
+  at?: string
+  /** `weekly`: 0 = Sunday … 6 = Saturday */
+  weekday?: number
+  /** `cron`: minute hour day-of-month month day-of-week */
+  expr?: string
+}
+
+export type JobType = 'backup'
+
+export interface Job {
+  id: string
+  projectId: string
+  name: string
+  type: JobType
+  enabled: boolean
+  /** null = the local stack */
+  envId: string | null
+  schedule: ScheduleSpec
+  scope: BackupScope
+  storageId: string | null
+  keepLocal: boolean
+  /** 0 = keep everything */
+  retentionDays: number
+  retentionCount: number
+  createdAt: string
+  lastRunAt: string | null
+  lastStatus: 'ok' | 'failed' | null
+  lastError: string | null
+  /** Computed by the scheduler; null when the job is off or the spec is invalid. */
+  nextRunAt: string | null
+  /** True while this job's run is in flight. */
+  running: boolean
+}
+
+/** What the job form sends — the run bookkeeping fields are the scheduler's. */
+export interface JobInput {
+  id?: string
+  projectId: string
+  name: string
+  type: JobType
+  enabled: boolean
+  envId: string | null
+  schedule: ScheduleSpec
+  scope: BackupScope
+  storageId: string | null
+  keepLocal: boolean
+  retentionDays: number
+  retentionCount: number
+}

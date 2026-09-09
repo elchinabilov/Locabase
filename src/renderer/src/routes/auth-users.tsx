@@ -1,17 +1,19 @@
 /**
  * "Users" — the GoTrue user table, read straight from `auth.users`.
  *
- * Read-only on purpose. Creating and deleting users properly means the admin
- * API (password hashing, identity rows, audit entries); writing those tables by
- * hand produces users that half work. Everything here is inspection: who
- * signed up, through which provider, when they last came back.
+ * Mostly inspection — who signed up, through which provider, when they last came
+ * back — plus the two actions that are safe to write directly: ban/unban, which
+ * is a single GoTrue column, and delete, which the auth schema's own foreign
+ * keys cascade. Creating a user is deliberately absent: doing it properly means
+ * password hashing and identity rows, which is the admin API's job.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type {
   AuthUser,
   AuthUserSort,
   AuthUserStatus,
-  Project
+  Project,
+  RemoteEnv
 } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
@@ -29,6 +31,7 @@ import {
   formatCount
 } from '../components/ui'
 import { EnvPicker, RemoteNote, envOf, useDbGate } from '../components/env-picker'
+import { Menu } from '../components/menu'
 
 const PAGE_SIZES = [25, 50, 100, 500]
 
@@ -62,6 +65,7 @@ export function AuthUsers({ project }: { project: Project }): ReactNode {
   const [pageSize, setPageSize] = useState(50)
   const [page, setPage] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<PendingAction | null>(null)
 
   // Typing shouldn't fire a query per keystroke; the list catches up shortly
   // after the typing stops.
@@ -189,11 +193,17 @@ export function AuthUsers({ project }: { project: Project }): ReactNode {
                     <Th>{t('authUsers.column.created')}</Th>
                     <Th>{t('authUsers.column.lastSignIn')}</Th>
                     <Th>{t('authUsers.column.uid')}</Th>
+                    <Th />
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((u) => (
-                    <UserRow key={u.id} user={u} onOpen={() => setOpenId(u.id)} />
+                    <UserRow
+                      key={u.id}
+                      user={u}
+                      onOpen={() => setOpenId(u.id)}
+                      onAction={(kind) => setConfirm({ kind, user: u })}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -210,20 +220,43 @@ export function AuthUsers({ project }: { project: Project }): ReactNode {
           onClose={() => setOpenId(null)}
         />
       )}
+
+      {confirm && (
+        <ConfirmAction
+          action={confirm}
+          projectId={project.id}
+          env={env}
+          onClose={() => setConfirm(null)}
+          onDone={() => {
+            setConfirm(null)
+            // A delete can empty the last page; the query re-runs either way.
+            users.refresh()
+          }}
+        />
+      )}
     </div>
   )
 }
 
 /* -------------------------------------------------------------------- rows */
 
-function Th({ children }: { children: ReactNode }): ReactNode {
+function Th({ children }: { children?: ReactNode }): ReactNode {
   return <th className="px-3 py-2 text-left font-medium whitespace-nowrap">{children}</th>
 }
 
-function UserRow({ user, onOpen }: { user: AuthUser; onOpen: () => void }): ReactNode {
+function UserRow({
+  user,
+  onOpen,
+  onAction
+}: {
+  user: AuthUser
+  onOpen: () => void
+  onAction: (kind: ActionKind) => void
+}): ReactNode {
   const t = useT()
   const { locale } = useI18n()
   const identifier = user.email ?? user.phone
+  const banned = isBanned(user)
   return (
     <tr
       onClick={onOpen}
@@ -252,6 +285,25 @@ function UserRow({ user, onOpen }: { user: AuthUser; onOpen: () => void }): Reac
         {user.lastSignInAt ? stamp(user.lastSignInAt, locale) : <span className="text-faint">—</span>}
       </td>
       <td className="px-3 py-2 font-mono text-meta text-faint">{user.id}</td>
+      {/* Stops the click from also opening the detail modal behind the menu. */}
+      <td className="px-2 py-1 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <Menu
+          label={t('authUsers.action.menu', { user: user.email ?? user.phone ?? user.id })}
+          items={[
+            {
+              id: 'ban',
+              label: banned ? t('authUsers.action.unban') : t('authUsers.action.ban'),
+              onSelect: () => onAction(banned ? 'unban' : 'ban')
+            },
+            {
+              id: 'delete',
+              label: t('common.delete'),
+              tone: 'danger',
+              onSelect: () => onAction('delete')
+            }
+          ]}
+        />
+      </td>
     </tr>
   )
 }
@@ -259,10 +311,9 @@ function UserRow({ user, onOpen }: { user: AuthUser; onOpen: () => void }): Reac
 /** Only what is worth saying — a plain confirmed user shows nothing at all. */
 function StatusBadges({ user }: { user: AuthUser }): ReactNode {
   const t = useT()
-  const banned = user.bannedUntil !== null && new Date(user.bannedUntil) > new Date()
   return (
     <div className="flex flex-wrap gap-1">
-      {banned && <Badge tone="danger">{t('authUsers.badge.banned')}</Badge>}
+      {isBanned(user) && <Badge tone="danger">{t('authUsers.badge.banned')}</Badge>}
       {user.confirmedAt === null && <Badge tone="warn">{t('authUsers.badge.unconfirmed')}</Badge>}
       {user.isAnonymous && <Badge tone="muted">{t('authUsers.badge.anonymous')}</Badge>}
       {user.isSso && <Badge tone="info">SSO</Badge>}
@@ -409,7 +460,113 @@ function Json({ label, value }: { label: string; value: string | null }): ReactN
   )
 }
 
+/* ------------------------------------------------------------ ban / delete */
+
+export type ActionKind = 'ban' | 'unban' | 'delete'
+
+interface PendingAction {
+  kind: ActionKind
+  user: AuthUser
+}
+
+/**
+ * One modal for all three actions.
+ *
+ * Delete is irreversible, and a ban on a live environment locks a real person
+ * out, so neither happens on a single click. The environment is named in the
+ * text: the same row looks identical whether it came from the local stack or
+ * from production, and that is precisely when a confirmation earns its keep.
+ */
+function ConfirmAction({
+  action,
+  projectId,
+  env,
+  onClose,
+  onDone
+}: {
+  action: PendingAction
+  projectId: string
+  env: RemoteEnv | null
+  onClose: () => void
+  onDone: () => void
+}): ReactNode {
+  const t = useT()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { kind, user } = action
+  const who = user.email ?? user.phone ?? user.id
+
+  const run = (): void => {
+    setBusy(true)
+    setError(null)
+    const call$ =
+      kind === 'delete'
+        ? call('auth:deleteUser', { id: projectId, envId: env?.id ?? null, userId: user.id })
+        : call('auth:setBanned', {
+            id: projectId,
+            envId: env?.id ?? null,
+            userId: user.id,
+            banned: kind === 'ban'
+          })
+    void call$
+      .then(onDone)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setBusy(false))
+  }
+
+  const title =
+    kind === 'delete'
+      ? t('authUsers.confirm.deleteTitle', { user: who })
+      : kind === 'ban'
+        ? t('authUsers.confirm.banTitle', { user: who })
+        : t('authUsers.confirm.unbanTitle', { user: who })
+
+  return (
+    <Modal
+      title={title}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            variant={kind === 'delete' ? 'danger' : 'primary'}
+            loading={busy}
+            onClick={run}
+          >
+            {kind === 'delete'
+              ? t('common.delete')
+              : kind === 'ban'
+                ? t('authUsers.action.ban')
+                : t('authUsers.action.unban')}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-ui leading-relaxed text-muted">
+        {kind === 'delete'
+          ? t('authUsers.confirm.deleteBody')
+          : kind === 'ban'
+            ? t('authUsers.confirm.banBody')
+            : t('authUsers.confirm.unbanBody')}
+      </p>
+      <p className="mt-2 text-small text-muted">
+        {t('authUsers.confirm.target', { env: env ? env.name : t('envPicker.local') })}
+      </p>
+      {error && (
+        <div className="mt-3">
+          <ErrorNote>{error}</ErrorNote>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
 /* ----------------------------------------------------------------- helpers */
+
+/** A ban is a timestamp in the future — a past one has simply expired. */
+function isBanned(user: AuthUser): boolean {
+  return user.bannedUntil !== null && new Date(user.bannedUntil) > new Date()
+}
 
 /** `linkedin_oidc` → `LinkedIn OIDC`; anything unknown is title-cased as-is. */
 function providerLabel(id: string): string {

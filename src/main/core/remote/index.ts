@@ -3,7 +3,9 @@
  * interface — the Sync and Deploy screens never know which kind they're talking to.
  */
 import type {
+  BackupFormat,
   BackupInfo,
+  BackupScope,
   HealthReport,
   Project,
   RemoteEnv,
@@ -36,6 +38,30 @@ export interface RemoteAdapter {
   listAppliedMigrations(): Promise<LedgerRow[]>
   applyMigrations(files: MigrationFile[], log: LogFn): Promise<void>
   backup(log: LogFn): Promise<BackupInfo>
+  /**
+   * Stream a database dump into a local file — the Backups screen and the
+   * scheduler both go through this, so a remote dump ends up on this machine and
+   * can be uploaded to object storage like any other.
+   *
+   * `scope` only means something for managed environments, where the dump is
+   * assembled from `supabase db dump` parts; self-hosted always writes a full
+   * `pg_dump -Fc`.
+   */
+  dumpTo(
+    file: string,
+    scope: BackupScope,
+    log: LogFn
+  ): Promise<{ bytes: number; format: BackupFormat }>
+  /**
+   * Load a dump file back into this environment. Destructive by definition — the
+   * caller is responsible for the confirmation.
+   */
+  restoreFrom(
+    file: string,
+    format: BackupFormat,
+    clean: boolean,
+    log: LogFn
+  ): Promise<{ output: string }>
   listSecretNames(): Promise<string[]>
   setSecrets(kv: Record<string, string>, log: LogFn): Promise<void>
   listFunctions(): Promise<RemoteFunctionInfo[]>

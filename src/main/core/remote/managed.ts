@@ -5,14 +5,25 @@
  * the auth configuration is read through the Management API. The access token is
  * never passed as an argument — only through the `SUPABASE_ACCESS_TOKEN` env var.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { supabase, supabaseJson } from '../cli.js'
 import { get as getSecret, keys } from '../secrets.js'
 import { readTree } from '../filetree.js'
 import type {
+  BackupFormat,
   BackupInfo,
+  BackupScope,
   HealthReport,
   ManagedEnv,
   Project,
@@ -29,6 +40,9 @@ import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 import { toSqlError } from '../sql/build.js'
 
 const API = 'https://api.supabase.com'
+
+/** Past this the Management API is the wrong tool — see `restoreFrom`. */
+const MANAGED_RESTORE_LIMIT = 8 * 1024 * 1024
 
 interface CliMigrationRow {
   local?: string
@@ -151,6 +165,86 @@ export class ManagedAdapter implements RemoteAdapter {
     if (!res.ok) throw new Error(res.error ?? res.output)
     const size = existsSync(file) ? `${Math.round(readFileSync(file).length / 1024)} KB` : '?'
     return { path: file, size, createdAt: new Date().toISOString() }
+  }
+
+  /**
+   * A managed project has no shell, so the dump goes through the CLI. `db dump`
+   * writes one aspect at a time — a `full` backup is roles + schema + data,
+   * concatenated in restore order into a single `.sql` file.
+   */
+  async dumpTo(
+    file: string,
+    scope: BackupScope,
+    log: LogFn
+  ): Promise<{ bytes: number; format: BackupFormat }> {
+    await this.ensureLinked()
+    const parts: Array<{ name: string; args: string[] }> =
+      scope === 'schema'
+        ? [{ name: 'schema', args: [] }]
+        : scope === 'data'
+          ? [{ name: 'data', args: ['--data-only'] }]
+          : [
+              { name: 'roles', args: ['--role-only'] },
+              { name: 'schema', args: [] },
+              { name: 'data', args: ['--data-only'] }
+            ]
+
+    const tmp = mkdtempSync(join(tmpdir(), 'locabase-dump-'))
+    try {
+      writeFileSync(file, `-- locabase ${scope} dump of ${this.env.projectRef}\n`, { mode: 0o600 })
+      for (const part of parts) {
+        const piece = join(tmp, `${part.name}.sql`)
+        log(`supabase db dump — ${part.name}`)
+        const res = await supabase(['db', 'dump', '--linked', '-f', piece, ...part.args], {
+          cwd: this.project.path,
+          env: this.cliEnv(),
+          stream: this.stream,
+          timeoutMs: 60 * 60 * 1000
+        })
+        if (!res.ok) throw new Error(res.error ?? res.output)
+        appendFileSync(file, `\n-- ---------- ${part.name} ----------\n`)
+        appendFileSync(file, readFileSync(piece))
+      }
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+    return { bytes: statSync(file).size, format: 'plain' }
+  }
+
+  /**
+   * A managed project has no shell to pipe a dump into, so the SQL goes through
+   * the Management API query endpoint in one request. That works for schema-sized
+   * dumps and not for a full production database — rather than half-restore and
+   * leave a broken schema behind, anything larger is refused with the `psql`
+   * command line to run instead.
+   */
+  async restoreFrom(
+    file: string,
+    format: BackupFormat,
+    _clean: boolean,
+    log: LogFn
+  ): Promise<{ output: string }> {
+    if (format !== 'plain') {
+      throw new Error(
+        'A managed project can only take a plain `.sql` dump — restore a custom-format one with `pg_restore` against the project connection string.'
+      )
+    }
+    const bytes = statSync(file).size
+    if (bytes > MANAGED_RESTORE_LIMIT) {
+      throw new Error(
+        `The dump is ${Math.round(bytes / 1024 / 1024)} MB — too large for the Management API. ` +
+          `Restore it from a terminal instead: psql "<connection string>" -f ${file} ` +
+          '(the string is in the project dashboard, Settings → Database).'
+      )
+    }
+    log(`Restoring ${bytes} bytes into ${this.env.projectRef} through the Management API`)
+    const run = await this.runSql(readFileSync(file, 'utf8'), {
+      readOnly: false,
+      maxRows: 1,
+      timeoutMs: 60 * 60 * 1000
+    })
+    if (!run.ok) throw new Error(run.error?.message ?? 'the restore query failed')
+    return { output: `${this.env.projectRef}: restore query finished` }
   }
 
   async listSecretNames(): Promise<string[]> {

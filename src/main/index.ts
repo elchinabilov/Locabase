@@ -9,6 +9,7 @@ import { migrateUserData } from './core/userdata.js'
 import { fixPath } from './core/env-path.js'
 import { logBus } from './core/log.js'
 import * as prefs from './core/prefs.js'
+import * as scheduler from './core/scheduler/index.js'
 
 // In dev the package name is used, in production `productName` — the name is
 // pinned here, before anything else, so both point at the same folder.
@@ -88,6 +89,8 @@ void app.whenReady().then(() => {
 
   registerIpc()
   pipeEvents()
+  // Scheduled backups only run while the app is open — arm them once it is.
+  scheduler.start()
   createWindow()
 
   app.on('activate', () => {
@@ -104,4 +107,5 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   stopAllTails()
   closeSqlPools()
+  scheduler.stop()
 })

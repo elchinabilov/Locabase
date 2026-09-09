@@ -16,6 +16,7 @@ import { SecretsRoute } from './routes/secrets'
 import { MigrationsRoute } from './routes/migrations'
 import { FunctionsRoute } from './routes/functions'
 import { SyncRoute } from './routes/sync'
+import { BackupsRoute } from './routes/backups'
 import { SettingsRoute } from './routes/settings'
 
 export type RouteId =
@@ -28,6 +29,7 @@ export type RouteId =
   | 'migrations'
   | 'functions'
   | 'sync'
+  | 'backups'
   | 'settings'
 
 const NAV: Array<{ id: RouteId; labelKey: TranslationKey; icon: string; needsProject: boolean }> = [
@@ -40,6 +42,7 @@ const NAV: Array<{ id: RouteId; labelKey: TranslationKey; icon: string; needsPro
   { id: 'migrations', labelKey: 'app.nav.migrations', icon: '⇅', needsProject: true },
   { id: 'functions', labelKey: 'app.nav.functions', icon: 'ƒ', needsProject: true },
   { id: 'sync', labelKey: 'app.nav.sync', icon: '⇈', needsProject: true },
+  { id: 'backups', labelKey: 'app.nav.backups', icon: '⛁', needsProject: true },
   { id: 'settings', labelKey: 'app.nav.settings', icon: '⋯', needsProject: false }
 ]
 
@@ -176,6 +179,14 @@ function Content({
       return <FunctionsRoute project={project} />
     case 'sync':
       return <SyncRoute project={project} onChanged={onProjectsChanged} />
+    case 'backups':
+      return (
+        <BackupsRoute
+          key={project.id}
+          project={project}
+          onOpenSettings={() => onRoute('settings')}
+        />
+      )
     default:
       return null
   }

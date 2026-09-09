@@ -6,12 +6,14 @@
  * second configuration to keep in sync.
  */
 import { basename } from 'node:path'
-import { run } from '../cli.js'
+import { run, runFromFile, runToFile } from '../cli.js'
 import { paths } from '../projects.js'
 import { MAX_FILE_BYTES } from '../filetree.js'
 import { parseBytes } from '@shared/services.js'
 import type {
+  BackupFormat,
   BackupInfo,
+  BackupScope,
   HealthReport,
   Project,
   RemoteFile,
@@ -271,6 +273,61 @@ export class SelfHostedAdapter implements RemoteAdapter {
       size: parts[4] ?? '?',
       createdAt: new Date().toISOString()
     }
+  }
+
+  /**
+   * `pg_dump` runs on the server, but its output is piped straight down the SSH
+   * connection into a local file — so the server needs no free disk space and the
+   * dump ends up where the Backups screen (and the storage upload) can see it.
+   */
+  async dumpTo(
+    file: string,
+    scope: BackupScope,
+    log: LogFn
+  ): Promise<{ bytes: number; format: BackupFormat }> {
+    const only = scope === 'schema' ? ' --schema-only' : scope === 'data' ? ' --data-only' : ''
+    const cmd =
+      `docker exec -i ${sq(this.env.dbContainer)} pg_dump -U postgres -d postgres -Fc${only}`
+    log(`${this.env.name}: pg_dump over ssh → ${basename(file)}`)
+    const res = await runToFile('ssh', [...this.sshArgs(), this.env.sshHost, cmd], file, {
+      stream: this.stream,
+      timeoutMs: 6 * 60 * 60 * 1000
+    })
+    if (res.bytes === 0) throw new Error('pg_dump produced an empty file')
+    return { bytes: res.bytes, format: 'custom' }
+  }
+
+  /**
+   * The dump travels **up** the SSH connection into the container's stdin, the
+   * exact reverse of `dumpTo` — nothing is staged on the server.
+   *
+   * `pg_restore` exits non-zero on the usual "role already exists" noise, so a
+   * custom-format restore runs without `ON_ERROR_STOP` and the output is handed
+   * back for the user to read.
+   */
+  async restoreFrom(
+    file: string,
+    format: BackupFormat,
+    clean: boolean,
+    log: LogFn
+  ): Promise<{ output: string }> {
+    const inner =
+      format === 'plain'
+        ? 'psql -U postgres -d postgres'
+        : [
+            'pg_restore -U postgres -d postgres --no-owner --no-privileges',
+            clean ? '--clean --if-exists' : ''
+          ]
+            .filter(Boolean)
+            .join(' ')
+    const cmd = `docker exec -i ${sq(this.env.dbContainer)} ${inner}`
+    log(`${this.env.name}: restoring ${basename(file)}`)
+    const res = await runFromFile('ssh', [...this.sshArgs(), this.env.sshHost, cmd], file, {
+      stream: this.stream,
+      timeoutMs: 6 * 60 * 60 * 1000
+    })
+    if (!res.ok) throw new Error(res.error ?? (res.output.trim() || 'the restore failed'))
+    return { output: res.output }
   }
 
   /** The key names in the remote `.env` — values are not fetched. */

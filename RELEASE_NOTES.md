@@ -30,8 +30,49 @@ minor number moves and the major stays put (semver).
   and UID, filters by provider and by status (confirmed, unconfirmed, anonymous,
   banned), five sort orders, paging, and a column showing which provider each
   user signed up through. Clicking a row opens their identities and their app /
-  user metadata. It reads the local stack or any remote environment, and it is
-  read-only — creating and deleting users belongs to the admin API.
+  user metadata. It reads the local stack or any remote environment.
+- **Ban, unban and delete users.** Each row carries a ⋮ menu with the two
+  actions, and both go through a confirmation naming the user and the
+  environment — the same row looks identical whether it came from the local
+  stack or from production. A ban writes GoTrue's own `banned_until` and drops the user's open
+  sessions, so it takes effect at the next token refresh; a delete relies on the
+  auth schema's foreign keys to take identities and sessions with it, and is
+  refused outright — with Postgres's own message — when one of your tables still
+  references the user. Creating a user stays out: doing it properly means
+  password hashing and identity rows, which is the admin API's job.
+- **Backups, for every environment.** A new Backups screen dumps the local
+  stack, a managed supabase.com project or a self-hosted server, all through one
+  button. Local and self-hosted go through `pg_dump -Fc` (a self-hosted dump is
+  piped down the SSH connection straight into a local file, so the server needs
+  no free disk space); a managed project is assembled from `supabase db dump` —
+  roles, schema and data concatenated in restore order. Full, schema-only and
+  data-only are the three scopes. Every run lands in one list with its size,
+  duration, whoever started it, and the failure reason when there is one.
+- **Scheduler jobs.** The same backup, on a schedule: daily at a time, weekly on
+  a weekday, every N minutes, or a plain five-field cron expression for anything
+  else. A job carries its own target, scope, upload destination and retention
+  (keep N days, keep N copies — 0 for no limit; the newest successful backup is
+  never pruned). Jobs run while Locabase is open — a run missed with the app
+  closed is not caught up on launch, so waking the laptop doesn't fire three
+  dumps at once. "Run now" uses the identical code path as the schedule.
+- **Storage connections (Cloudflare R2).** Settings → Storage connects an
+  S3-compatible bucket, tested with a real signed request rather than a guess.
+  Backups upload to it automatically (manually or from a job), and the local
+  copy can be dropped once the upload succeeds. Access keys are held in the
+  system key store like every other credential, and the signing is ~100 lines of
+  SigV4 instead of a 4 MB SDK. R2 is the only provider today; the model is the
+  S3 one, so the next is a row in a dropdown.
+- **Restore.** Every finished backup carries a Restore action: the dump goes back
+  into a database of your choosing — pulling a production dump into the local
+  stack is a target select away, not a terminal session. Local and self-hosted go
+  through `pg_restore` / `psql` inside the Postgres container (the file is piped
+  up the SSH connection, nothing is staged on the server); a managed project
+  takes a plain `.sql` through the Management API, and says so plainly, with the
+  `psql` line to run, when the dump is too large for that. Custom-format restores
+  can drop existing objects first (`--clean --if-exists`). It overwrites a
+  database, so it asks for the target's name typed out — the same guard the stack
+  reset uses. When the local copy is gone (a job with "keep local" off), the dump
+  is pulled back down from the bucket first and the temp file is removed after.
 
 ## Changed
 

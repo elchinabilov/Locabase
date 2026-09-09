@@ -11,8 +11,15 @@
  *     `auth.identities`, one row per provider, so it is aggregated per user —
  *     with a fallback for the rows that have no identity at all (an
  *     admin-created user, or an anonymous sign-in on an older stack).
+ *
+ * Ban and delete are written the same way GoTrue itself stores them, so the
+ * service reads back exactly what it would have written: a ban is a
+ * `banned_until` in the future, a delete is a row removal that the auth schema's
+ * own foreign keys cascade. See `setBanned()` and `remove()`.
  */
 import { rowsOf, targetFor, type Target } from './target.js'
+import { poolFor } from './pool.js'
+import { inlineParams } from './ident.js'
 import { clampInt } from './build.js'
 import type { AuthUser, AuthUserDetail, AuthUsersPage, AuthUsersQuery } from '@shared/types.js'
 
@@ -60,6 +67,43 @@ function confirmedExpr(has: Set<string>): string {
   if (has.has('confirmed_at')) return 'u.confirmed_at'
   if (has.has('email_confirmed_at')) return 'u.email_confirmed_at'
   return 'null::timestamptz'
+}
+
+/** GoTrue's own ban is a far-future timestamp — its admin API sends 876000h. */
+const BAN_INTERVAL = "interval '100 years'"
+
+async function tableExists(target: Target, table: string): Promise<boolean> {
+  const rows = await rowsOf<{ n: string }>(
+    target,
+    `select count(*)::text as n from information_schema.tables
+     where table_schema = 'auth' and table_name = $1`,
+    [table]
+  )
+  return Number(rows[0]?.n ?? 0) > 0
+}
+
+/**
+ * A write, on either transport. `rowsOf` cannot be used: the remote adapters'
+ * `queryJson` forces read-only, so a write has to go through `runSql` — with
+ * `returning 1` because the remote command tag is not a reliable row count.
+ */
+async function exec(
+  target: Target,
+  sql: string,
+  params: Array<string | null | boolean>
+): Promise<number> {
+  if (target.adapter) {
+    const literals = params.map((p) => (typeof p === 'boolean' ? String(p) : p))
+    const run = await target.adapter.runSql(`${inlineParams(sql, literals)} returning 1`, {
+      readOnly: false,
+      maxRows: 5000,
+      timeoutMs: 60_000
+    })
+    if (!run.ok) throw new Error(run.error?.message ?? 'The statement failed')
+    return run.results[0]?.rows.length ?? 0
+  }
+  const res = await poolFor(target.id).query(sql, params)
+  return res.rowCount ?? 0
 }
 
 interface Row extends Record<string, unknown> {
@@ -268,4 +312,84 @@ function asJson(v: unknown): string | null {
   } catch {
     return String(v)
   }
+}
+
+/* ------------------------------------------------------------ ban / delete */
+
+/**
+ * Ban or unban, exactly as GoTrue records it: `banned_until` in the future
+ * blocks new tokens, `null` lifts the ban.
+ *
+ * Setting the column alone would leave anyone already signed in with a working
+ * session until their refresh token expired, so a ban also drops the user's
+ * sessions — the ban then takes effect at the next refresh, which is the
+ * soonest anything server-side can act on it. Already-issued access tokens stay
+ * valid until they expire; that is true of the admin API too, and is why JWT
+ * lifetime matters.
+ */
+export async function setBanned(
+  id: string,
+  envId: string | null,
+  userId: string,
+  banned: boolean
+): Promise<{ bannedUntil: string | null }> {
+  const target = targetFor(id, envId)
+  const has = await columnsOf(target, 'users')
+  if (!has.has('banned_until')) {
+    throw new Error('This stack’s auth.users has no banned_until column — it is too old to ban users.')
+  }
+
+  const updated = await exec(
+    target,
+    `update auth.users
+        set banned_until = ${banned ? `now() + ${BAN_INTERVAL}` : 'null'}
+          ${has.has('updated_at') ? ', updated_at = now()' : ''}
+      where id::text = $1`,
+    [userId]
+  )
+  if (updated === 0) throw new Error(`User not found: ${userId}`)
+
+  if (banned) {
+    // Best effort, and deliberately not fatal: the ban itself is already
+    // written, and an old stack simply has nowhere to drop sessions.
+    if (await tableExists(target, 'sessions')) {
+      await exec(target, `delete from auth.sessions where user_id::text = $1`, [userId]).catch(
+        () => 0
+      )
+    }
+    if (await tableExists(target, 'refresh_tokens')) {
+      await exec(
+        target,
+        `update auth.refresh_tokens set revoked = true where user_id::text = $1 and revoked = false`,
+        [userId]
+      ).catch(() => 0)
+    }
+  }
+
+  const rows = await rowsOf<{ banned_until: string | null }>(
+    target,
+    `select ${ts('u.banned_until')} as banned_until from auth.users u where u.id::text = $1`,
+    [userId]
+  )
+  return { bannedUntil: rows[0]?.banned_until ?? null }
+}
+
+/**
+ * Delete a user.
+ *
+ * The auth schema's own foreign keys cascade — identities, sessions and refresh
+ * tokens go with the row. A foreign key from the application's own tables is a
+ * different matter: unless it was declared `on delete cascade`, Postgres refuses
+ * the delete, and that refusal is passed through untouched. It names the table
+ * holding the reference, which is exactly what the caller needs to know.
+ */
+export async function remove(
+  id: string,
+  envId: string | null,
+  userId: string
+): Promise<{ deleted: number }> {
+  const target = targetFor(id, envId)
+  const deleted = await exec(target, `delete from auth.users where id::text = $1`, [userId])
+  if (deleted === 0) throw new Error(`User not found: ${userId}`)
+  return { deleted }
 }

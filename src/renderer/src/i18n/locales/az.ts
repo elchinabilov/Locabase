@@ -9,6 +9,7 @@ const az = {
     cancel: 'Ləğv et',
     save: 'Yadda saxla',
     delete: 'Sil',
+    edit: 'Redaktə',
     loading: 'yüklənir',
     checking: 'yoxlanılır',
     add: 'Əlavə et'
@@ -24,6 +25,7 @@ const az = {
       migrations: 'Miqrasiyalar',
       functions: 'Funksiyalar',
       sync: 'Sync / Deploy',
+      backups: 'Backuplar',
       settings: 'Ayarlar'
     },
     sidebar: {
@@ -190,6 +192,18 @@ const az = {
     userMetadata: 'İstifadəçi metadata',
     appMetadata: 'Tətbiq metadata',
     empty: 'boş',
+    action: { ban: 'Blokla', unban: 'Bloku aç', menu: '{user} üçün əməliyyatlar' },
+    confirm: {
+      banTitle: '{user} bloklansın?',
+      banBody:
+        'Yeni girişlər və token yeniləmələri rədd ediləcək, hazırkı sessiyaları da bağlanır. Artıq verilmiş access token müddəti bitənə qədər işləməyə davam edir. İstənilən vaxt geri qaytarıla bilər.',
+      unbanTitle: '{user} üçün blok açılsın?',
+      unbanBody: 'Dərhal yenidən daxil ola biləcək.',
+      deleteTitle: '{user} silinsin?',
+      deleteBody:
+        'İstifadəçi, kimlikləri və sessiyaları həmişəlik silinir. Öz cədvəllərindən biri ON DELETE CASCADE olmadan ona istinad edirsə, silmə rədd olunur və heç nə dəyişmir.',
+      target: 'Hədəf: {env}'
+    },
     column: {
       user: 'İstifadəçi',
       providers: 'Provayderlər',
@@ -744,6 +758,157 @@ const az = {
     default: 'default',
     deleteConfirmTitle: '{count} sətir silinsin?',
     irreversible: 'Bu əməliyyat geri qaytarılmır.'
+  },
+  backups: {
+    title: 'Backuplar',
+    subtitle: 'Lokal stack, managed və self-hosted mühitlərin dump-ları',
+    take: 'Backup al',
+    taking: 'Backup alınır…',
+    target: 'Mühit',
+    localTarget: 'Lokal stack',
+    scope: {
+      label: 'Əhatə',
+      full: 'Tam (sxem + data)',
+      schema: 'Yalnız sxem',
+      data: 'Yalnız data'
+    },
+    destination: {
+      label: 'Storage',
+      none: 'Yalnız lokal fayl'
+    },
+    keepLocal: 'Yükləndikdən sonra lokal faylı saxla',
+    count: '{count} backup',
+    empty: 'Hələ backup yoxdur.',
+    status: {
+      running: 'gedir',
+      ok: 'hazır',
+      failed: 'uğursuz'
+    },
+    trigger: {
+      manual: 'əl ilə',
+      job: 'job'
+    },
+    localOnly: 'yalnız lokal',
+    fileGone: 'lokal fayl yoxdur',
+    reveal: 'Qovluqda göstər',
+    restore: 'Bərpa',
+    restoreTitle: 'Backup-dan bərpa',
+    restoreTarget: 'Hara bərpa olunsun',
+    restoreSource: 'Mənbə',
+    restoreClean: 'Əvvəlcə mövcud obyektləri sil (--clean --if-exists)',
+    restoreWarning:
+      'Bərpa hədəf bazanın üstünə yazır və geri qaytarılmır. Davam etmək üçün hədəfin adını yaz.',
+    restoreConfirm: 'Təsdiq üçün «{name}» yaz',
+    restoreFromStorage: 'Lokal fayl yoxdur — dump bucket-dən endiriləcək.',
+    restoreRunning: 'Bərpa gedir…',
+    restoreWarnings: '{count} ifadə xəta verdi — çıxışa bax',
+    restoreOk: '«{name}» bərpa olundu ({count} san)',
+    restoreManagedNote:
+      'Managed layihəyə yalnız plain «.sql» dump-ı, Management API ilə bərpa olunur — böyük dump üçün psql lazımdır.',
+    openSettings: 'Ayarlar → Storage',
+    upload: 'Yüklə',
+    uploadTitle: 'Storage-ə yüklə',
+    remove: 'Sil',
+    removeTitle: 'Backup silinsin?',
+    removeHint:
+      'Qeyd siyahıdan çıxır. Faylı və bucket-dəki obyekti də silmək üçün seçimi işarələ.',
+    removeFiles: 'Faylı və bucket obyektini də sil',
+    noStorage: 'Storage qoşulmayıb — «Ayarlar» səhifəsindən R2 əlavə et.',
+    seconds: '{count} san',
+    restoreHint:
+      'Bərpa: `pg_restore -d <baza> fayl.dump` (custom format) və ya `psql -f fayl.sql` (plain).'
+  },
+  jobs: {
+    title: 'Scheduler jobs',
+    subtitle: 'Avtomatik backuplar — yalnız Locabase açıq olanda işləyir',
+    new: 'Yeni job',
+    edit: 'Redaktə',
+    empty: 'Job yoxdur — nightly backup üçün birini yarat.',
+    runNow: 'İndi işlət',
+    running: 'işləyir',
+    next: 'növbəti: {time}',
+    last: 'sonuncu: {time}',
+    never: 'heç vaxt',
+    off: 'söndürülüb',
+    removeTitle: '«{name}» silinsin?',
+    removeHint: 'Alınmış backuplara toxunulmur — yalnız cədvəl silinir.',
+    status: {
+      ok: 'uğurlu',
+      failed: 'uğursuz'
+    },
+    schedule: {
+      interval: 'hər {count} dəq',
+      daily: 'hər gün {time}',
+      weekly: '{day} {time}',
+      cron: 'cron: {expr}'
+    },
+    weekday: {
+      sun: 'Bazar',
+      mon: 'Bazar ertəsi',
+      tue: 'Çərşənbə axşamı',
+      wed: 'Çərşənbə',
+      thu: 'Cümə axşamı',
+      fri: 'Cümə',
+      sat: 'Şənbə'
+    },
+    form: {
+      title: 'Scheduler job',
+      name: 'Ad',
+      namePlaceholder: 'Gecə backup — prod',
+      target: 'Mühit',
+      schedule: 'Cədvəl',
+      kind: {
+        interval: 'Interval',
+        daily: 'Hər gün',
+        weekly: 'Həftəlik',
+        cron: 'Cron'
+      },
+      everyMinutes: 'Hər neçə dəqiqədən bir',
+      time: 'Saat (HH:MM)',
+      weekday: 'Həftənin günü',
+      cron: 'Cron ifadəsi',
+      cronHint: 'Beş sahə: dəqiqə saat ayın-günü ay həftənin-günü. Nümunə: 0 3 * * *',
+      scope: 'Əhatə',
+      storage: 'Storage',
+      keepLocal: 'Lokal faylı saxla',
+      retentionDays: 'Neçə gün saxlanılsın',
+      retentionCount: 'Neçə ədəd saxlanılsın',
+      retentionHint:
+        '0 = limitsiz. Retention həm lokal faylı, həm bucket-dəki obyekti silir; ən son uğurlu backup heç vaxt silinmir.',
+      enabled: 'Aktiv',
+      save: 'Yadda saxla'
+    }
+  },
+  storage: {
+    title: 'Storage bağlantıları',
+    subtitle: 'Backuplar (və gələcək məqsədlər) üçün obyekt anbarı. Hələlik Cloudflare R2.',
+    add: 'Storage qoş',
+    empty: 'Bağlantı yoxdur.',
+    test: 'Yoxla',
+    testing: 'yoxlanılır…',
+    remove: 'Sil',
+    removeTitle: '«{name}» silinsin?',
+    removeHint: 'Bucket-dəki fayllara toxunulmur — yalnız bağlantı və açar silinir.',
+    hasSecret: 'açar yaddaşda',
+    missingSecret: 'açar yoxdur',
+    provider: {
+      r2: 'Cloudflare R2'
+    },
+    form: {
+      title: 'Storage bağlantısı',
+      name: 'Ad',
+      namePlaceholder: 'R2 — backups',
+      provider: 'Provayder',
+      accountId: 'Account ID',
+      accountIdHint: 'Cloudflare → R2 → «Use R2 with APIs» hissəsindəki hesab id-si',
+      bucket: 'Bucket',
+      accessKeyId: 'Access Key ID',
+      secretAccessKey: 'Secret Access Key',
+      secretKept: 'boş buraxsan, mövcud açar qalır',
+      prefix: 'Prefiks',
+      prefixHint: 'Bucket içindəki qovluq, məsələn locabase/backups. Boş ola bilər.',
+      save: 'Yadda saxla'
+    }
   }
 } as const
 

@@ -4,6 +4,7 @@ import { Badge, Button, Card, Row, Select, Skeleton } from '../components/ui'
 import { LOCALES, useI18n } from '../i18n'
 import { cx } from '../lib/format'
 import { THEMES, useTheme, type ThemePreference } from '../theme'
+import { StorageCard } from '../components/storage-form'
 import {
   available,
   EDITOR_SIZES,
@@ -227,6 +228,8 @@ export function SettingsRoute(): ReactNode {
           </div>
         </div>
       </Card>
+
+      <StorageCard />
 
       <Card title={t('settings.doctor.title')} subtitle={t('settings.doctor.subtitle')}>
         {doctor.loading && (

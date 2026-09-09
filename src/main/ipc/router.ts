@@ -23,6 +23,9 @@ import { logBus as bus } from '../core/log.js'
 import type { EnvEntry } from '@shared/types.js'
 import { scanToml } from '../core/toml/scan.js'
 import * as prefs from '../core/prefs.js'
+import * as storage from '../core/storage/index.js'
+import * as backups from '../core/backup/index.js'
+import * as scheduler from '../core/scheduler/index.js'
 import * as authUsers from '../core/sql/authusers.js'
 import { readFileSync } from 'node:fs'
 
@@ -48,7 +51,13 @@ const handlers: Handlers = {
   'projects:list': async () => projects.list(),
   'projects:add': async ({ path }) => projects.add(path),
   'projects:create': async ({ path, name, portBase }) => scaffold.create({ path, name, portBase }),
-  'projects:remove': async ({ id }) => projects.remove(id),
+  'projects:remove': async ({ id }) => {
+    // The dumps on disk and in the bucket stay; only the bookkeeping goes, and
+    // the jobs, which have nothing left to back up.
+    scheduler.forgetProject(id)
+    backups.forgetProject(id)
+    return projects.remove(id)
+  },
   'projects:update': async ({ id, patch }) => projects.update(id, patch),
   'projects:inspect': async ({ path }) => projects.inspect(path),
   'projects:pickFolder': async () => {
@@ -215,12 +224,52 @@ const handlers: Handlers = {
   'db:rows': async ({ id, ...req }) => sql.selectRows(id, req),
   'auth:users': async ({ id, ...req }) => authUsers.users(id, req),
   'auth:user': async ({ id, envId, userId }) => authUsers.user(id, envId, userId),
+  'auth:setBanned': async ({ id, envId, userId, banned }) =>
+    authUsers.setBanned(id, envId, userId, banned),
+  'auth:deleteUser': async ({ id, envId, userId }) => authUsers.remove(id, envId, userId),
   'db:insertRow': async ({ id, envId, schema, table, values }) =>
     sql.insertRow(id, envId, schema, table, values),
   'db:updateRow': async ({ id, envId, schema, table, pk, patch }) =>
     sql.updateRow(id, envId, schema, table, pk, patch),
   'db:deleteRows': async ({ id, envId, schema, table, pks }) =>
     sql.deleteRows(id, envId, schema, table, pks),
+
+  /* --- storage connections --- */
+  'storage:list': async () => storage.list(),
+  'storage:upsert': async ({ conn, secretAccessKey }) => storage.upsert(conn, secretAccessKey),
+  'storage:remove': async ({ storageId }) => storage.remove(storageId),
+  'storage:test': async ({ storageId }) => storage.test(storageId),
+  'storage:objects': async ({ storageId, prefix, limit }) =>
+    storage.objects(storageId, prefix ?? '', limit ?? 200),
+
+  /* --- backups --- */
+  'backups:list': async ({ id }) => backups.list(id),
+  'backups:run': async ({ id, ...options }) => backups.run(id, options, { trigger: 'manual' }),
+  'backups:remove': async ({ backupId, deleteFile }) => backups.remove(backupId, deleteFile),
+  'backups:reveal': async ({ backupId }) => {
+    const record = backups.get(backupId)
+    if (!record.path) throw new Error('This backup has no local file')
+    shell.showItemInFolder(record.path)
+  },
+  'backups:upload': async ({ backupId, storageId }) => backups.upload(backupId, storageId),
+  'backups:restore': async (options) => {
+    const record = backups.get(options.backupId)
+    const result = await backups.restore(options)
+    // The restored database is a different database — pooled connections and the
+    // cached column metadata are both looking at the old one.
+    if (result.ok) {
+      if (options.envId === null) sql.invalidate(record.projectId)
+      sql.introspect.forgetColumns(record.projectId, options.envId)
+    }
+    return result
+  },
+
+  /* --- scheduler jobs --- */
+  'jobs:list': async ({ id }) => scheduler.list(id),
+  'jobs:upsert': async ({ job }) => scheduler.upsert(job),
+  'jobs:remove': async ({ jobId }) => scheduler.remove(jobId),
+  'jobs:setEnabled': async ({ jobId, enabled }) => scheduler.setEnabled(jobId, enabled),
+  'jobs:runNow': async ({ jobId }) => scheduler.runJob(jobId),
 
   /* --- sistem --- */
   'system:doctor': async () => stack.doctor(),
@@ -249,11 +298,18 @@ export function registerIpc(): void {
   }
 }
 
-/** Wire the log bus to every window. */
+/** Wire the log bus and the background workers to every window. */
 export function pipeEvents(): void {
-  logBus.on('line', (line) => {
+  const broadcast = (event: string, payload: unknown): void => {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('log:line', line)
+      if (!win.isDestroyed()) win.webContents.send(event, payload)
     }
-  })
+  }
+  logBus.on('line', (line) => broadcast('log:line', line))
+  // A backup or a job can start without anyone clicking anything — the screens
+  // that show them need to hear about it.
+  backups.backupBus.on('changed', (projectId: string) =>
+    broadcast('backups:changed', { projectId })
+  )
+  scheduler.jobBus.on('changed', (projectId: string) => broadcast('jobs:changed', { projectId }))
 }

@@ -7,6 +7,8 @@ import type {
   AuthUsersPage,
   AuthUsersQuery,
   BackupInfo,
+  BackupOptions,
+  BackupRecord,
   DbCells,
   DbColumn,
   DbCompletion,
@@ -23,16 +25,24 @@ import type {
   FunctionDiff,
   FunctionInfo,
   HealthReport,
+  Job,
+  JobInput,
   LogLine,
   MigrationReport,
   PatchPreview,
   PortConflict,
   Project,
   RemoteEnv,
+  RestoreOptions,
+  RestoreResult,
   RemoteService,
   SavedQuery,
   SqlRun,
   StackStatus,
+  StorageConnection,
+  StorageConnectionInput,
+  StorageObject,
+  StorageTestReport,
   SyncReport,
   TaskResult,
   VerifyReport
@@ -206,6 +216,55 @@ export interface IpcContract {
   'auth:users': { req: { id: string } & AuthUsersQuery; res: AuthUsersPage }
   /** One user with metadata and identities, for the detail panel */
   'auth:user': { req: { id: string; envId: string | null; userId: string }; res: AuthUserDetail }
+  /** Ban (a far-future `banned_until`) or lift a ban; a ban also drops sessions */
+  'auth:setBanned': {
+    req: { id: string; envId: string | null; userId: string; banned: boolean }
+    res: { bannedUntil: string | null }
+  }
+  /** Delete the user. Fails loudly if an application table still references them. */
+  'auth:deleteUser': {
+    req: { id: string; envId: string | null; userId: string }
+    res: { deleted: number }
+  }
+
+  /* --- storage connections (app-wide, not per project) --- */
+  'storage:list': { req: void; res: StorageConnection[] }
+  /** Create or update; the secret key is only sent when it changes. */
+  'storage:upsert': {
+    req: { conn: StorageConnectionInput; secretAccessKey?: string }
+    res: StorageConnection
+  }
+  'storage:remove': { req: { storageId: string }; res: void }
+  /** Signs a real request against the bucket — credentials are checked, not guessed. */
+  'storage:test': { req: { storageId: string }; res: StorageTestReport }
+  'storage:objects': {
+    req: { storageId: string; prefix?: string; limit?: number }
+    res: StorageObject[]
+  }
+
+  /* --- backups --- */
+  /** Every backup of this project, newest first. */
+  'backups:list': { req: { id: string }; res: BackupRecord[] }
+  /** Take one now — the same engine the scheduler uses. */
+  'backups:run': { req: { id: string } & BackupOptions; res: BackupRecord }
+  'backups:remove': { req: { id: string; backupId: string; deleteFile: boolean }; res: void }
+  /** Show the dump in Finder / Explorer. */
+  'backups:reveal': { req: { backupId: string }; res: void }
+  /** Re-upload a kept local dump to a storage connection. */
+  'backups:upload': { req: { backupId: string; storageId: string }; res: BackupRecord }
+  /**
+   * Load a dump into a database. Destructive: `confirm` must be the target
+   * environment's name. A failed restore comes back in `res.error`, not as a throw.
+   */
+  'backups:restore': { req: RestoreOptions; res: RestoreResult }
+
+  /* --- scheduler jobs --- */
+  'jobs:list': { req: { id: string }; res: Job[] }
+  'jobs:upsert': { req: { job: JobInput }; res: Job }
+  'jobs:remove': { req: { jobId: string }; res: void }
+  'jobs:setEnabled': { req: { jobId: string; enabled: boolean }; res: Job }
+  /** Run a job right now, outside its schedule. */
+  'jobs:runNow': { req: { jobId: string }; res: BackupRecord }
 
   /* --- sistem --- */
   'system:doctor': {
@@ -228,6 +287,10 @@ export type IpcRes<C extends IpcChannel> = IpcContract[C]['res']
 export interface IpcEvents {
   'log:line': LogLine
   'stack:changed': { projectId: string }
+  /** A backup started, finished or was deleted — the Backups screen reloads. */
+  'backups:changed': { projectId: string }
+  /** A job was saved, removed, or its run state changed. */
+  'jobs:changed': { projectId: string }
   'task:progress': { stream: string; step: string; pct: number | null }
 }
 
@@ -295,8 +358,32 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'db:deleteRows',
   'auth:users',
   'auth:user',
+  'auth:setBanned',
+  'auth:deleteUser',
+  'storage:list',
+  'storage:upsert',
+  'storage:remove',
+  'storage:test',
+  'storage:objects',
+  'backups:list',
+  'backups:run',
+  'backups:remove',
+  'backups:reveal',
+  'backups:upload',
+  'backups:restore',
+  'jobs:list',
+  'jobs:upsert',
+  'jobs:remove',
+  'jobs:setEnabled',
+  'jobs:runNow',
   'system:doctor',
   'system:setTheme'
 ]
 
-export const IPC_EVENTS: IpcEventName[] = ['log:line', 'stack:changed', 'task:progress']
+export const IPC_EVENTS: IpcEventName[] = [
+  'log:line',
+  'stack:changed',
+  'task:progress',
+  'backups:changed',
+  'jobs:changed'
+]

@@ -12,6 +12,7 @@ const en = {
     cancel: 'Cancel',
     save: 'Save',
     delete: 'Delete',
+    edit: 'Edit',
     loading: 'loading',
     checking: 'checking',
     add: 'Add'
@@ -27,6 +28,7 @@ const en = {
       migrations: 'Migrations',
       functions: 'Functions',
       sync: 'Sync / Deploy',
+      backups: 'Backups',
       settings: 'Settings'
     },
     sidebar: {
@@ -193,6 +195,18 @@ const en = {
     userMetadata: 'User metadata',
     appMetadata: 'App metadata',
     empty: 'empty',
+    action: { ban: 'Ban', unban: 'Unban', menu: 'Actions for {user}' },
+    confirm: {
+      banTitle: 'Ban {user}?',
+      banBody:
+        'New sign-ins and token refreshes will be rejected, and the sessions they have open now are dropped. An access token already issued keeps working until it expires. Reversible at any time.',
+      unbanTitle: 'Unban {user}?',
+      unbanBody: 'They will be able to sign in again straight away.',
+      deleteTitle: 'Delete {user}?',
+      deleteBody:
+        'The user, their identities and their sessions are removed for good. If one of your own tables still references them without ON DELETE CASCADE, the delete is refused and nothing changes.',
+      target: 'Target: {env}'
+    },
     column: {
       user: 'User',
       providers: 'Providers',
@@ -747,6 +761,157 @@ const en = {
     default: 'default',
     deleteConfirmTitle: 'Delete {count} row(s)?',
     irreversible: 'This action can’t be undone.'
+  },
+  backups: {
+    title: 'Backups',
+    subtitle: 'Dumps of the local stack, managed and self-hosted environments',
+    take: 'Back up now',
+    taking: 'Backing up…',
+    target: 'Environment',
+    localTarget: 'Local stack',
+    scope: {
+      label: 'Scope',
+      full: 'Full (schema + data)',
+      schema: 'Schema only',
+      data: 'Data only'
+    },
+    destination: {
+      label: 'Storage',
+      none: 'Local file only'
+    },
+    keepLocal: 'Keep the local copy after upload',
+    count: '{count} backup(s)',
+    empty: 'No backups yet.',
+    status: {
+      running: 'running',
+      ok: 'done',
+      failed: 'failed'
+    },
+    trigger: {
+      manual: 'manual',
+      job: 'job'
+    },
+    localOnly: 'local only',
+    fileGone: 'local file removed',
+    reveal: 'Show in folder',
+    restore: 'Restore',
+    restoreTitle: 'Restore from backup',
+    restoreTarget: 'Restore into',
+    restoreSource: 'Source',
+    restoreClean: 'Drop existing objects first (--clean --if-exists)',
+    restoreWarning:
+      'A restore overwrites the target database and cannot be undone. Type the target’s name to continue.',
+    restoreConfirm: 'Type «{name}» to confirm',
+    restoreFromStorage: 'No local file — the dump will be pulled from the bucket first.',
+    restoreRunning: 'Restoring…',
+    restoreWarnings: '{count} statement(s) reported an error — read the output',
+    restoreOk: 'Restored into «{name}» ({count}s)',
+    restoreManagedNote:
+      'A managed project only takes a plain «.sql» dump through the Management API — a large dump needs psql.',
+    openSettings: 'Settings → Storage',
+    upload: 'Upload',
+    uploadTitle: 'Upload to storage',
+    remove: 'Delete',
+    removeTitle: 'Delete this backup?',
+    removeHint:
+      'The record leaves the list. Tick the box to delete the file and the bucket object as well.',
+    removeFiles: 'Delete the file and the bucket object too',
+    noStorage: 'No storage connected — add R2 in Settings.',
+    seconds: '{count}s',
+    restoreHint:
+      'Restore with `pg_restore -d <db> file.dump` (custom format) or `psql -f file.sql` (plain).'
+  },
+  jobs: {
+    title: 'Scheduler jobs',
+    subtitle: 'Automatic backups — they run while Locabase is open',
+    new: 'New job',
+    edit: 'Edit',
+    empty: 'No jobs yet — create one for a nightly backup.',
+    runNow: 'Run now',
+    running: 'running',
+    next: 'next: {time}',
+    last: 'last: {time}',
+    never: 'never',
+    off: 'off',
+    removeTitle: 'Delete «{name}»?',
+    removeHint: 'Backups already taken are untouched — only the schedule goes.',
+    status: {
+      ok: 'ok',
+      failed: 'failed'
+    },
+    schedule: {
+      interval: 'every {count} min',
+      daily: 'daily at {time}',
+      weekly: '{day} at {time}',
+      cron: 'cron: {expr}'
+    },
+    weekday: {
+      sun: 'Sunday',
+      mon: 'Monday',
+      tue: 'Tuesday',
+      wed: 'Wednesday',
+      thu: 'Thursday',
+      fri: 'Friday',
+      sat: 'Saturday'
+    },
+    form: {
+      title: 'Scheduler job',
+      name: 'Name',
+      namePlaceholder: 'Nightly backup — prod',
+      target: 'Environment',
+      schedule: 'Schedule',
+      kind: {
+        interval: 'Interval',
+        daily: 'Daily',
+        weekly: 'Weekly',
+        cron: 'Cron'
+      },
+      everyMinutes: 'Every N minutes',
+      time: 'Time (HH:MM)',
+      weekday: 'Weekday',
+      cron: 'Cron expression',
+      cronHint: 'Five fields: minute hour day-of-month month day-of-week. Example: 0 3 * * *',
+      scope: 'Scope',
+      storage: 'Storage',
+      keepLocal: 'Keep the local file',
+      retentionDays: 'Keep for N days',
+      retentionCount: 'Keep N backups',
+      retentionHint:
+        '0 = no limit. Retention deletes the local file and the bucket object; the newest successful backup is never deleted.',
+      enabled: 'Enabled',
+      save: 'Save'
+    }
+  },
+  storage: {
+    title: 'Storage connections',
+    subtitle: 'Object storage for backups (and whatever comes next). Cloudflare R2 for now.',
+    add: 'Connect storage',
+    empty: 'No connections yet.',
+    test: 'Test',
+    testing: 'testing…',
+    remove: 'Delete',
+    removeTitle: 'Delete «{name}»?',
+    removeHint: 'Files in the bucket are untouched — only the connection and its key go.',
+    hasSecret: 'key stored',
+    missingSecret: 'key missing',
+    provider: {
+      r2: 'Cloudflare R2'
+    },
+    form: {
+      title: 'Storage connection',
+      name: 'Name',
+      namePlaceholder: 'R2 — backups',
+      provider: 'Provider',
+      accountId: 'Account ID',
+      accountIdHint: 'Cloudflare → R2 → «Use R2 with APIs» shows the account id',
+      bucket: 'Bucket',
+      accessKeyId: 'Access Key ID',
+      secretAccessKey: 'Secret Access Key',
+      secretKept: 'leave empty to keep the stored key',
+      prefix: 'Prefix',
+      prefixHint: 'A folder inside the bucket, e.g. locabase/backups. May be empty.',
+      save: 'Save'
+    }
   }
 } satisfies Dict
 
