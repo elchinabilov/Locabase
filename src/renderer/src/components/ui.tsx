@@ -1,7 +1,7 @@
 import type { ReactNode, InputHTMLAttributes, ButtonHTMLAttributes } from 'react'
 import { useEffect, useRef } from 'react'
 import { cx } from '../lib/format'
-import { useT } from '../i18n'
+import { useI18n, useT } from '../i18n'
 
 /* ------------------------------------------------------------------ Button */
 
@@ -303,6 +303,47 @@ export function Row({
     </div>
   )
 }
+
+/* ------------------------------------------------------------------- Pager */
+
+export function Pager({
+  page,
+  pageSize,
+  count,
+  total,
+  onPage
+}: {
+  page: number
+  pageSize: number
+  count: number
+  total: number | null
+  onPage: (p: number) => void
+}): ReactNode {
+  const { locale } = useI18n()
+  const from = count === 0 ? 0 : page * pageSize + 1
+  const to = page * pageSize + count
+  const last = total !== null && to >= total
+  return (
+    <div className="flex items-center gap-1.5 text-small text-muted">
+      <Button disabled={page === 0} onClick={() => onPage(page - 1)}>
+        ‹
+      </Button>
+      <span className="tabular-nums">
+        {from}–{to}
+        {total !== null && ` / ${formatCount(total, locale)}`}
+      </span>
+      <Button disabled={count < pageSize || last} onClick={() => onPage(page + 1)}>
+        ›
+      </Button>
+    </div>
+  )
+}
+
+/** Thousands separators follow the interface language, not the system locale. */
+export function formatCount(n: number, locale: 'az' | 'en'): string {
+  return n.toLocaleString(locale === 'az' ? 'az-AZ' : 'en-US')
+}
+
 
 /* ---------------------------------------------------------------- Skeleton */
 

@@ -3,6 +3,9 @@
  * live here, in one place — the main handler and the renderer call see the same type.
  */
 import type {
+  AuthUserDetail,
+  AuthUsersPage,
+  AuthUsersQuery,
   BackupInfo,
   DbCells,
   DbColumn,
@@ -198,6 +201,12 @@ export interface IpcContract {
     res: { deleted: number }
   }
 
+  /* --- auth --- */
+  /** The GoTrue user table, filtered and paged */
+  'auth:users': { req: { id: string } & AuthUsersQuery; res: AuthUsersPage }
+  /** One user with metadata and identities, for the detail panel */
+  'auth:user': { req: { id: string; envId: string | null; userId: string }; res: AuthUserDetail }
+
   /* --- sistem --- */
   'system:doctor': {
     req: void
@@ -284,6 +293,8 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'db:insertRow',
   'db:updateRow',
   'db:deleteRows',
+  'auth:users',
+  'auth:user',
   'system:doctor',
   'system:setTheme'
 ]

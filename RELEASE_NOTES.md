@@ -23,6 +23,15 @@ minor number moves and the major stays put (semver).
   seam back where it started. The query list keeps its width in pixels and the
   results pane keeps its share of the height, so a resized window doesn't undo
   the layout. Every size is remembered between launches.
+- **Authentication → Users.** The Auth screen is now a section with its own two
+  pages, like the Supabase dashboard: **Users**, which lists everyone in
+  `auth.users`, and **Sign In / Providers**, which is the provider configuration
+  that used to be the whole screen. The user list has search across email, phone
+  and UID, filters by provider and by status (confirmed, unconfirmed, anonymous,
+  banned), five sort orders, paging, and a column showing which provider each
+  user signed up through. Clicking a row opens their identities and their app /
+  user metadata. It reads the local stack or any remote environment, and it is
+  read-only — creating and deleting users belongs to the admin API.
 
 ## Changed
 
@@ -37,6 +46,8 @@ minor number moves and the major stays put (semver).
   lights follow the theme too.
 - **The SQL editor follows the theme.** CodeMirror is reconfigured in place on a
   switch, so the document, the undo history and the cursor all survive it.
+- **"Auth" is now "Authentication"** in the sidebar, and the old screen lives on
+  as its "Sign In / Providers" page.
 - **Text sizes are a named ladder.** The ~200 one-off pixel sizes scattered
   through the components are now ten named steps (`text-micro` … `text-h1`),
   each a multiple of one variable — which is what makes a single text-size

@@ -23,6 +23,7 @@ import { logBus as bus } from '../core/log.js'
 import type { EnvEntry } from '@shared/types.js'
 import { scanToml } from '../core/toml/scan.js'
 import * as prefs from '../core/prefs.js'
+import * as authUsers from '../core/sql/authusers.js'
 import { readFileSync } from 'node:fs'
 
 type Handlers = { [C in IpcChannel]: (req: IpcContract[C]['req']) => Promise<IpcContract[C]['res']> }
@@ -212,6 +213,8 @@ const handlers: Handlers = {
     sql.introspect.columns(id, envId, schema, table),
   'db:completion': async ({ id, envId }) => sql.introspect.completion(id, envId),
   'db:rows': async ({ id, ...req }) => sql.selectRows(id, req),
+  'auth:users': async ({ id, ...req }) => authUsers.users(id, req),
+  'auth:user': async ({ id, envId, userId }) => authUsers.user(id, envId, userId),
   'db:insertRow': async ({ id, envId, schema, table, values }) =>
     sql.insertRow(id, envId, schema, table, values),
   'db:updateRow': async ({ id, envId, schema, table, pk, patch }) =>

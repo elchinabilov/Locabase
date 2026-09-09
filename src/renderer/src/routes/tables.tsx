@@ -17,10 +17,12 @@ import {
   ErrorNote,
   Input,
   Modal,
+  Pager,
   Select,
   SkeletonRows,
   SkeletonTable,
-  Toggle
+  Toggle,
+  formatCount
 } from '../components/ui'
 import { DataGrid, type GridSort } from '../components/data-grid'
 import { EnvPicker, RemoteNote, envOf, useDbGate } from '../components/env-picker'
@@ -459,38 +461,6 @@ function RowsPane({
   )
 }
 
-function Pager({
-  page,
-  pageSize,
-  count,
-  total,
-  onPage
-}: {
-  page: number
-  pageSize: number
-  count: number
-  total: number | null
-  onPage: (p: number) => void
-}): ReactNode {
-  const { locale } = useI18n()
-  const from = count === 0 ? 0 : page * pageSize + 1
-  const to = page * pageSize + count
-  const last = total !== null && to >= total
-  return (
-    <div className="flex items-center gap-1.5 text-small text-muted">
-      <Button disabled={page === 0} onClick={() => onPage(page - 1)}>
-        ‹
-      </Button>
-      <span className="tabular-nums">
-        {from}–{to}
-        {total !== null && ` / ${formatCount(total, locale)}`}
-      </span>
-      <Button disabled={count < pageSize || last} onClick={() => onPage(page + 1)}>
-        ›
-      </Button>
-    </div>
-  )
-}
 
 function FilterBar({
   columns,
@@ -874,8 +844,4 @@ export function pkCells(columns: DbColumn[], row: DbRow): DbCells {
 function shortType(c: DbColumn): string {
   const pk = c.pkOrd !== null ? '🔑' : ''
   return `${pk}${c.dataType}`
-}
-
-function formatCount(n: number, locale: 'az' | 'en'): string {
-  return n.toLocaleString(locale === 'az' ? 'az-AZ' : 'en-US')
 }

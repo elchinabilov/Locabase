@@ -20,7 +20,7 @@ const en = {
     nav: {
       dashboard: 'Overview',
       config: 'Configuration',
-      auth: 'Auth',
+      auth: 'Authentication',
       tables: 'Tables',
       sql: 'SQL',
       secrets: 'Secrets',
@@ -177,14 +177,66 @@ const en = {
       genericError: 'Failed'
     }
   },
+  authUsers: {
+    title: 'Users',
+    searchPlaceholder: 'Email, phone or UID…',
+    allProviders: 'All providers',
+    noIdentifier: 'no email or phone',
+    noUsers: 'No users yet',
+    noUsersHint: 'Everyone who signs up through Auth shows up here.',
+    noMatches: 'Nothing matches these filters',
+    noMatchesHint: 'Clear the search or widen the filters.',
+    detailTitle: 'User',
+    copyUid: 'Copy UID',
+    identities: 'Identities',
+    noIdentities: 'This user has no identity row — created through the admin API, most likely.',
+    userMetadata: 'User metadata',
+    appMetadata: 'App metadata',
+    empty: 'empty',
+    column: {
+      user: 'User',
+      providers: 'Providers',
+      status: 'Status',
+      created: 'Created',
+      lastSignIn: 'Last sign in',
+      uid: 'UID'
+    },
+    field: {
+      email: 'Email',
+      phone: 'Phone',
+      confirmed: 'Confirmed',
+      providerId: 'Provider ID'
+    },
+    badge: {
+      banned: 'banned',
+      unconfirmed: 'unconfirmed',
+      anonymous: 'anonymous'
+    },
+    status: {
+      all: 'All users',
+      confirmed: 'Confirmed',
+      unconfirmed: 'Unconfirmed',
+      anonymous: 'Anonymous',
+      banned: 'Banned'
+    },
+    sort: {
+      createdDesc: 'Newest first',
+      createdAsc: 'Oldest first',
+      signinDesc: 'Recently active',
+      signinAsc: 'Least recently active',
+      emailAsc: 'Email A→Z'
+    }
+  },
   auth: {
-    title: 'Auth providers',
+    resizeSidebar: 'Resize the section list',
+    section: { users: 'Users', providers: 'Sign In / Providers' },
+    title: 'Authentication',
     changeCount: '{count} change(s)',
     saveEllipsis: 'Save…',
     copied: 'copied ✓',
     callbackHint:
       'Paste this URL into the provider console (Google Cloud Console → Credentials, GitHub → OAuth Apps, LinkedIn → Auth). It changes when the local port changes — remember to update it on the provider side too.',
-    providers: 'Providers',
+    providers: 'Sign In / Providers',
     activeCount: '{active} active / {total}',
     noKey: 'no key',
     collapse: 'collapse',

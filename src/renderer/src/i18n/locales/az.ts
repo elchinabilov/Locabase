@@ -17,7 +17,7 @@ const az = {
     nav: {
       dashboard: 'Ümumi',
       config: 'Konfiqurasiya',
-      auth: 'Auth',
+      auth: 'Authentication',
       tables: 'Cədvəllər',
       sql: 'SQL',
       secrets: 'Secrets',
@@ -174,14 +174,66 @@ const az = {
       genericError: 'Uğursuz oldu'
     }
   },
+  authUsers: {
+    title: 'İstifadəçilər',
+    searchPlaceholder: 'Email, telefon və ya UID…',
+    allProviders: 'Bütün provayderlər',
+    noIdentifier: 'email və telefon yoxdur',
+    noUsers: 'Hələ istifadəçi yoxdur',
+    noUsersHint: 'Auth vasitəsilə qeydiyyatdan keçən hər kəs burada görünür.',
+    noMatches: 'Bu filtrlərə uyğun nəticə yoxdur',
+    noMatchesHint: 'Axtarışı təmizlə və ya filtrləri genişləndir.',
+    detailTitle: 'İstifadəçi',
+    copyUid: 'UID-i kopyala',
+    identities: 'Kimliklər',
+    noIdentities: 'Bu istifadəçinin identity sətri yoxdur — çox güman admin API ilə yaradılıb.',
+    userMetadata: 'İstifadəçi metadata',
+    appMetadata: 'Tətbiq metadata',
+    empty: 'boş',
+    column: {
+      user: 'İstifadəçi',
+      providers: 'Provayderlər',
+      status: 'Status',
+      created: 'Yaradılıb',
+      lastSignIn: 'Son giriş',
+      uid: 'UID'
+    },
+    field: {
+      email: 'Email',
+      phone: 'Telefon',
+      confirmed: 'Təsdiqlənib',
+      providerId: 'Provayder ID'
+    },
+    badge: {
+      banned: 'bloklanıb',
+      unconfirmed: 'təsdiqlənməyib',
+      anonymous: 'anonim'
+    },
+    status: {
+      all: 'Bütün istifadəçilər',
+      confirmed: 'Təsdiqlənmiş',
+      unconfirmed: 'Təsdiqlənməmiş',
+      anonymous: 'Anonim',
+      banned: 'Bloklanmış'
+    },
+    sort: {
+      createdDesc: 'Əvvəlcə yenilər',
+      createdAsc: 'Əvvəlcə köhnələr',
+      signinDesc: 'Son aktivlər',
+      signinAsc: 'Ən az aktivlər',
+      emailAsc: 'Email A→Z'
+    }
+  },
   auth: {
-    title: 'Auth providerlər',
+    resizeSidebar: 'Bölmə siyahısının enini dəyiş',
+    section: { users: 'İstifadəçilər', providers: 'Giriş / Provayderlər' },
+    title: 'Authentication',
     changeCount: '{count} dəyişiklik',
     saveEllipsis: 'Yadda saxla…',
     copied: 'kopyalandı ✓',
     callbackHint:
       'Bu ünvan provider konsoluna yapışdırılır (Google Cloud Console → Credentials, GitHub → OAuth Apps, LinkedIn → Auth). Lokal port dəyişəndə bu URL də dəyişir — provider tərəfdə də yeniləməyi unutma.',
-    providers: 'Providerlər',
+    providers: 'Giriş / Provayderlər',
     activeCount: '{active} aktiv / {total}',
     noKey: 'açar yoxdur',
     collapse: 'bağla',
