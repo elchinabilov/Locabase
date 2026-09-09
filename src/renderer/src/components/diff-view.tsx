@@ -20,18 +20,18 @@ export function DiffView({
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border border-line bg-[#0d141b] py-1 font-mono text-[11.5px] leading-[1.6]">
+    <div className="overflow-x-auto rounded-md border border-line bg-sunken py-1 font-mono text-[11.5px] leading-[1.6]">
       {lines.map((l, i) => (
         <div
           key={i}
           className={cx(
             'flex gap-3 px-2 whitespace-pre',
-            l.kind === 'add' && 'bg-[#0f2a20] text-accent',
-            l.kind === 'del' && 'bg-[#241417] text-[#e79a9a]',
-            l.kind === 'gap' && 'text-[#3f4f5f]'
+            l.kind === 'add' && 'bg-accent-bg text-accent',
+            l.kind === 'del' && 'bg-danger-tint text-danger-soft',
+            l.kind === 'gap' && 'text-dimmer'
           )}
         >
-          <span className="w-9 shrink-0 text-right text-[#3f4f5f] select-none">
+          <span className="w-9 shrink-0 text-right text-dimmer select-none">
             {l.kind === 'gap' ? '' : (l.b ?? l.a ?? '')}
           </span>
           <span className="w-3 shrink-0 select-none">

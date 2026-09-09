@@ -8,10 +8,10 @@ import { useT } from '../i18n'
 type Variant = 'primary' | 'ghost' | 'danger' | 'subtle'
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-accent text-[#062018] hover:bg-[#4ee0a0] border-transparent font-medium',
-  subtle: 'bg-panel-2 text-text hover:bg-[#1d2a37] border-line',
+  primary: 'bg-accent text-accent-fg hover:bg-accent-hover border-transparent font-medium',
+  subtle: 'bg-panel-2 text-text hover:bg-panel-3 border-line',
   ghost: 'bg-transparent text-muted hover:text-text hover:bg-panel-2 border-transparent',
-  danger: 'bg-transparent text-danger hover:bg-[#2a1618] border-[#3a1f22]'
+  danger: 'bg-transparent text-danger hover:bg-danger-bg border-danger-border'
 }
 
 export function Button({
@@ -85,11 +85,11 @@ export function Badge({
   children: ReactNode
 }): ReactNode {
   const tones: Record<string, string> = {
-    muted: 'bg-[#1a242f] text-muted border-line',
-    ok: 'bg-[#0f2a20] text-accent border-[#1c4635]',
-    warn: 'bg-[#2b2312] text-warn border-[#4a3c17]',
-    danger: 'bg-[#2a1618] text-danger border-[#452023]',
-    info: 'bg-[#132335] text-info border-[#1d3a55]'
+    muted: 'bg-chip text-muted border-line',
+    ok: 'bg-accent-bg text-accent border-accent-border',
+    warn: 'bg-warn-chip text-warn border-warn-border',
+    danger: 'bg-danger-bg text-danger border-danger-border',
+    info: 'bg-info-bg text-info border-info-border'
   }
   return (
     <span
@@ -108,7 +108,7 @@ export function Dot({ tone }: { tone: 'ok' | 'warn' | 'danger' | 'muted' }): Rea
     ok: 'bg-accent',
     warn: 'bg-warn',
     danger: 'bg-danger',
-    muted: 'bg-[#3a4a5a]'
+    muted: 'bg-dimmer'
   }
   return <span className={cx('inline-block size-1.5 shrink-0 rounded-full', c[tone])} />
 }
@@ -123,8 +123,8 @@ export function Input({
     <input
       {...rest}
       className={cx(
-        'w-full rounded-md border border-line bg-[#0d141b] px-2 py-1.5 text-[12.5px] text-text',
-        'placeholder:text-[#54677a] focus:border-accent-dim focus:outline-none disabled:opacity-50',
+        'w-full rounded-md border border-line bg-sunken px-2 py-1.5 text-[12.5px] text-text',
+        'placeholder:text-faint focus:border-accent-dim focus:outline-none disabled:opacity-50',
         className
       )}
     />
@@ -160,8 +160,8 @@ export function Toggle({
       className={cx(
         'relative h-[18px] w-[32px] shrink-0 rounded-full border transition-colors disabled:opacity-40',
         on && 'border-accent-dim bg-accent-dim',
-        pending && 'border-[#4a3c17] bg-[#2b2312]',
-        !checked && 'border-line bg-[#0d141b]'
+        pending && 'border-warn-border bg-warn-chip',
+        !checked && 'border-line bg-sunken'
       )}
     >
       <span
@@ -170,7 +170,7 @@ export function Toggle({
           checked ? 'left-[16px]' : 'left-[2px]',
           on && 'bg-accent',
           pending && 'bg-warn',
-          !checked && 'bg-[#4a5b6c]'
+          !checked && 'bg-dim'
         )}
       />
     </button>
@@ -193,7 +193,7 @@ export function Select({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={cx(
-        'w-full rounded-md border border-line bg-[#0d141b] px-2 py-1.5 text-[12.5px] text-text',
+        'w-full rounded-md border border-line bg-sunken px-2 py-1.5 text-[12.5px] text-text',
         'focus:border-accent-dim focus:outline-none',
         className
       )}
@@ -235,7 +235,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-8"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--lb-overlay)] p-8"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -271,14 +271,14 @@ export function Empty({ title, hint }: { title: string; hint?: ReactNode }): Rea
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
       <p className="text-[13px] text-muted">{title}</p>
-      {hint && <div className="max-w-md text-[12px] text-[#5f7488]">{hint}</div>}
+      {hint && <div className="max-w-md text-[12px] text-faint">{hint}</div>}
     </div>
   )
 }
 
 export function ErrorNote({ children }: { children: ReactNode }): ReactNode {
   return (
-    <div className="rounded-md border border-[#452023] bg-[#1e1315] px-3 py-2 text-[12px] text-[#f2a0a0]">
+    <div className="rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-[12px] text-danger-soft">
       {children}
     </div>
   )

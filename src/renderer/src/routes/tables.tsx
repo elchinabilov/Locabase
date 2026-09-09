@@ -215,7 +215,7 @@ function TableItem({
       onClick={onClick}
       className={cx(
         'mb-0.5 flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left',
-        active ? 'bg-panel-2' : 'hover:bg-[#141d27]'
+        active ? 'bg-panel-2' : 'hover:bg-hover'
       )}
     >
       <Dot tone={table.editable ? 'ok' : 'muted'} />
@@ -334,7 +334,7 @@ function RowsPane({
         </div>
       )}
       {!editable && rows.data && (
-        <p className="border-b border-line-soft bg-[#1c1708] px-3 py-1.5 text-[11.5px] text-warn">
+        <p className="border-b border-line-soft bg-warn-bg px-3 py-1.5 text-[11.5px] text-warn">
           {t('tables.notEditable', { reason: rows.data.editableReason ?? '' })}
         </p>
       )}
@@ -715,7 +715,7 @@ function RowModal({
                     disabled={f.mode !== 'value'}
                     onChange={(e) => set(c.name, { text: e.target.value })}
                     rows={3}
-                    className="w-full rounded-md border border-line bg-[#0d141b] px-2 py-1.5 font-mono text-[12px] text-text focus:border-accent-dim focus:outline-none disabled:opacity-40"
+                    className="w-full rounded-md border border-line bg-sunken px-2 py-1.5 font-mono text-[12px] text-text focus:border-accent-dim focus:outline-none disabled:opacity-40"
                   />
                 ) : (
                   <Input
@@ -731,7 +731,7 @@ function RowModal({
                       type="checkbox"
                       checked={f.mode === 'null'}
                       onChange={(e) => set(c.name, { mode: e.target.checked ? 'null' : 'value' })}
-                      className="accent-[#3ecf8e]"
+                      className="accent-accent"
                     />
                     NULL
                   </label>
@@ -743,7 +743,7 @@ function RowModal({
                         onChange={(e) =>
                           set(c.name, { mode: e.target.checked ? 'default' : 'value' })
                         }
-                        className="accent-[#3ecf8e]"
+                        className="accent-accent"
                       />
                       {t('tables.default')} {c.defaultExpr ? `(${c.defaultExpr})` : ''}
                     </label>
@@ -792,7 +792,7 @@ function DeleteModal({
       }
     >
       <p className="mb-3 text-[12.5px] text-muted">{t('tables.irreversible')}</p>
-      <ul className="max-h-64 overflow-auto rounded-md border border-line bg-[#0d141b] p-2 font-mono text-[11.5px]">
+      <ul className="max-h-64 overflow-auto rounded-md border border-line bg-sunken p-2 font-mono text-[11.5px]">
         {rows.map((r, i) => (
           <li key={i} className="truncate py-0.5 text-muted">
             {JSON.stringify(pkCells(columns, r))}

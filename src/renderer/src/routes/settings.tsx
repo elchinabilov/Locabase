@@ -2,6 +2,94 @@ import type { ReactNode } from 'react'
 import { useQuery } from '../lib/ipc'
 import { Badge, Card, Select, Skeleton } from '../components/ui'
 import { LOCALES, useI18n } from '../i18n'
+import { cx } from '../lib/format'
+import { THEMES, useTheme, type ThemePreference } from '../theme'
+
+/**
+ * A segmented control rather than a dropdown: there are only three options, and
+ * each one shows the palette it selects — so the choice is visible before it is
+ * made. `system` shows both halves, because that is what it means.
+ */
+function ThemePicker(): ReactNode {
+  const { t } = useI18n()
+  const { theme, setTheme } = useTheme()
+  const label: Record<ThemePreference, string> = {
+    system: t('settings.appearance.system'),
+    light: t('settings.appearance.light'),
+    dark: t('settings.appearance.dark')
+  }
+  return (
+    <div role="radiogroup" aria-label={t('settings.appearance.subtitle')} className="flex gap-2">
+      {THEMES.map((id) => {
+        const active = theme === id
+        return (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => setTheme(id)}
+            className={cx(
+              'flex flex-1 flex-col items-start gap-2 rounded-md border px-3 py-2.5 text-left transition-colors',
+              active
+                ? 'border-accent-dim bg-accent-tint'
+                : 'border-line bg-sunken hover:border-accent-dim hover:bg-hover'
+            )}
+          >
+            <Swatch theme={id} />
+            <span className={cx('text-[12px]', active ? 'text-text' : 'text-muted')}>
+              {label[id]}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * A miniature window in the palette the option stands for. The colours are
+ * literal on purpose: a swatch has to show the *other* theme while the current
+ * one is on screen, so it cannot go through the themed tokens.
+ */
+function Swatch({ theme }: { theme: ThemePreference }): ReactNode {
+  const box = 'flex h-9 w-full overflow-hidden rounded border border-line'
+  if (theme === 'system') {
+    return (
+      <span className={box} aria-hidden>
+        <span className="w-1/2 border-r border-line bg-[#0b0f14]">
+          <span className="mt-1.5 ml-1.5 block h-1 w-6 rounded-full bg-[#3ecf8e]" />
+          <span className="mt-1 ml-1.5 block h-1 w-4 rounded-full bg-[#22303d]" />
+        </span>
+        <span className="w-1/2 bg-[#f2f5f8]">
+          <span className="mt-1.5 ml-1.5 block h-1 w-6 rounded-full bg-[#0e8a5f]" />
+          <span className="mt-1 ml-1.5 block h-1 w-4 rounded-full bg-[#cbd5df]" />
+        </span>
+      </span>
+    )
+  }
+  const dark = theme === 'dark'
+  return (
+    <span
+      className={cx(box, 'flex-col justify-start p-1.5')}
+      style={{ background: dark ? '#0b0f14' : '#f2f5f8' }}
+      aria-hidden
+    >
+      <span
+        className="block h-1 w-8 rounded-full"
+        style={{ background: dark ? '#3ecf8e' : '#0e8a5f' }}
+      />
+      <span
+        className="mt-1 block h-1 w-12 rounded-full"
+        style={{ background: dark ? '#22303d' : '#cbd5df' }}
+      />
+      <span
+        className="mt-1 block h-1 w-6 rounded-full"
+        style={{ background: dark ? '#1a242f' : '#dde4ea' }}
+      />
+    </span>
+  )
+}
 
 export function SettingsRoute(): ReactNode {
   const { t, locale, setLocale } = useI18n()
@@ -12,6 +100,12 @@ export function SettingsRoute(): ReactNode {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-3 p-4">
       <h1 className="text-[17px] font-medium">{t('settings.title')}</h1>
+
+      <Card title={t('settings.appearance.title')} subtitle={t('settings.appearance.subtitle')}>
+        <div className="px-3.5 py-3">
+          <ThemePicker />
+        </div>
+      </Card>
 
       <Card title={t('settings.language.title')}>
         <div className="px-3.5 py-3">

@@ -74,6 +74,13 @@ const en = {
   },
   settings: {
     title: 'Settings',
+    appearance: {
+      title: 'Appearance',
+      subtitle: 'Colour scheme',
+      system: 'Match system',
+      light: 'Light',
+      dark: 'Dark'
+    },
     language: {
       title: 'Language'
     },

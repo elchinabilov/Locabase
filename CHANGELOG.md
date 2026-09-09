@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] — 2026-09-08
+See `RELEASE_NOTES.md` for the entries queued for the next release.
+
+## [1.0.0] — 2026-09-08
 
 First public release.
 
@@ -50,5 +52,5 @@ First public release.
 - The table editor uses offset pagination, so far pages of large tables are slow.
 - Builds are unsigned and not notarized, and there is no auto-update.
 
-[Unreleased]: https://github.com/elchinabilov/Locabase/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/elchinabilov/Locabase/releases/tag/v0.2.0
+[Unreleased]: https://github.com/elchinabilov/Locabase/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/elchinabilov/Locabase/releases/tag/v1.0.0

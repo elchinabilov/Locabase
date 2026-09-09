@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { writeFileSync } from 'node:fs'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, shell } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { registerIpc, pipeEvents } from './ipc/router.js'
 import { stopAllTails } from './core/docker.js'
@@ -8,6 +8,7 @@ import { closeAll as closeSqlPools } from './core/sql/pool.js'
 import { migrateUserData } from './core/userdata.js'
 import { fixPath } from './core/env-path.js'
 import { logBus } from './core/log.js'
+import * as prefs from './core/prefs.js'
 
 // In dev the package name is used, in production `productName` — the name is
 // pinned here, before anything else, so both point at the same folder.
@@ -18,6 +19,9 @@ app.setName('Locabase')
 fixPath()
 
 function createWindow(): BrowserWindow {
+  // Set before the window exists, so the first frame is already the right
+  // colour — the renderer confirms the same choice a moment later.
+  nativeTheme.themeSource = prefs.theme()
   const win = new BrowserWindow({
     width: 1360,
     height: 900,
@@ -25,7 +29,7 @@ function createWindow(): BrowserWindow {
     minHeight: 640,
     show: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    backgroundColor: '#0b0f14',
+    backgroundColor: prefs.BACKGROUND[nativeTheme.shouldUseDarkColors ? 'dark' : 'light'],
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false,

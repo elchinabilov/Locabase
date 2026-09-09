@@ -140,7 +140,7 @@ export function FieldEditor({
     <div
       className={cx(
         'grid grid-cols-[minmax(200px,300px)_1fr] items-start gap-4 px-3.5 py-2.5',
-        dirty && 'bg-[#101c17]'
+        dirty && 'bg-accent-tint'
       )}
     >
       <div className="pt-1">
@@ -150,12 +150,12 @@ export function FieldEditor({
             <span className="size-1.5 rounded-full bg-accent" title={t('fieldEditor.changed')} />
           )}
           {absent && !dirty && (
-            <span className="text-[10px] text-[#54677a]" title={t('fieldEditor.defaultTitle')}>
+            <span className="text-[10px] text-faint" title={t('fieldEditor.defaultTitle')}>
               {t('fieldEditor.default')}
             </span>
           )}
         </div>
-        <div className="mt-0.5 font-mono text-[10.5px] text-[#54677a]">{field.path}</div>
+        <div className="mt-0.5 font-mono text-[10.5px] text-faint">{field.path}</div>
         {field.help && <p className="mt-1 text-[11.5px] leading-snug text-muted">{field.help}</p>}
       </div>
 
@@ -182,7 +182,7 @@ export function FieldEditor({
               className={cx(
                 'mt-1 rounded border px-1.5 py-0.5 text-[10.5px] whitespace-nowrap',
                 draft.kind === 'env'
-                  ? 'border-accent-dim bg-[#0f2a20] text-accent'
+                  ? 'border-accent-dim bg-accent-bg text-accent'
                   : 'border-line text-muted hover:text-text'
               )}
               title={t('fieldEditor.bindEnvTitle')}

@@ -54,7 +54,7 @@ export function RemoteNote({ env }: { env: RemoteEnv }): ReactNode {
       ? [t('envPicker.managedLine1'), t('envPicker.managedLine2')]
       : [t('envPicker.selfHostedLine1'), t('envPicker.selfHostedLine2')]
   return (
-    <p className="border-b border-line-soft bg-[#101d2b] px-3 py-1.5 text-[11px] leading-relaxed text-info">
+    <p className="border-b border-line-soft bg-info-bg px-3 py-1.5 text-[11px] leading-relaxed text-info">
       <b>{env.name}</b> — {lines.join(' ')} {t('envPicker.cancelHint')}
     </p>
   )

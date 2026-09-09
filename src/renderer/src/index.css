@@ -1,21 +1,171 @@
 @import 'tailwindcss';
 
-@theme {
-  --color-bg: #0b0f14;
-  --color-panel: #111820;
-  --color-panel-2: #161f29;
-  --color-line: #1e2a36;
-  --color-line-soft: #182430;
-  --color-text: #dbe4ee;
-  --color-muted: #7d8fa3;
-  --color-accent: #3ecf8e;
-  --color-accent-dim: #1c6b4c;
-  --color-warn: #f0b429;
-  --color-danger: #ef5f5f;
-  --color-info: #5aa9e6;
+/* ------------------------------------------------------------------ theme
+   Tailwind utilities point at CSS variables rather than at fixed values
+   (`@theme inline`), so swapping the palette below re-colours the whole app at
+   runtime — no rebuild, and no `dark:` prefix on every element.
+
+   `:root` carries dark (the historical default), `[data-theme='light']` swaps
+   it. `ThemeProvider` always writes a concrete value onto the attribute, so
+   "system" is resolved in JS and CSS only ever sees two states. */
+@theme inline {
+  --color-bg: var(--lb-bg);
+  --color-panel: var(--lb-panel);
+  --color-panel-2: var(--lb-panel-2);
+  --color-panel-3: var(--lb-panel-3);
+  --color-sunken: var(--lb-sunken);
+  --color-hover: var(--lb-hover);
+  --color-chip: var(--lb-chip);
+
+  --color-line: var(--lb-line);
+  --color-line-soft: var(--lb-line-soft);
+
+  --color-text: var(--lb-text);
+  --color-text-soft: var(--lb-text-soft);
+  --color-muted: var(--lb-muted);
+  --color-faint: var(--lb-faint);
+  --color-dim: var(--lb-dim);
+  --color-dimmer: var(--lb-dimmer);
+
+  --color-accent: var(--lb-accent);
+  --color-accent-hover: var(--lb-accent-hover);
+  --color-accent-fg: var(--lb-accent-fg);
+  --color-accent-dim: var(--lb-accent-dim);
+  --color-accent-border: var(--lb-accent-border);
+  --color-accent-bg: var(--lb-accent-bg);
+  --color-accent-tint: var(--lb-accent-tint);
+
+  --color-warn: var(--lb-warn);
+  --color-warn-bg: var(--lb-warn-bg);
+  --color-warn-chip: var(--lb-warn-chip);
+  --color-warn-border: var(--lb-warn-border);
+  --color-warn-dim: var(--lb-warn-dim);
+
+  --color-danger: var(--lb-danger);
+  --color-danger-bg: var(--lb-danger-bg);
+  --color-danger-border: var(--lb-danger-border);
+  --color-danger-soft: var(--lb-danger-soft);
+  --color-danger-tint: var(--lb-danger-tint);
+
+  --color-info: var(--lb-info);
+  --color-info-bg: var(--lb-info-bg);
+  --color-info-border: var(--lb-info-border);
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+/* ---------------------------------------------------------- dark (default) */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --lb-bg: #0b0f14;
+  --lb-panel: #111820;
+  --lb-panel-2: #161f29;
+  --lb-panel-3: #1d2a37;
+  --lb-sunken: #0d141b;
+  --lb-hover: #141d27;
+  --lb-chip: #1a242f;
+
+  --lb-line: #1e2a36;
+  --lb-line-soft: #182430;
+
+  --lb-text: #dbe4ee;
+  --lb-text-soft: #9fb3c6;
+  --lb-muted: #7d8fa3;
+  --lb-faint: #54677a;
+  --lb-dim: #4a5b6c;
+  --lb-dimmer: #3f4f5f;
+
+  --lb-accent: #3ecf8e;
+  --lb-accent-hover: #4ee0a0;
+  --lb-accent-fg: #062018;
+  --lb-accent-dim: #1c6b4c;
+  --lb-accent-border: #1c4635;
+  --lb-accent-bg: #0f2a20;
+  --lb-accent-tint: #101c17;
+
+  --lb-warn: #f0b429;
+  --lb-warn-bg: #211c10;
+  --lb-warn-chip: #2b2312;
+  --lb-warn-border: #4a3c17;
+  --lb-warn-dim: #8a7440;
+
+  --lb-danger: #ef5f5f;
+  --lb-danger-bg: #2a1618;
+  --lb-danger-border: #452023;
+  --lb-danger-soft: #e79a9a;
+  --lb-danger-tint: #241417;
+
+  --lb-info: #5aa9e6;
+  --lb-info-bg: #101d2b;
+  --lb-info-border: #1d3a55;
+
+  --lb-scroll-thumb: #22303d;
+  --lb-scroll-thumb-hover: #2c3d4d;
+  --lb-skeleton: #1a2430;
+  --lb-skeleton-sheen: rgba(125, 143, 163, 0.13);
+  --lb-selection: rgba(28, 107, 76, 0.4);
+  --lb-overlay: rgba(0, 0, 0, 0.55);
+}
+
+/* ------------------------------------------------------------------- light
+   Not an inversion: the greens are darkened until they carry on white (dark
+   mode's #3ecf8e reads at ~1.9:1 there), the surfaces stay near-neutral so the
+   accent keeps its meaning, and each status tint is the same hue laid thinly
+   over white. */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --lb-bg: #f2f5f8;
+  --lb-panel: #ffffff;
+  --lb-panel-2: #eef2f6;
+  --lb-panel-3: #e2e8ee;
+  --lb-sunken: #ffffff;
+  --lb-hover: #eff3f7;
+  --lb-chip: #eef2f6;
+
+  --lb-line: #d9e0e7;
+  --lb-line-soft: #e8edf2;
+
+  --lb-text: #17222e;
+  --lb-text-soft: #405061;
+  --lb-muted: #5d6f81;
+  --lb-faint: #78899b;
+  --lb-dim: #93a3b2;
+  --lb-dimmer: #aebbc7;
+
+  --lb-accent: #0e8a5f;
+  --lb-accent-hover: #0b7350;
+  --lb-accent-fg: #ffffff;
+  --lb-accent-dim: #5cc39b;
+  --lb-accent-border: #a8dfc7;
+  --lb-accent-bg: #e6f6ee;
+  --lb-accent-tint: #f1faf5;
+
+  --lb-warn: #92610a;
+  --lb-warn-bg: #fdf5e2;
+  --lb-warn-chip: #fbeccc;
+  --lb-warn-border: #e8d3a3;
+  --lb-warn-dim: #a98b52;
+
+  --lb-danger: #c23434;
+  --lb-danger-bg: #fdedec;
+  --lb-danger-border: #f2c5c3;
+  --lb-danger-soft: #9d2b2b;
+  --lb-danger-tint: #fdf0ef;
+
+  --lb-info: #1a6fbb;
+  --lb-info-bg: #eaf3fc;
+  --lb-info-border: #bcd8f2;
+
+  --lb-scroll-thumb: #c6d0da;
+  --lb-scroll-thumb-hover: #adbbc8;
+  --lb-skeleton: #e6ebf1;
+  --lb-skeleton-sheen: rgba(93, 111, 129, 0.16);
+  --lb-selection: rgba(14, 138, 95, 0.2);
+  --lb-overlay: rgba(23, 34, 46, 0.38);
 }
 
 * {
@@ -43,12 +193,12 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #22303d;
+  background: var(--lb-scroll-thumb);
   border-radius: 6px;
   border: 2px solid var(--color-bg);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2c3d4d;
+  background: var(--lb-scroll-thumb-hover);
 }
 ::-webkit-scrollbar-corner {
   background: transparent;
@@ -93,12 +243,12 @@ body {
   --sk-delay: 0ms;
   position: relative;
   border-radius: 4px;
-  background-color: #1a2430;
+  background-color: var(--lb-skeleton);
   background-image: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(125, 143, 163, 0.13) 45%,
-    rgba(125, 143, 163, 0.13) 55%,
+    var(--lb-skeleton-sheen) 45%,
+    var(--lb-skeleton-sheen) 55%,
     transparent 100%
   );
   background-size: 200% 100%;

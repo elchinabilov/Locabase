@@ -71,6 +71,13 @@ const az = {
   },
   settings: {
     title: 'Ayarlar',
+    appearance: {
+      title: 'Görünüş',
+      subtitle: 'Rəng sxemi',
+      system: 'Sistemə uyğun',
+      light: 'İşıqlı',
+      dark: 'Qaranlıq'
+    },
     language: {
       title: 'Dil'
     },

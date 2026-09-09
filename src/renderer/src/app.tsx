@@ -286,7 +286,7 @@ function ProjectItem({
       onClick={onClick}
       className={cx(
         'mb-0.5 flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors',
-        active ? 'bg-panel-2' : 'hover:bg-[#141d27]'
+        active ? 'bg-panel-2' : 'hover:bg-hover'
       )}
     >
       <Dot tone={unhealthy ? 'warn' : running ? 'ok' : 'muted'} />

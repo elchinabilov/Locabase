@@ -157,7 +157,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
               onClick={() => void load(q.name)}
               className={cx(
                 'mb-0.5 flex w-full items-center gap-1.5 rounded-md px-2.5 py-1.5 text-left text-[12px]',
-                q.name === activeName ? 'bg-panel-2 text-text' : 'text-muted hover:bg-[#141d27]'
+                q.name === activeName ? 'bg-panel-2 text-text' : 'text-muted hover:bg-hover'
               )}
             >
               <span className="min-w-0 flex-1 truncate">{q.name}</span>
@@ -184,7 +184,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
               type="checkbox"
               checked={readOnly}
               onChange={(e) => setReadOnly(e.target.checked)}
-              className="accent-[#3ecf8e]"
+              className="accent-accent"
             />
             {t('sql.readOnly')}
           </label>
@@ -226,7 +226,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
 
         {env && <RemoteNote env={env} />}
         {!readOnly && (
-          <p className="border-b border-line-soft bg-[#1c1708] px-3 py-1.5 text-[11.5px] text-warn">
+          <p className="border-b border-line-soft bg-warn-bg px-3 py-1.5 text-[11.5px] text-warn">
             {t('sql.writeModeOn', { target: env ? t('sql.writeModeTarget', { name: env.name }) : '' })}
           </p>
         )}

@@ -193,7 +193,7 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
                           <span className={cx('text-[12.5px]', on ? 'text-text' : 'text-muted')}>
                             {meta.label}
                           </span>
-                          <code className="font-mono text-[10.5px] text-[#54677a]">{meta.id}</code>
+                          <code className="font-mono text-[10.5px] text-faint">{meta.id}</code>
                           {on && !configured && <Badge tone="warn">{t('auth.noKey')}</Badge>}
                         </button>
                         <button
@@ -205,7 +205,7 @@ export function AuthRoute({ project }: { project: Project }): ReactNode {
                       </div>
 
                       {expanded && (
-                        <div className="border-t border-line-soft bg-[#0d141b] pb-2">
+                        <div className="border-t border-line-soft bg-sunken pb-2">
                           {PROVIDER_HINT_KEY[meta.id] && (
                             <p className="px-3.5 pt-2.5 text-[11.5px] leading-relaxed text-muted">
                               {t(PROVIDER_HINT_KEY[meta.id]!)}

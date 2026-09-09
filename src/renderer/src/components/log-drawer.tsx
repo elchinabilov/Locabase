@@ -10,8 +10,8 @@ const LEVEL_CLASS: Record<string, string> = {
   error: 'text-danger',
   warn: 'text-warn',
   info: 'text-info',
-  stderr: 'text-[#d9a3a3]',
-  stdout: 'text-[#9fb3c6]'
+  stderr: 'text-danger-soft',
+  stdout: 'text-text-soft'
 }
 
 export function LogDrawer({
@@ -62,7 +62,7 @@ export function LogDrawer({
           {t('logDrawer.title')}
         </button>
         {!open && unseen > 0 && (
-          <span className="rounded bg-[#1a242f] px-1.5 py-0.5 text-[10px] text-accent">
+          <span className="rounded bg-chip px-1.5 py-0.5 text-[10px] text-accent">
             {unseen}
           </span>
         )}
@@ -73,7 +73,7 @@ export function LogDrawer({
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder={t('logDrawer.filterPlaceholder')}
-              className="w-40 rounded border border-line bg-[#0d141b] px-2 py-1 text-[11.5px] outline-none focus:border-accent-dim"
+              className="w-40 rounded border border-line bg-sunken px-2 py-1 text-[11.5px] outline-none focus:border-accent-dim"
             />
             <button
               onClick={() => setLines([])}
@@ -97,8 +97,8 @@ export function LogDrawer({
           {shown.length === 0 && <p className="py-4 text-muted">{t('logDrawer.empty')}</p>}
           {shown.map((l, i) => (
             <div key={i} className="flex gap-2 whitespace-pre-wrap">
-              <span className="shrink-0 text-[#4a5b6c]">{clock(l.at, locale)}</span>
-              <span className="w-[120px] shrink-0 truncate text-[#5f7488]">{l.stream}</span>
+              <span className="shrink-0 text-dim">{clock(l.at, locale)}</span>
+              <span className="w-[120px] shrink-0 truncate text-faint">{l.stream}</span>
               <span className={cx('min-w-0 flex-1', LEVEL_CLASS[l.level] ?? '')}>{l.text}</span>
             </div>
           ))}

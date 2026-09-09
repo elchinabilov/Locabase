@@ -2,12 +2,12 @@
 
 ## Supported versions
 
-Locabase is pre-1.0. Only the latest release on `main` receives security fixes.
+Only the latest release receives security fixes.
 
 | Version | Supported |
 | --- | --- |
-| 0.2.x | ✅ |
-| < 0.2 | ❌ |
+| 1.0.x | ✅ |
+| < 1.0 | ❌ |
 
 ## Reporting a vulnerability
 

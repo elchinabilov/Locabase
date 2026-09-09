@@ -2,7 +2,7 @@
  * The IPC router. Every channel is one handler typed by `IpcContract`; an
  * exception thrown here shows up on the renderer side as `{ ok: false, error }`.
  */
-import { dialog, ipcMain, shell, BrowserWindow } from 'electron'
+import { dialog, ipcMain, nativeTheme, shell, BrowserWindow } from 'electron'
 import { IPC_CHANNELS, type IpcChannel, type IpcContract } from '@shared/ipc.js'
 import { logBus } from '../core/log.js'
 import * as projects from '../core/projects.js'
@@ -22,6 +22,7 @@ import { adapterFor } from '../core/remote/index.js'
 import { logBus as bus } from '../core/log.js'
 import type { EnvEntry } from '@shared/types.js'
 import { scanToml } from '../core/toml/scan.js'
+import * as prefs from '../core/prefs.js'
 import { readFileSync } from 'node:fs'
 
 type Handlers = { [C in IpcChannel]: (req: IpcContract[C]['req']) => Promise<IpcContract[C]['res']> }
@@ -219,7 +220,15 @@ const handlers: Handlers = {
     sql.deleteRows(id, envId, schema, table, pks),
 
   /* --- sistem --- */
-  'system:doctor': async () => stack.doctor()
+  'system:doctor': async () => stack.doctor(),
+  'system:setTheme': async ({ theme }) => {
+    nativeTheme.themeSource = theme
+    prefs.setTheme(theme)
+    // The window background is what shows through while a page loads or the
+    // window resizes — keep it on the same side as the palette.
+    const bg = prefs.BACKGROUND[nativeTheme.shouldUseDarkColors ? 'dark' : 'light']
+    for (const w of BrowserWindow.getAllWindows()) w.setBackgroundColor(bg)
+  }
 }
 
 export function registerIpc(): void {

@@ -238,7 +238,7 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
 
             <Axis title={t('sync.schema')} dirty={report.schema.dirty} error={report.schema.error}>
               {report.schema.dirty ? (
-                <pre className="max-h-56 overflow-auto px-3.5 py-2 font-mono text-[11px] whitespace-pre-wrap text-[#9fb3c6]">
+                <pre className="max-h-56 overflow-auto px-3.5 py-2 font-mono text-[11px] whitespace-pre-wrap text-text-soft">
                   {report.schema.items[0]?.sql.trim().slice(0, 4000)}
                 </pre>
               ) : (
@@ -468,7 +468,7 @@ function Pick({
         checked={checked}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
-        className="accent-[#3ecf8e]"
+        className="accent-accent"
       />
       <span className="min-w-0 flex-1 truncate text-[12px]">{label}</span>
       {right}
@@ -554,7 +554,7 @@ function DeployModal({
       </ol>
 
       {env.kind === 'managed' && plan.migrations.length > 0 && (
-        <p className="mb-3 rounded-md border border-[#4a3c17] bg-[#211c10] px-3 py-2 text-[11.5px] text-warn">
+        <p className="mb-3 rounded-md border border-warn-border bg-warn-bg px-3 py-2 text-[11.5px] text-warn">
           {t('sync.managedMigrationWarning')}
         </p>
       )}
@@ -565,7 +565,7 @@ function DeployModal({
       <Input value={text} onChange={(e) => setText(e.target.value)} autoFocus />
 
       {result && (
-        <p className="mt-3 rounded-md border border-[#1c4635] bg-[#0f2a20] px-3 py-2 text-[12px] text-accent">
+        <p className="mt-3 rounded-md border border-accent-border bg-accent-bg px-3 py-2 text-[12px] text-accent">
           {result}
         </p>
       )}

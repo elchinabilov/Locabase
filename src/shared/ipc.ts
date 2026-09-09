@@ -203,6 +203,12 @@ export interface IpcContract {
     req: void
     res: Array<{ label: string; ok: boolean; info: string }>
   }
+  /**
+   * Mirrors the interface theme onto Electron's `nativeTheme` — the title bar,
+   * the traffic lights and the native menus, which CSS cannot reach — and
+   * remembers it for the next launch's very first frame.
+   */
+  'system:setTheme': { req: { theme: 'system' | 'dark' | 'light' }; res: void }
 }
 
 export type IpcChannel = keyof IpcContract
@@ -278,7 +284,8 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'db:insertRow',
   'db:updateRow',
   'db:deleteRows',
-  'system:doctor'
+  'system:doctor',
+  'system:setTheme'
 ]
 
 export const IPC_EVENTS: IpcEventName[] = ['log:line', 'stack:changed', 'task:progress']

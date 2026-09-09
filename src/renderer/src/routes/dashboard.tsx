@@ -132,13 +132,13 @@ function ProjectView({
       {s?.error && !status.error && <ErrorNote>{s.error}</ErrorNote>}
 
       {mine.length > 0 && (
-        <div className="rounded-md border border-[#4a3c17] bg-[#211c10] px-3 py-2 text-[12px] text-warn">
+        <div className="rounded-md border border-warn-border bg-warn-bg px-3 py-2 text-[12px] text-warn">
           {t('dashboard.portConflict', { ports: mine.map((c) => c.port).join(', ') })}
         </div>
       )}
 
       {needsRestart && (
-        <div className="flex items-center gap-3 rounded-md border border-[#4a3c17] bg-[#211c10] px-3.5 py-2 text-[12px] text-warn">
+        <div className="flex items-center gap-3 rounded-md border border-warn-border bg-warn-bg px-3.5 py-2 text-[12px] text-warn">
           {t('dashboard.needsRestart.message')}
           <Button onClick={() => void act('restart')} loading={busy === 'restart'}>
             {t('dashboard.needsRestart.now')}
@@ -359,7 +359,7 @@ function Services({
                 members.map((m) => (
                   <div
                     key={m.container}
-                    className="flex items-center gap-2.5 border-t border-line-soft bg-[#0d141b] py-1.5 pr-3.5 pl-[52px]"
+                    className="flex items-center gap-2.5 border-t border-line-soft bg-sunken py-1.5 pr-3.5 pl-[52px]"
                   >
                     <Dot tone={m.state === 'running' ? 'ok' : 'muted'} />
                     <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted">
@@ -450,7 +450,7 @@ function QuickLinks({
           {LINKS.filter((l) => vars[l.key]).map((l) => (
             <li key={l.key} className="flex items-center gap-2 px-3.5 py-1.5">
               <span className="w-[104px] shrink-0 text-[12px] text-muted">{l.label}</span>
-              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[#9fb3c6]">
+              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-soft">
                 {l.key.endsWith('KEY') ? `${vars[l.key]!.slice(0, 18)}…` : vars[l.key]}
               </span>
               <button

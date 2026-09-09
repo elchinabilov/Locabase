@@ -72,7 +72,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
           {list.error && <ErrorNote>{list.error}</ErrorNote>}
 
           {envId && stale.length > 0 && (
-            <div className="rounded-md border border-[#1d3a55] bg-[#101d2a] px-3.5 py-2 text-[12px] text-info">
+            <div className="rounded-md border border-info-border bg-info-bg px-3.5 py-2 text-[12px] text-info">
               {t('functions.staleWarning', { count: stale.length, names: stale.map((f) => f.name).join(', ') })}
             </div>
           )}
@@ -95,7 +95,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
                       )}
                       {fn.remote?.version && <Badge tone="muted">v{fn.remote.version}</Badge>}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-3 font-mono text-[10.5px] text-[#54677a]">
+                    <div className="mt-0.5 flex items-center gap-3 font-mono text-[10.5px] text-faint">
                       {fn.path !== '' && (
                         <>
                           <span>{fn.entrypoint}</span>

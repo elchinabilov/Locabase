@@ -145,7 +145,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
                       key={r.version}
                       className={cx(
                         'border-b border-line-soft last:border-0',
-                        r.state !== 'synced' && 'bg-[#131a12]/40'
+                        r.state !== 'synced' && 'bg-accent-tint/40'
                       )}
                     >
                       <td className="px-3.5 py-1.5 font-mono text-[11.5px]">{r.version}</td>
@@ -193,7 +193,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
 
       {diff !== null && (
         <Modal wide title={t('migrations.diffTitle')} onClose={() => setDiff(null)}>
-          <pre className="overflow-auto rounded-md border border-line bg-[#0d141b] p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap">
+          <pre className="overflow-auto rounded-md border border-line bg-sunken p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap">
             {diff.trim() || t('diffView.noDiff')}
           </pre>
         </Modal>
@@ -225,11 +225,11 @@ function Cell({ on }: { on: boolean | null }): ReactNode {
   return (
     <td className="px-2 py-1.5 text-center">
       {on === null ? (
-        <span className="text-[#3f4f5f]">–</span>
+        <span className="text-dimmer">–</span>
       ) : on ? (
         <span className="text-accent">✓</span>
       ) : (
-        <span className="text-[#5a4a2a]">·</span>
+        <span className="text-warn-dim">·</span>
       )}
     </td>
   )

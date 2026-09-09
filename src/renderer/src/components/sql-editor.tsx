@@ -6,7 +6,7 @@
  * way the cursor stays put and the text doesn't jump.
  */
 import { useEffect, useRef, type ReactNode } from 'react'
-import { Compartment, EditorState, StateEffect, StateField } from '@codemirror/state'
+import { Compartment, EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { Decoration, EditorView, highlightSpecialChars, keymap, lineNumbers, type DecorationSet } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { bracketMatching, HighlightStyle, syntaxHighlighting } from '@codemirror/language'
@@ -15,20 +15,23 @@ import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { PostgreSQL, sql } from '@codemirror/lang-sql'
 import { tags as t } from '@lezer/highlight'
 import type { DbCompletion } from '@shared/types'
+import { useTheme } from '../theme'
 
 /**
  * The theme is NOT from `@codemirror/theme-one-dark`: that brings its own fixed
  * palette and clashes with the `@theme` tokens in `index.css`. The CSS variables
- * are read directly so the theme stays in sync automatically.
+ * are read directly, so light/dark follows the app with no second palette here.
+ * Only CodeMirror's own `dark` flag — which it uses for the bits it draws
+ * itself — has to be handed over, hence the argument and the compartment below.
  */
-const theme = EditorView.theme(
-  {
+function editorTheme(dark: boolean): Extension {
+  return EditorView.theme({
     '&': { backgroundColor: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '12.5px', height: '100%' },
     '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6' },
     '.cm-content': { padding: '10px 0' },
     '.cm-gutters': {
       backgroundColor: 'var(--color-panel)',
-      color: '#4a5b6c',
+      color: 'var(--color-dim)',
       border: 'none',
       borderRight: '1px solid var(--color-line)'
     },
@@ -37,7 +40,7 @@ const theme = EditorView.theme(
     '.cm-cursor': { borderLeftColor: 'var(--color-accent)' },
     '&.cm-focused': { outline: 'none' },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
-      backgroundColor: '#1c6b4c66'
+      backgroundColor: 'var(--lb-selection)'
     },
     '.cm-tooltip': {
       backgroundColor: 'var(--color-panel-2)',
@@ -52,9 +55,8 @@ const theme = EditorView.theme(
       textDecoration: 'underline wavy var(--color-danger)',
       textUnderlineOffset: '3px'
     }
-  },
-  { dark: true }
-)
+  }, { dark })
+}
 
 const highlight = syntaxHighlighting(
   HighlightStyle.define([
@@ -124,6 +126,10 @@ export function SqlEditor({
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
   const schemaComp = useRef(new Compartment()).current
+  const themeComp = useRef(new Compartment()).current
+  const { resolved } = useTheme()
+  const resolvedRef = useRef(resolved)
+  resolvedRef.current = resolved
 
   // Callbacks live in refs so the view is never rebuilt
   const runRef = useRef(onRun)
@@ -161,7 +167,7 @@ export function SqlEditor({
           EditorView.updateListener.of((u) => {
             if (u.docChanged) changeRef.current?.(u.state.doc.toString())
           }),
-          theme,
+          themeComp.of(editorTheme(resolvedRef.current === 'dark')),
           highlight
         ]
       })
@@ -199,6 +205,12 @@ export function SqlEditor({
       )
     })
   }, [completion, schemaComp])
+
+  // Light/dark reconfigures rather than rebuilds — the document, the history
+  // and the cursor all survive the switch.
+  useEffect(() => {
+    view.current?.dispatch({ effects: themeComp.reconfigure(editorTheme(resolved === 'dark')) })
+  }, [resolved, themeComp])
 
   useEffect(() => {
     view.current?.dispatch({ effects: setError.of(errorPosition ?? null) })

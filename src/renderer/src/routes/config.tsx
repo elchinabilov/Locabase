@@ -125,7 +125,7 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder={t('config.searchPlaceholder')}
-          className="w-52 rounded border border-line bg-[#0d141b] px-2 py-1 text-[11.5px] outline-none focus:border-accent-dim"
+          className="w-52 rounded border border-line bg-sunken px-2 py-1 text-[11.5px] outline-none focus:border-accent-dim"
         />
         {patches.length > 0 && (
           <>
@@ -139,7 +139,7 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
       </header>
 
       {savedRestart && (
-        <div className="flex items-center gap-3 border-b border-[#4a3c17] bg-[#211c10] px-4 py-2 text-[12px] text-warn">
+        <div className="flex items-center gap-3 border-b border-warn-border bg-warn-bg px-4 py-2 text-[12px] text-warn">
           {t('config.savedRestartMessage')}
           <Button onClick={() => void restart()} loading={restarting}>
             {t('dashboard.needsRestart.now')}

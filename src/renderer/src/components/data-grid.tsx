@@ -123,7 +123,7 @@ export function DataGrid({
                         allSelected ? new Set() : new Set(rows.map((_, i) => i))
                       )
                     }
-                    className="accent-[#3ecf8e]"
+                    className="accent-accent"
                   />
                 </th>
               )}
@@ -181,7 +181,7 @@ export function DataGrid({
                   style={{ height: ROW_H }}
                   className={cx(
                     'group border-b border-line-soft last:border-0',
-                    selectable && selected.has(index) ? 'bg-[#132a20]' : 'hover:bg-panel-2/60'
+                    selectable && selected.has(index) ? 'bg-accent-bg' : 'hover:bg-panel-2/60'
                   )}
                 >
                   {selectable && (
@@ -190,7 +190,7 @@ export function DataGrid({
                         type="checkbox"
                         checked={selected.has(index)}
                         onChange={() => toggleRow(index)}
-                        className="accent-[#3ecf8e]"
+                        className="accent-accent"
                       />
                     </td>
                   )}
@@ -216,7 +216,7 @@ export function DataGrid({
 
       {zoom && (
         <Modal wide title={zoom.column} onClose={() => setZoom(null)}>
-          <pre className="overflow-auto rounded-md border border-line bg-[#0d141b] p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap">
+          <pre className="overflow-auto rounded-md border border-line bg-sunken p-3 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap">
             {pretty(zoom.value)}
           </pre>
         </Modal>
@@ -234,7 +234,7 @@ function Cell({ value, onZoom }: { value: string | null; onZoom: (v: string) => 
   if (value === null) {
     return (
       <td className="px-2.5 font-mono text-[11.5px] whitespace-nowrap">
-        <span className="text-[#55697d] italic">NULL</span>
+        <span className="text-faint italic">NULL</span>
       </td>
     )
   }

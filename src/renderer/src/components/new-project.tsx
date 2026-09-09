@@ -69,7 +69,7 @@ function Choice({
   return (
     <button
       onClick={onClick}
-      className="rounded-md border border-line bg-[#0d141b] px-3.5 py-3 text-left transition-colors hover:border-accent-dim hover:bg-panel-2"
+      className="rounded-md border border-line bg-sunken px-3.5 py-3 text-left transition-colors hover:border-accent-dim hover:bg-panel-2"
     >
       <span className="block text-[12.5px] text-text">{label}</span>
       <span className="mt-1 block text-[11.5px] leading-snug text-muted">{hint}</span>

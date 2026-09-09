@@ -83,12 +83,12 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
           {entries.error && <ErrorNote>{entries.error}</ErrorNote>}
 
           {missing.length > 0 && (
-            <div className="rounded-md border border-[#4a3c17] bg-[#211c10] px-3.5 py-2.5 text-[12px] text-warn">
+            <div className="rounded-md border border-warn-border bg-warn-bg px-3.5 py-2.5 text-[12px] text-warn">
               <p className="mb-1.5 font-medium">{t('secrets.missingHeading', { count: missing.length })}</p>
               <ul className="space-y-0.5 font-mono text-[11px]">
                 {missing.slice(0, 8).map((m) => (
                   <li key={m.path}>
-                    {m.varName} <span className="text-[#8a7440]">← {m.path}</span>
+                    {m.varName} <span className="text-warn-dim">← {m.path}</span>
                   </li>
                 ))}
               </ul>
@@ -109,20 +109,20 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
                 return (
                   <li
                     key={e.key}
-                    className={cx('grid grid-cols-[minmax(220px,300px)_1fr_auto] items-start gap-3 px-3.5 py-2', changed && 'bg-[#101c17]')}
+                    className={cx('grid grid-cols-[minmax(220px,300px)_1fr_auto] items-start gap-3 px-3.5 py-2', changed && 'bg-accent-tint')}
                   >
                     <div className="pt-1.5">
                       <code className="font-mono text-[12px] text-text">{e.key}</code>
                       {e.referencedBy.length > 0 ? (
                         <div className="mt-1 space-y-0.5">
                           {e.referencedBy.map((p) => (
-                            <div key={p} className="font-mono text-[10px] text-[#54677a]">
+                            <div key={p} className="font-mono text-[10px] text-faint">
                               ← {p}
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="mt-1 text-[10px] text-[#54677a]">{t('secrets.unused')}</div>
+                        <div className="mt-1 text-[10px] text-faint">{t('secrets.unused')}</div>
                       )}
                     </div>
                     <Input
