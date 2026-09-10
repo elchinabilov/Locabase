@@ -7,6 +7,7 @@ import type {
 import { useEffect, useRef, useState } from 'react'
 import { cx } from '../lib/format'
 import { useI18n, useT } from '../i18n'
+import { useAction } from '../lib/use-action'
 
 /* ------------------------------------------------------------------ Button */
 
@@ -380,6 +381,73 @@ export function ConfirmModal({
         <Input value={text} onChange={(e) => setText(e.target.value)} autoFocus />
       </Row>
       {error && <ErrorNote>{error}</ErrorNote>}
+    </Modal>
+  )
+}
+
+/**
+ * "Type a name, press save." Two screens had their own copy — saving a query
+ * and creating a migration — differing only in the label on the button and in
+ * which of them remembered to catch a failure.
+ *
+ * `valid` is a predicate rather than a regex so the caller can also reject a
+ * name that is already taken.
+ */
+export function NameModal({
+  title,
+  initial = '',
+  hint,
+  placeholder,
+  confirmLabel,
+  valid,
+  onClose,
+  onSubmit
+}: {
+  title: string
+  initial?: string
+  hint: ReactNode
+  placeholder?: string
+  confirmLabel: string
+  valid: (value: string) => boolean
+  onClose: () => void
+  onSubmit: (name: string) => Promise<unknown>
+}): ReactNode {
+  const t = useT()
+  const [name, setName] = useState(initial)
+  const { run, busy, error } = useAction()
+
+  return (
+    <Modal
+      title={title}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button
+            variant="primary"
+            disabled={!valid(name)}
+            loading={busy}
+            onClick={() => void run(() => onSubmit(name))}
+          >
+            {confirmLabel}
+          </Button>
+        </>
+      }
+    >
+      <label className="mb-1 block text-note text-muted">{t('newProject.name.label')}</label>
+      <Input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={placeholder}
+        className="font-mono"
+        autoFocus
+      />
+      <p className="mt-2 text-small leading-relaxed text-muted">{hint}</p>
+      {error && (
+        <div className="mt-3">
+          <ErrorNote>{error}</ErrorNote>
+        </div>
+      )}
     </Modal>
   )
 }

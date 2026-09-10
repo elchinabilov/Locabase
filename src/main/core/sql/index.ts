@@ -26,8 +26,7 @@ import {
   pkColumns,
   TEXT_TYPES,
   toResult,
-  failedRun,
-  toSqlError
+  failedRun
 } from './build.js'
 import * as introspect from './introspect.js'
 import { inlineParams } from './ident.js'

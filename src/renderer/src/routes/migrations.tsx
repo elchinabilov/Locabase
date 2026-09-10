@@ -9,8 +9,8 @@ import {
   Button,
   Card,
   ErrorNote,
-  Input,
   Modal,
+  NameModal,
   Select,
   SkeletonTable
 } from '../components/ui'
@@ -206,9 +206,14 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
       </div>
 
       {creating && (
-        <NewMigration
+        <NameModal
+          title={t('migrations.newTitle')}
+          placeholder="add_feedback_table"
+          hint={t('migrations.nameHint', { name: t('functions.namePlaceholder') })}
+          confirmLabel={t('functions.create')}
+          valid={(v) => /^[a-z0-9_]+$/.test(v)}
           onClose={() => setCreating(false)}
-          onCreate={async (name) => {
+          onSubmit={async (name) => {
             const res = await call('migrations:new', { id: project.id, name })
             setCreating(false)
             report.refresh()
@@ -258,56 +263,6 @@ function Cell({ on }: { on: boolean | null }): ReactNode {
         <span className="text-warn-dim">·</span>
       )}
     </td>
-  )
-}
-
-function NewMigration({
-  onClose,
-  onCreate
-}: {
-  onClose: () => void
-  onCreate: (name: string) => Promise<string>
-}): ReactNode {
-  const t = useT()
-  const [name, setName] = useState('')
-  const { run, busy, error } = useAction()
-  const valid = /^[a-z0-9_]+$/.test(name)
-
-  return (
-    <Modal
-      title={t('migrations.newTitle')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={!valid}
-            loading={busy}
-            onClick={() => void run(() => onCreate(name))}
-          >
-            {t('functions.create')}
-          </Button>
-        </>
-      }
-    >
-      <label className="mb-1 block text-note text-muted">{t('newProject.name.label')}</label>
-      <Input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="add_feedback_table"
-        className="font-mono"
-        autoFocus
-      />
-      <p className="mt-2 text-small text-muted">
-        {t('migrations.nameHint', { name: name || t('functions.namePlaceholder') })}
-      </p>
-      {error && (
-        <div className="mt-3">
-          <ErrorNote>{error}</ErrorNote>
-        </div>
-      )}
-    </Modal>
   )
 }
 

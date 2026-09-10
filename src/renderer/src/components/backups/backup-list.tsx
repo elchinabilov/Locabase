@@ -5,7 +5,7 @@
  * held both lists, a toolbar and four modal mounts in one 340-line function.
  */
 import type { ReactNode } from 'react'
-import type { BackupRecord, Project, StorageConnection } from '@shared/types'
+import type { BackupRecord, StorageConnection } from '@shared/types'
 import { bytes as humanBytes, cx, stamp } from '../../lib/format'
 import { useI18n, useT } from '../../i18n'
 import { Badge, Button, Card, Dot, SkeletonList } from '../ui'
