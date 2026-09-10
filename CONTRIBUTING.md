@@ -25,13 +25,22 @@ npm run dev
 ## Before you open a pull request
 
 ```bash
+npm run lint
+npm run format:check
 npm run typecheck
 npm test
 ```
 
-Both must pass. There is no linter in the repo — match the style of the file
-you are editing (2-space indent, single quotes, no semicolons, `.editorconfig`
-covers the rest).
+All four must pass; CI runs the same four on Linux, macOS and Windows.
+
+`npm run lint:fix` and `npm run format` fix most of what the first two report.
+A `pre-commit` hook runs both on staged files, so in practice you rarely need
+to run them by hand. Formatting is Prettier's — settings live in `.prettierrc`
+and `.editorconfig`; don't hand-format around them.
+
+`npm run test:coverage` enforces a floor. It is deliberately set at whatever
+the project covers today, so it can only go up: if you add code, add the test
+that keeps the number where it is.
 
 ## Ground rules
 

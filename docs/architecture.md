@@ -6,8 +6,12 @@ Docker, or a remote environment the user configured.
 
 ```
 src/
-  shared/            types shared by main and renderer, the IPC contract,
-                     config field metadata, the auth provider list
+  shared/
+    types/           the shapes that cross the bridge, split by domain
+                     (project, stack, sql, backup, …) behind one barrel
+    ipc.ts           the channel contract — types
+    ipc-schemas.ts   the channel contract — Zod, checked at runtime
+    ...              config field metadata, the auth provider list
   main/core/
     toml/            the comment-preserving config.toml patcher (scan + patch)
     remote/          RemoteAdapter: managed.ts (CLI + Management API),
@@ -16,7 +20,11 @@ src/
     ...              projects, stack, docker, ports, config, envfile,
                      migrations, functions, sync, secrets, log, cli
   preload/           the context bridge — the only surface the renderer sees
-  renderer/src/      React 19 + Tailwind 4, with its own small UI primitives
+  renderer/src/
+    lib/             the bridge client (`ipc.ts`), and the hooks every screen
+                     shares: useAction, useCopy, useStackStatus
+    components/      the UI primitives — no component library
+    routes/          one file per screen
 ```
 
 ## The main ↔ renderer contract
@@ -27,12 +35,18 @@ Every channel and its input/output types live in one file,
 [`src/renderer/src/lib/ipc.ts`](../src/renderer/src/lib/ipc.ts) both read that
 same type, so a mismatch is a compile error rather than a runtime surprise.
 
-Adding a call is three steps:
+Adding a call is four steps:
 
 1. add the channel to `IpcContract` in `src/shared/ipc.ts`;
-2. implement it in `router.ts`, delegating to a module under `src/main/core/`;
-3. call it from the renderer with `call('channel', args)` or
+2. add its request schema to `IPC_SCHEMAS` in `src/shared/ipc-schemas.ts` —
+   the map is typed against `IpcChannel`, so skipping this does not compile;
+3. implement it in `router.ts`, delegating to a module under `src/main/core/`;
+4. call it from the renderer with `call('channel', args)` or
    `useQuery('channel', args)`.
+
+Step 2 is the one that is easy to think of as ceremony and is not: the types in
+step 1 are erased at build time, so the schema is the only thing that actually
+establishes what arrived. See [security.md](security.md).
 
 Two conventions matter:
 
@@ -43,6 +57,30 @@ Two conventions matter:
 - **Every cell that crosses IPC is text.** Row values are `string | null`
   (`TEXT_TYPES` in `src/main/core/sql/build.ts`) — structured clone would mangle
   a `Buffer` and drop a `bigint`, and the two transports disagree about `int8`.
+- **The main process has no locale.** Anything it produces is English. Where a
+  string is UI copy rather than a log line it crosses as a code the renderer
+  translates — `DbRowsPage.editableReason` is the example to copy.
+
+## State in the renderer
+
+There is no state library. Three hooks in `renderer/src/lib/` carry the
+patterns that would otherwise be rewritten per screen:
+
+- **`useQuery(channel, req, options)`** calls on mount and whenever the request
+  changes. The request is its own dependency — it is serialized to a key — so
+  there is no dependency array to keep in sync with it. A response that arrives
+  after the request changed is discarded, which is what makes switching project
+  mid-flight safe.
+- **`useAction()`** wraps an action in its busy flag and error message, catches
+  rather than throws, and is unmount-safe. Every button that calls main goes
+  through it; a bare `void call(...)` is a bug, because a failure would change
+  nothing on screen.
+- **`useStackStatus(projectId)`** shares one `stack:status` poll per project
+  across every screen watching it, refcounted.
+
+Failures that get past all of that hit an `ErrorBoundary` — one at the root and
+one per route, so a screen that throws leaves the sidebar usable and navigating
+away clears it.
 
 ## The comment-preserving TOML patcher
 

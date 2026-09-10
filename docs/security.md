@@ -77,20 +77,61 @@ builds itself are inlined with `quoteLiteral()` (`standard_conforming_strings`
 assumed). SQL the user typed never passes through that function — it is sent as
 written, to a connection that is read-only unless the user turned that off.
 
+## The IPC boundary
+
+`IpcContract` in [`src/shared/ipc.ts`](../src/shared/ipc.ts) is a compile-time
+type and nothing survives of it at runtime, so it is not a boundary on its own.
+Every channel therefore also has a Zod schema in
+[`src/shared/ipc-schemas.ts`](../src/shared/ipc-schemas.ts), and `registerIpc`
+parses the payload before it dispatches. The map is typed
+`satisfies Record<IpcChannel, ZodTypeAny>`, so adding a channel to the contract
+without adding a schema fails to compile rather than leaving a hole.
+
+This matters because these values go on to reach `spawn` argv arrays,
+filesystem paths and SQL identifier quoting. The schemas are where
+`sshHost` is refused if it could be read as an `ssh` option, where `envFile`
+is refused if it contains a NUL byte, and where a `projects:update` patch is
+narrowed to the three fields the renderer is allowed to change.
+
 ## Path traversal
 
-Saved query names are validated against `^[A-Za-z0-9\p{L} _-]{1,64}$` — note the
-absence of a dot, which kills `..`, `a.b`, `/abs` and NUL tricks with one rule.
-The resolved path is then checked to still be inside the queries folder,
-separator included, so a sibling `queries-evil/` is rejected too.
+A relative path that came from outside the process goes through
+`containedPath()` in [`src/main/core/safe-path.ts`](../src/main/core/safe-path.ts)
+before it reaches `fs`. `join()` resolves `..` happily, so it is not a boundary;
+`containedPath` resolves and then proves the result is still inside the folder,
+separator included, so a sibling `queries-evil/` is rejected too. This covers
+both the saved-query names and the project's `envFile`, which the renderer can
+set.
+
+Saved query names are additionally validated against
+`^[A-Za-z0-9\p{L} _-]{1,64}$` — note the absence of a dot, which kills `..`,
+`a.b`, `/abs` and NUL tricks with one rule.
+
+## Remote shell safety
+
+Scripts sent over SSH are assembled from `sq()`-quoted fragments. Anything
+interpolated into one — the container name, the backup directory, the project
+id — is quoted; a value that cannot be quoted because it is a bare shell token
+(`find -mtime +N`) is coerced to a number first. `ssh` and `rsync` are invoked
+with `--` before the host, and the host itself is validated when the
+environment is saved.
 
 ## Electron hardening
 
-- `contextIsolation: true`, `nodeIntegration: false`; the renderer only sees the
-  channels listed in [`src/preload/index.ts`](../src/preload/index.ts).
+- `contextIsolation: true`, `nodeIntegration: false`. The renderer's bridge
+  checks the channel against `IPC_CHANNELS` at runtime — the type alone would
+  not stop an unknown channel being invoked.
+- The OS sandbox is **off**, because the preload is built as ESM and a
+  sandboxed preload must be CommonJS. Turning it on means moving the preload
+  build to CJS first.
 - A Content-Security-Policy of `default-src 'self'` is set in the renderer HTML.
-- External links open in the system browser; `setWindowOpenHandler` denies
-  everything else.
+- External links open in the system browser: `setWindowOpenHandler` denies
+  `window.open`, and a `will-navigate` handler refuses top-level navigation away
+  from the app, which `setWindowOpenHandler` does not cover.
+- Permission requests (camera, microphone, location) are denied outright.
+- Error messages crossing back to the renderer are redacted, not just the ones
+  written to the log panel — `ssh` and the Management API both throw raw remote
+  output.
 
 ## What is not covered
 
