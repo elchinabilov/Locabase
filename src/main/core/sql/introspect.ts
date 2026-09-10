@@ -168,7 +168,22 @@ interface ColumnRaw extends Record<string, unknown> {
 
 /** Row CRUD reads columns on every operation — a short cache cuts the round trips. */
 const COL_TTL_MS = 5_000
+/**
+ * Entries expire by time but nothing evicted them, so the map grew with every
+ * schema/table ever browsed and lived for the process. The cap is generous —
+ * far more tables than anyone opens in a session — and drops the oldest first.
+ */
+const COL_CACHE_MAX = 500
 const colCache = new Map<string, { at: number; cols: DbColumn[] }>()
+
+function rememberColumns(key: string, cols: DbColumn[]): void {
+  // Map preserves insertion order, so the first key is the least recently added.
+  if (colCache.size >= COL_CACHE_MAX) {
+    const oldest = colCache.keys().next().value
+    if (oldest !== undefined) colCache.delete(oldest)
+  }
+  colCache.set(key, { at: Date.now(), cols })
+}
 
 export async function columns(
   id: string,
@@ -196,7 +211,7 @@ export async function columns(
     refColumn: r.ref_column,
     comment: r.comment
   }))
-  colCache.set(key, { at: Date.now(), cols })
+  rememberColumns(key, cols)
   return cols
 }
 

@@ -4,6 +4,11 @@ import { useEvent } from '../lib/ipc'
 import { clock, cx } from '../lib/format'
 import { useI18n, useT } from '../i18n'
 
+/** A log line plus the arrival order it is keyed by. */
+interface KeyedLine extends LogLine {
+  seq: number
+}
+
 const MAX = 800
 
 const LEVEL_CLASS: Record<string, string> = {
@@ -15,20 +20,23 @@ const LEVEL_CLASS: Record<string, string> = {
 }
 
 export function LogDrawer({ open, onToggle }: { open: boolean; onToggle: () => void }): ReactNode {
-  const [lines, setLines] = useState<LogLine[]>([])
+  const [lines, setLines] = useState<KeyedLine[]>([])
   const [filter, setFilter] = useState('')
   const [unseen, setUnseen] = useState(0)
   const t = useT()
   const { locale } = useI18n()
   const boxRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
+  const seqRef = useRef(0)
 
   useEvent('log:line', (line) => {
-    setLines((prev) => {
-      const next =
-        prev.length >= MAX ? [...prev.slice(prev.length - MAX + 1), line] : [...prev, line]
-      return next
-    })
+    // A monotonic sequence number, assigned once on arrival. The index cannot be
+    // the key: past `MAX` every entry shifts down by one, so React would see
+    // every visible row's text change on each new line instead of one append.
+    const keyed: KeyedLine = { ...line, seq: seqRef.current++ }
+    setLines((prev) =>
+      prev.length >= MAX ? [...prev.slice(prev.length - MAX + 1), keyed] : [...prev, keyed]
+    )
     if (!open) setUnseen((n) => n + 1)
   })
 
@@ -85,8 +93,8 @@ export function LogDrawer({ open, onToggle }: { open: boolean; onToggle: () => v
           className="h-[220px] overflow-auto px-3 pb-2 font-mono text-meta leading-[1.55]"
         >
           {shown.length === 0 && <p className="py-4 text-muted">{t('logDrawer.empty')}</p>}
-          {shown.map((l, i) => (
-            <div key={i} className="flex gap-2 whitespace-pre-wrap">
+          {shown.map((l) => (
+            <div key={l.seq} className="flex gap-2 whitespace-pre-wrap">
               <span className="shrink-0 text-dim">{clock(l.at, locale)}</span>
               <span className="w-[120px] shrink-0 truncate text-faint">{l.stream}</span>
               <span className={cx('min-w-0 flex-1', LEVEL_CLASS[l.level] ?? '')}>{l.text}</span>

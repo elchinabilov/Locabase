@@ -5,7 +5,16 @@
  * principle), but 5000 rows × 15 columns = 75,000 DOM cells freezes the renderer —
  * so there is simple windowing with a fixed row height.
  */
-import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type UIEvent
+} from 'react'
 import type { DbRow } from '@shared/types'
 import { cx } from '../lib/format'
 import { useT } from '../i18n'
@@ -68,6 +77,28 @@ export function DataGrid({
     return () => ro.disconnect()
   }, [])
 
+  /**
+   * Scroll fires far more often than a frame, and each `setScrollTop` re-renders
+   * the whole table. Coalescing to one update per frame keeps the windowing
+   * exact without doing the work several times over between paints.
+   */
+  const frame = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current)
+    },
+    []
+  )
+
+  const onScroll = useCallback((e: UIEvent<HTMLDivElement>) => {
+    const next = e.currentTarget.scrollTop
+    if (frame.current !== null) return
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null
+      setScrollTop(next)
+    })
+  }, [])
+
   const windowed = rows.length > WINDOW_FROM
   const first = windowed ? Math.max(0, Math.floor(scrollTop / ROW_H) - 10) : 0
   const last = windowed
@@ -87,6 +118,12 @@ export function DataGrid({
     },
     [selectable, selected, onSelectedChange]
   )
+
+  // A stable identity, so every visible cell is not handed a fresh closure on
+  // each scroll frame — which would defeat memoizing `Cell` entirely.
+  const openZoom = useCallback((column: string, value: string) => {
+    setZoom({ column, value })
+  }, [])
 
   const clickHeader = useCallback(
     (name: string) => {
@@ -109,11 +146,7 @@ export function DataGrid({
 
   return (
     <>
-      <div
-        ref={scroller}
-        className="h-full overflow-auto"
-        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-      >
+      <div ref={scroller} className="h-full overflow-auto" onScroll={onScroll}>
         <table className="w-max min-w-full border-collapse text-note">
           <thead className="sticky top-0 z-10 bg-panel">
             <tr className="border-b border-line text-badge tracking-wide text-muted uppercase">
@@ -199,8 +232,9 @@ export function DataGrid({
                   {columns.map((c, ci) => (
                     <Cell
                       key={`${c.name}-${ci}`}
+                      column={c.name}
                       value={row[ci] ?? null}
-                      onZoom={(v) => setZoom({ column: c.name, value: v })}
+                      onZoom={openZoom}
                     />
                   ))}
                   {rowActions && (
@@ -231,7 +265,15 @@ export function DataGrid({
  * A `null` and an empty string MUST look different — since every cell arrives as
  * text (see `TEXT_TYPES` in `sql/build.ts`), this is the only distinguishing mark.
  */
-function Cell({ value, onZoom }: { value: string | null; onZoom: (v: string) => void }): ReactNode {
+const Cell = memo(function GridCell({
+  column,
+  value,
+  onZoom
+}: {
+  column: string
+  value: string | null
+  onZoom: (column: string, value: string) => void
+}): ReactNode {
   const t = useT()
   if (value === null) {
     return (
@@ -254,7 +296,7 @@ function Cell({ value, onZoom }: { value: string | null; onZoom: (v: string) => 
   return (
     <td
       title={long ? t('dataGrid.clickForFullValue') : value}
-      onClick={long ? () => onZoom(value) : undefined}
+      onClick={long ? () => onZoom(column, value) : undefined}
       className={cx(
         'px-2.5 font-mono text-small whitespace-nowrap',
         long && 'cursor-pointer text-text hover:text-accent'
@@ -263,7 +305,7 @@ function Cell({ value, onZoom }: { value: string | null; onZoom: (v: string) => 
       {shown}
     </td>
   )
-}
+})
 
 function pretty(value: string): string {
   const t = value.trim()
