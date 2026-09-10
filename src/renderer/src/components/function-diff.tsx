@@ -43,7 +43,7 @@ export function FunctionDiffModal({
   onClose: () => void
 }): ReactNode {
   const t = useT()
-  const diff = useQuery('functions:diff', { id: projectId, envId, name }, [projectId, envId, name])
+  const diff = useQuery('functions:diff', { id: projectId, envId, name })
   const changed = diff.data?.changed ?? 0
 
   return (

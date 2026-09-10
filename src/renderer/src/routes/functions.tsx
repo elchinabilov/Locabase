@@ -8,8 +8,13 @@ import { DRIFT, FunctionDiffModal } from '../components/function-diff'
 
 export function FunctionsRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
-  const [envId, setEnvId] = useState<string>(project.environments[0]?.id ?? '')
-  const list = useQuery('functions:list', { id: project.id, envId: envId || null }, [project.id, envId])
+  // `picked` is the explicit choice; the id is re-derived every render so a
+  // removed environment falls back to local instead of being queried after it
+  // has stopped existing. Empty string = the local stack.
+  const [picked, setPicked] = useState<string>('')
+  const envId = project.environments.some((e) => e.id === picked) ? picked : ''
+  const setEnvId = setPicked
+  const list = useQuery('functions:list', { id: project.id, envId: envId || null })
   const [serving, setServing] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)

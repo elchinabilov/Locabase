@@ -76,7 +76,13 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
   const env = envOf(project, envId)
   const [includeSystem, setIncludeSystem] = useState(false)
   const [schema, setSchema] = useState('public')
-  const [table, setTable] = useState<string | null>(null)
+  /**
+   * The selection carries the schema it belongs to. Keeping them apart meant a
+   * cross-schema jump from a foreign key (`setSchema` then `setTable`) tripped
+   * the "schema changed, clear the table" effect and landed on nothing.
+   */
+  const [selection, setSelection] = useState<{ schema: string; table: string } | null>(null)
+  const table = selection && selection.schema === schema ? selection.table : null
   const [tab, setTab] = useState<'rows' | 'structure'>('rows')
   const [filter, setFilter] = useState('')
   const [sidebarWidth, setSidebarWidth] = useStoredSize(
@@ -87,33 +93,31 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
   const schemas = useQuery(
     'db:schemas',
     { id: project.id, envId, includeSystem },
-    [project.id, envId, includeSystem],
     { enabled: ready }
   )
   const tables = useQuery(
     'db:tables',
     { id: project.id, envId, schema },
-    [project.id, envId, schema],
     { enabled: ready && schema.length > 0 }
   )
 
   const list = useMemo(() => {
     const all = tables.data ?? []
     const q = filter.trim().toLowerCase()
-    return q ? all.filter((t) => t.name.toLowerCase().includes(q)) : all
+    return q ? all.filter((tbl) => tbl.name.toLowerCase().includes(q)) : all
   }, [tables.data, filter])
 
-  // The selection resets when the schema or the environment changes
-  useEffect(() => setTable(null), [schema, envId])
+  // A different environment is a different database — nothing carries over.
+  useEffect(() => setSelection(null), [envId])
 
   const active = useMemo(
-    () => (tables.data ?? []).find((t) => t.name === table) ?? null,
+    () => (tables.data ?? []).find((tbl) => tbl.name === table) ?? null,
     [tables.data, table]
   )
 
-  const goTo = useCallback((s: string, t: string) => {
-    setSchema(s)
-    setTable(t)
+  const goTo = useCallback((nextSchema: string, nextTable: string) => {
+    setSchema(nextSchema)
+    setSelection({ schema: nextSchema, table: nextTable })
     setTab('rows')
   }, [])
 
@@ -150,7 +154,7 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
               key={tb.name}
               table={tb}
               active={tb.name === table}
-              onClick={() => setTable(tb.name)}
+              onClick={() => setSelection({ schema, table: tb.name })}
             />
           ))}
         </div>
@@ -264,9 +268,16 @@ function RowsPane({
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState<GridSort | null>(null)
   const [filters, setFilters] = useState<DbFilter[]>([])
-  const [selected, setSelected] = useState<Set<number>>(new Set())
+  /**
+   * Selection and the open editor are keyed by PRIMARY KEY, not by row index.
+   * An index is only meaningful for the page that produced it, so paging with
+   * rows checked used to carry the ticks onto whichever rows happened to land
+   * in those positions next. A table without a primary key is not editable, so
+   * wherever a key is needed one exists.
+   */
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [adding, setAdding] = useState(false)
-  const [editing, setEditing] = useState<number | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -281,18 +292,35 @@ function RowsPane({
       offset: page * pageSize,
       orderBy: sort,
       filters
-    },
-    [project.id, envId, table.schema, table.name, pageSize, page, sort, filters]
-  )
+    })
 
-  // Go back to the first page when the filter/sort changes
-  useEffect(() => {
-    setPage(0)
-    setSelected(new Set())
-  }, [filters, sort, pageSize])
+  // Go back to the first page when the filter/sort changes.
+  useEffect(() => setPage(0), [filters, sort, pageSize])
+
+  // The selection applies to the rows on screen, so leaving the page clears it.
+  // Keying by primary key on top of that means a refresh or a re-sort keeps the
+  // right rows ticked rather than the same positions.
+  useEffect(() => setSelected(new Set()), [filters, sort, pageSize, page])
 
   const cols = rows.data?.columns ?? []
   const data = rows.data?.rows ?? []
+  const keyOf = useCallback((row: DbRow) => JSON.stringify(pkCells(cols, row)), [cols])
+  /** The rows on this page that are selected, by their position in the grid. */
+  const selectedIndexes = useMemo(() => {
+    const out = new Set<number>()
+    data.forEach((row, i) => {
+      if (selected.has(keyOf(row))) out.add(i)
+    })
+    return out
+  }, [data, selected, keyOf])
+  const editingRow = useMemo(
+    () => data.find((row) => keyOf(row) === editing) ?? null,
+    [data, editing, keyOf]
+  )
+  const selectedRows = useMemo(
+    () => data.filter((row) => selected.has(keyOf(row))),
+    [data, selected, keyOf]
+  )
   const editable = rows.data?.editable ?? false
   const total = rows.data?.total ?? null
 
@@ -324,9 +352,9 @@ function RowsPane({
             {t('tables.addRow')}
           </Button>
         )}
-        {editable && selected.size > 0 && (
+        {editable && selectedRows.length > 0 && (
           <Button variant="danger" onClick={() => setDeleting(true)}>
-            {t('tables.deleteRows', { count: selected.size })}
+            {t('tables.deleteRows', { count: selectedRows.length })}
           </Button>
         )}
         <FilterBar columns={cols} filters={filters} onChange={setFilters} />
@@ -367,13 +395,24 @@ function RowsPane({
           rows={data}
           sort={sort}
           onSort={setSort}
-          selected={editable ? selected : undefined}
-          onSelectedChange={editable ? setSelected : undefined}
+          selected={editable ? selectedIndexes : undefined}
+          onSelectedChange={
+            editable
+              ? (next) => {
+                  // The grid speaks in positions; store what they identify.
+                  const keys = [...next].map((i) => data[i]).filter(Boolean).map((r) => keyOf(r!))
+                  setSelected(new Set(keys))
+                }
+              : undefined
+          }
           rowActions={
             editable
               ? (i) => (
                   <button
-                    onClick={() => setEditing(i)}
+                    onClick={() => {
+                      const row = data[i]
+                      if (row) setEditing(keyOf(row))
+                    }}
                     className="text-meta text-muted hover:text-accent"
                   >
                     {t('tables.edit')}
@@ -405,15 +444,14 @@ function RowsPane({
         />
       )}
 
-      {editing !== null && data[editing] && (
+      {editingRow && (
         <RowModal
           title={t('tables.editRowTitle', { schema: table.schema, table: table.name })}
           columns={cols}
-          row={data[editing] ?? null}
+          row={editingRow}
           onClose={() => setEditing(null)}
           onSubmit={async (values) => {
-            const current = data[editing]
-            if (!current) return
+            const current = editingRow
             const patch = changedOnly(cols, current, values)
             if (Object.keys(patch).length === 0) {
               setEditing(null)
@@ -437,13 +475,10 @@ function RowsPane({
       {deleting && (
         <DeleteModal
           columns={cols}
-          rows={[...selected].map((i) => data[i]).filter((r): r is DbRow => Boolean(r))}
+          rows={selectedRows}
           onClose={() => setDeleting(false)}
           onConfirm={async () => {
-            const pks = [...selected]
-              .map((i) => data[i])
-              .filter((r): r is DbRow => Boolean(r))
-              .map((r) => pkCells(cols, r))
+            const pks = selectedRows.map((r) => pkCells(cols, r))
             const ok = await run(() =>
               call('db:deleteRows', {
                 id: project.id,
@@ -561,9 +596,7 @@ function StructurePane({
   const t = useT()
   const cols = useQuery(
     'db:columns',
-    { id: project.id, envId, schema: table.schema, table: table.name },
-    [project.id, envId, table.schema, table.name]
-  )
+    { id: project.id, envId, schema: table.schema, table: table.name })
 
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4">

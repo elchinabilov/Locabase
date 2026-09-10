@@ -685,6 +685,11 @@ const az = {
     markApplied: '«tətbiq olunub» kimi işarələ (sətri əlavə et)',
     markReverted: '«geri qaytarılıb» kimi işarələ (sətri sil)'
   },
+  errorBoundary: {
+    title: 'Bu ekran açılmadı',
+    retry: 'Yenidən cəhd et',
+    reload: 'Tətbiqi yenilə'
+  },
   dataGrid: {
     noRows: 'Sətir yoxdur',
     clickForFullValue: 'Tam dəyər üçün klikləyin'

@@ -22,9 +22,14 @@ export function SyncRoute({
   onChanged: () => void
 }): ReactNode {
   const t = useT()
-  const [envId, setEnvId] = useState<string>(project.environments[0]?.id ?? '')
+  // Derived, not seeded from props: seeding at mount left `envId` empty forever
+  // when the first environment was added from the empty state below, so the
+  // panel never appeared. `picked` is only what the user chose explicitly.
+  const [picked, setPicked] = useState<string | null>(null)
   const [editing, setEditing] = useState<RemoteEnv | null | 'new'>(null)
-  const env = project.environments.find((e) => e.id === envId) ?? null
+  const env =
+    project.environments.find((e) => e.id === picked) ?? project.environments[0] ?? null
+  const envId = env?.id ?? ''
 
   if (project.environments.length === 0) {
     return (
@@ -59,7 +64,7 @@ export function SyncRoute({
         {project.environments.map((e) => (
           <button
             key={e.id}
-            onClick={() => setEnvId(e.id)}
+            onClick={() => setPicked(e.id)}
             className={cx(
               'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-note',
               e.id === envId
@@ -107,7 +112,7 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
   const [report, setReport] = useState<SyncReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const health = useQuery('envs:ping', { id: project.id, envId: env.id }, [env.id])
+  const health = useQuery('envs:ping', { id: project.id, envId: env.id })
 
   const [pickedMigrations, setPickedMigrations] = useState<Set<string>>(new Set())
   const [pickedFunctions, setPickedFunctions] = useState<Set<string>>(new Set())

@@ -29,7 +29,7 @@ function localize(field: ConfigField, tDynamic: (k: string) => string | undefine
 
 export function ConfigRoute({ project }: { project: Project }): ReactNode {
   const { t, tDynamic } = useI18n()
-  const doc = useQuery('config:read', { id: project.id }, [project.id])
+  const doc = useQuery('config:read', { id: project.id })
   const [group, setGroup] = useState<string>('General')
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [preview, setPreview] = useState<PatchPreview | null>(null)

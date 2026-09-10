@@ -82,7 +82,6 @@ export function AuthUsers({ project }: { project: Project }): ReactNode {
   const users = useQuery(
     'auth:users',
     { id: project.id, envId, search: debounced, provider, status, sort, page, pageSize },
-    [project.id, envId, debounced, provider, status, sort, page, pageSize],
     { enabled: ready }
   )
 
@@ -337,7 +336,7 @@ function UserDetail({
   const t = useT()
   const { locale } = useI18n()
   const [copied, setCopied] = useState(false)
-  const detail = useQuery('auth:user', { id: projectId, envId, userId }, [projectId, envId, userId])
+  const detail = useQuery('auth:user', { id: projectId, envId, userId })
   const u = detail.data
 
   return (

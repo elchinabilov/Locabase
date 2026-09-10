@@ -92,7 +92,7 @@ export function NewProjectModal({
 }): ReactNode {
   const t = useT()
   const suggested = useQuery('ports:suggestRange', undefined)
-  const existing = useQuery('projects:inspect', { path: dir }, [dir])
+  const existing = useQuery('projects:inspect', { path: dir })
   const [name, setName] = useState(() => baseName(dir))
   const [base, setBase] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)

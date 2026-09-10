@@ -688,6 +688,11 @@ const en = {
     markApplied: 'Mark as "applied" (add the row)',
     markReverted: 'Mark as "reverted" (remove the row)'
   },
+  errorBoundary: {
+    title: 'This screen failed to render',
+    retry: 'Try again',
+    reload: 'Reload the app'
+  },
   dataGrid: {
     noRows: 'No rows',
     clickForFullValue: 'Click for the full value'

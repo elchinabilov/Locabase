@@ -52,7 +52,7 @@ function fieldFor(providerId: string, name: string, t: (k: TranslationKey) => st
 
 export function AuthProviders({ project }: { project: Project }): ReactNode {
   const t = useT()
-  const doc = useQuery('config:read', { id: project.id }, [project.id])
+  const doc = useQuery('config:read', { id: project.id })
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [enabledOverride, setEnabledOverride] = useState<Record<string, boolean>>({})
   const [open, setOpen] = useState<string | null>(null)

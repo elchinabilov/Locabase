@@ -62,11 +62,11 @@ function ProjectView({
 }): ReactNode {
   const t = useT()
   const { locale } = useI18n()
-  const status = useQuery('stack:status', { id: project.id, withStats: true }, [project.id], {
+  const status = useQuery('stack:status', { id: project.id, withStats: true }, {
     pollMs: 8000
   })
-  const config = useQuery('config:read', { id: project.id }, [project.id])
-  const conflicts = useQuery('ports:conflicts', undefined, [], { pollMs: 30000 })
+  const config = useQuery('config:read', { id: project.id })
+  const conflicts = useQuery('ports:conflicts', undefined, { pollMs: 30000 })
   const [busy, setBusy] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
   const [needsRestart, setNeedsRestart] = useState(false)

@@ -20,7 +20,6 @@ export function RemoteServices({
   const services = useQuery(
     'remote:services',
     { id: project.id, envId: env.id },
-    [env.id],
     { enabled: env.kind === 'self-hosted' }
   )
   const [pending, setPending] = useState<string | null>(null)

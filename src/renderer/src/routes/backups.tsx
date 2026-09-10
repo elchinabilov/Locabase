@@ -36,8 +36,8 @@ export function BackupsRoute({
   const t = useT()
   const { locale } = useI18n()
 
-  const backups = useQuery('backups:list', { id: project.id }, [project.id])
-  const jobs = useQuery('jobs:list', { id: project.id }, [project.id])
+  const backups = useQuery('backups:list', { id: project.id })
+  const jobs = useQuery('jobs:list', { id: project.id })
   const storages = useQuery('storage:list', undefined)
 
   const [envId, setEnvId] = useState('')

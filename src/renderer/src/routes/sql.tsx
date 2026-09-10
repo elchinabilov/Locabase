@@ -81,8 +81,8 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
     'locabase.sql.resultsHeight',
     RESULTS_HEIGHT.default
   )
-  const saved = useQuery('queries:list', { id: project.id }, [project.id])
-  const completion = useQuery('db:completion', { id: project.id, envId }, [project.id, envId], {
+  const saved = useQuery('queries:list', { id: project.id })
+  const completion = useQuery('db:completion', { id: project.id, envId }, {
     enabled: ready
   })
 

@@ -69,7 +69,7 @@ export function useDbGate(
   envId: string | null
 ): { ready: boolean; blocked: ReactNode | null } {
   const t = useT()
-  const status = useQuery('stack:status', { id: projectId }, [projectId], {
+  const status = useQuery('stack:status', { id: projectId }, {
     pollMs: 10_000,
     enabled: envId === null
   })

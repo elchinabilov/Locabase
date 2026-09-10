@@ -8,8 +8,8 @@ import { Badge, Button, Card, ErrorNote, Input, Modal, SkeletonList } from '../c
 export function SecretsRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
   const [reveal, setReveal] = useState(false)
-  const entries = useQuery('env:read', { id: project.id, reveal }, [project.id, reveal])
-  const doc = useQuery('config:read', { id: project.id }, [project.id])
+  const entries = useQuery('env:read', { id: project.id, reveal })
+  const doc = useQuery('config:read', { id: project.id })
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
