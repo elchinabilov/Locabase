@@ -221,12 +221,25 @@ export function serve(id: string, on: boolean): void {
     cwd: project.path,
     stream,
     signal: controller.signal
-  }).then(() => serving.delete(id))
+    // A fast stop → start replaces the entry before this settles; deleting
+    // unconditionally would drop the *new* controller.
+  }).then(() => {
+    if (serving.get(id) === controller) serving.delete(id)
+  })
   logBus.push(stream, 'info', 'functions serve started — changes are reloaded on every request')
 }
 
 export function isServing(id: string): boolean {
   return serving.has(id)
+}
+
+/**
+ * Called on quit. Without this the Deno server outlives the app and keeps its
+ * port, so the next launch cannot serve functions.
+ */
+export function stopAllServes(): void {
+  for (const controller of serving.values()) controller.abort()
+  serving.clear()
 }
 
 /** Is the path a file: `statSync` for existence only. */

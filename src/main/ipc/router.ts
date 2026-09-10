@@ -4,7 +4,9 @@
  */
 import { dialog, ipcMain, nativeTheme, shell, BrowserWindow } from 'electron'
 import { IPC_CHANNELS, type IpcChannel, type IpcContract } from '@shared/ipc.js'
-import { logBus } from '../core/log.js'
+import { ZodError } from 'zod'
+import { describeIpcError, parseIpcRequest } from '@shared/ipc-schemas.js'
+import { logBus, redact } from '../core/log.js'
 import * as projects from '../core/projects.js'
 import * as scaffold from '../core/scaffold.js'
 import * as stack from '../core/stack.js'
@@ -298,12 +300,22 @@ export function registerIpc(): void {
   for (const channel of IPC_CHANNELS) {
     ipcMain.handle(channel, async (_event, req: unknown) => {
       try {
+        // The contract types are erased at build time, so this is the only point
+        // where the shape of a renderer payload is actually established. These
+        // values go on to reach spawn argv, filesystem paths and SQL quoting.
+        const parsed = parseIpcRequest(channel, req)
         const handler = handlers[channel] as (r: unknown) => Promise<unknown>
-        return { ok: true, data: await handler(req) }
+        return { ok: true, data: await handler(parsed) }
       } catch (err) {
-        const message = (err as Error).message ?? String(err)
+        const message =
+          err instanceof ZodError
+            ? `invalid request — ${describeIpcError(err)}`
+            : ((err as Error).message ?? String(err))
         logBus.push('app', 'error', `${channel}: ${message}`)
-        return { ok: false, error: message }
+        // `redact` is wired into the log bus, not into the value returned here —
+        // and `ssh`/the Management API both throw raw remote output, which can
+        // carry a connection string. Redact on the way out too.
+        return { ok: false, error: redact(message) }
       }
     })
   }

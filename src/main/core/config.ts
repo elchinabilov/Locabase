@@ -92,12 +92,28 @@ export function preview(projectId: string, patches: ConfigPatch[]): PatchPreview
   const project = getProject(projectId)
   const path = paths.configToml(project)
   const before = readFileSync(path, 'utf8')
+  assertKnownPaths(before, patches)
   const result = applyPatches(before, patches)
   return {
     before,
     after: result.text,
     changedLines: result.changedLines,
     restartRequired: needsRestart(patches.map((p) => p.path))
+  }
+}
+
+/**
+ * The form can only reach the keys it renders, so anything else arriving here
+ * came from somewhere other than the UI. Without this, `config:write` could set
+ * any dotted path — `project_id` included, which is the suffix of every
+ * container name and the prefix of the remote backup filenames.
+ */
+function assertKnownPaths(configText: string, patches: ConfigPatch[]): void {
+  const allowed = new Set(knownPaths(configText))
+  for (const patch of patches) {
+    if (!allowed.has(patch.path)) {
+      throw new Error(`Not a configurable key: ${patch.path}`)
+    }
   }
 }
 
