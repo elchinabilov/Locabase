@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { MigrationRow, MigrationState, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import {
@@ -34,8 +35,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
   const envId = project.environments.some((e) => e.id === picked) ? picked : ''
   const setEnvId = setPicked
   const report = useQuery('migrations:report', { id: project.id, envId: envId || null })
-  const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { run, runningLabel: busy, error } = useAction()
   const [creating, setCreating] = useState(false)
   const [diff, setDiff] = useState<string | null>(null)
   const [repairRow, setRepairRow] = useState<MigrationRow | null>(null)
@@ -49,19 +49,15 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
 
   const runTask = useCallback(
     async (label: string, fn: () => Promise<{ ok: boolean; error: string | null }>) => {
-      setBusy(label)
-      setError(null)
-      try {
+      await run(async () => {
         const res = await fn()
-        if (!res.ok) setError(res.error ?? t('dashboard.reset.genericError'))
-      } catch (err) {
-        setError((err as Error).message)
-      } finally {
-        setBusy(null)
-        report.refresh()
-      }
+        // These handlers report a refusal in the result rather than throwing.
+        if (!res.ok) throw new Error(res.error ?? t('dashboard.reset.genericError'))
+        return res
+      }, label)
+      report.refresh()
     },
-    [report, t]
+    [report, t, run]
   )
 
   return (
@@ -276,8 +272,7 @@ function NewMigration({
 }): ReactNode {
   const t = useT()
   const [name, setName] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy, error } = useAction()
   const valid = /^[a-z0-9_]+$/.test(name)
 
   return (
@@ -291,13 +286,7 @@ function NewMigration({
             variant="primary"
             disabled={!valid}
             loading={busy}
-            onClick={() => {
-              setBusy(true)
-              setError(null)
-              void onCreate(name)
-                .catch((e: Error) => setError(e.message))
-                .finally(() => setBusy(false))
-            }}
+            onClick={() => void run(() => onCreate(name))}
           >
             {t('functions.create')}
           </Button>

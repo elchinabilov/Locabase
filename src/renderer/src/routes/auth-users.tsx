@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AuthUser, AuthUserSort, AuthUserStatus, Project, RemoteEnv } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useCopy } from '../lib/use-copy'
 import { cx } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
 import {
@@ -331,7 +332,7 @@ function UserDetail({
 }): ReactNode {
   const t = useT()
   const { locale } = useI18n()
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopy()
   const detail = useQuery('auth:user', { id: projectId, envId, userId })
   const u = detail.data
 
@@ -342,13 +343,7 @@ function UserDetail({
       onClose={onClose}
       footer={
         <>
-          <Button
-            onClick={() => {
-              void navigator.clipboard.writeText(userId)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 1200)
-            }}
-          >
+          <Button onClick={() => copy(userId)}>
             {copied ? t('auth.copied') : t('authUsers.copyUid')}
           </Button>
           <Button variant="primary" onClick={onClose}>

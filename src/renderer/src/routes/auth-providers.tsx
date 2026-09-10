@@ -9,6 +9,8 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { ConfigField, ConfigPatch, FieldValue, PatchPreview, Project } from '@shared/types'
 import { AUTH_PROVIDERS, callbackUrl, envVarName } from '@shared/providers'
 import { call, useQuery } from '../lib/ipc'
+import { useCopy } from '../lib/use-copy'
+import { useAction } from '../lib/use-action'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Modal, SkeletonList, Toggle } from '../components/ui'
@@ -63,9 +65,8 @@ export function AuthProviders({ project }: { project: Project }): ReactNode {
   const [enabledOverride, setEnabledOverride] = useState<Record<string, boolean>>({})
   const [open, setOpen] = useState<string | null>(null)
   const [preview, setPreview] = useState<PatchPreview | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const { run, busy: saving, error } = useAction()
+  const { copied, copy } = useCopy()
 
   const values = doc.data?.values
 
@@ -103,20 +104,13 @@ export function AuthProviders({ project }: { project: Project }): ReactNode {
   }, [drafts, enabledOverride, values, t])
 
   const save = useCallback(async () => {
-    setSaving(true)
-    setError(null)
-    try {
-      await call('config:write', { id: project.id, patches })
-      setDrafts({})
-      setEnabledOverride({})
-      setPreview(null)
-      doc.refresh()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }, [project.id, patches, doc])
+    const ok = await run(() => call('config:write', { id: project.id, patches }))
+    if (ok === undefined) return
+    setDrafts({})
+    setEnabledOverride({})
+    setPreview(null)
+    doc.refresh()
+  }, [project.id, patches, doc, run])
 
   const cb = callbackUrl(apiUrl)
 
@@ -139,9 +133,9 @@ export function AuthProviders({ project }: { project: Project }): ReactNode {
             <Button
               variant="primary"
               onClick={() =>
-                void call('config:preview', { id: project.id, patches })
-                  .then(setPreview)
-                  .catch((e: Error) => setError(e.message))
+                void run(() => call('config:preview', { id: project.id, patches })).then((p) => {
+                  if (p) setPreview(p)
+                })
               }
             >
               {t('auth.saveEllipsis')}
@@ -155,13 +149,7 @@ export function AuthProviders({ project }: { project: Project }): ReactNode {
           <div className="flex items-center gap-3 rounded-lg border border-line bg-panel px-3.5 py-2.5">
             <span className="text-note text-muted">{t('auth.callbackUrl')}</span>
             <code className="min-w-0 flex-1 truncate font-mono text-note text-accent">{cb}</code>
-            <Button
-              onClick={() => {
-                void navigator.clipboard.writeText(cb)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 1200)
-              }}
-            >
+            <Button onClick={() => copy(cb)}>
               {copied ? t('auth.copied') : t('dashboard.quickLinks.copy')}
             </Button>
           </div>

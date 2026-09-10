@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { DbCells, DbColumn, DbFilter, DbOp, DbRow, DbTable, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { cx } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
 import {
@@ -281,7 +282,7 @@ function RowsPane({
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, error } = useAction()
 
   const rows = useQuery('db:rows', {
     id: project.id,
@@ -329,19 +330,13 @@ function RowsPane({
     rows.refresh()
   }, [rows])
 
-  const run = useCallback(
+  const submit = useCallback(
     async (fn: () => Promise<unknown>) => {
-      setError(null)
-      try {
-        await fn()
-        refresh()
-        return true
-      } catch (err) {
-        setError((err as Error).message)
-        return false
-      }
+      const ok = (await run(fn)) !== undefined
+      if (ok) refresh()
+      return ok
     },
-    [refresh]
+    [refresh, run]
   )
 
   return (
@@ -440,7 +435,7 @@ function RowsPane({
           row={null}
           onClose={() => setAdding(false)}
           onSubmit={async (values) => {
-            const ok = await run(() =>
+            const ok = await submit(() =>
               call('db:insertRow', {
                 id: project.id,
                 envId,
@@ -467,7 +462,7 @@ function RowsPane({
               setEditing(null)
               return
             }
-            const ok = await run(() =>
+            const ok = await submit(() =>
               call('db:updateRow', {
                 id: project.id,
                 envId,
@@ -489,7 +484,7 @@ function RowsPane({
           onClose={() => setDeleting(false)}
           onConfirm={async () => {
             const pks = selectedRows.map((r) => pkCells(cols, r))
-            const ok = await run(() =>
+            const ok = await submit(() =>
               call('db:deleteRows', {
                 id: project.id,
                 envId,

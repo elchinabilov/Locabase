@@ -1,7 +1,8 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, type ReactNode } from 'react'
 import type { Project, RemoteEnv } from '@shared/types'
 import { formatBytes } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { useT } from '../i18n'
 import { Badge, Button, Card, Dot, ErrorNote, Skeleton, Toggle } from '../components/ui'
 
@@ -16,29 +17,24 @@ export function RemoteServices({ project, env }: { project: Project; env: Remote
     { id: project.id, envId: env.id },
     { enabled: env.kind === 'self-hosted' }
   )
-  const [pending, setPending] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { run, runningLabel: pending, error } = useAction()
 
   const toggle = useCallback(
     async (container: string, on: boolean) => {
-      setPending(container)
-      setError(null)
-      try {
+      await run(async () => {
         const res = await call('remote:setService', {
           id: project.id,
           envId: env.id,
           container,
           on
         })
-        if (!res.ok) setError(res.error ?? t('dashboard.reset.genericError'))
-      } catch (err) {
-        setError((err as Error).message)
-      } finally {
-        setPending(null)
-        services.refresh()
-      }
+        // The handler reports a refusal in the result rather than throwing.
+        if (!res.ok) throw new Error(res.error ?? t('dashboard.reset.genericError'))
+        return res
+      }, container)
+      services.refresh()
     },
-    [project.id, env.id, services, t]
+    [project.id, env.id, services, t, run]
   )
 
   if (env.kind === 'managed') {

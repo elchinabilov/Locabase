@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { cx } from '../lib/format'
 import { useT } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Input, Modal, SkeletonList } from '../components/ui'
@@ -12,8 +13,7 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
   const doc = useQuery('config:read', { id: project.id })
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [adding, setAdding] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  const { run, busy: saving, error } = useAction()
 
   /** When `config.toml` says `env(X)` but `.env` has no X. */
   const missing = useMemo(() => {
@@ -28,22 +28,17 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
   const dirty = Object.keys(edits).length > 0
 
   const save = useCallback(async () => {
-    setSaving(true)
-    setError(null)
-    try {
-      await call('env:write', {
+    const ok = await run(() =>
+      call('env:write', {
         id: project.id,
         entries: Object.entries(edits).map(([key, value]) => ({ key, value }))
       })
-      setEdits({})
-      entries.refresh()
-      doc.refresh()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }, [project.id, edits, entries, doc])
+    )
+    if (ok === undefined) return
+    setEdits({})
+    entries.refresh()
+    doc.refresh()
+  }, [project.id, edits, entries, doc, run])
 
   const remove = useCallback(
     async (key: string) => {

@@ -8,6 +8,7 @@
 import { useState, type ReactNode } from 'react'
 import type { BackupRecord, BackupScope, Job, Project } from '@shared/types'
 import { call, useEvent, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { bytes as humanBytes, cx, stamp } from '../lib/format'
 import { useI18n, useT } from '../i18n'
 import {
@@ -44,8 +45,7 @@ export function BackupsRoute({
   const [scope, setScope] = useState<BackupScope>('full')
   const [storageId, setStorageId] = useState('')
   const [keepLocal, setKeepLocal] = useState(true)
-  const [running, setRunning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy: running, runningLabel, error } = useAction()
 
   const [editingJob, setEditingJob] = useState<Job | null | 'new'>(null)
   const [removingJob, setRemovingJob] = useState<Job | null>(null)
@@ -66,9 +66,7 @@ export function BackupsRoute({
   const jobRows = jobs.data ?? []
 
   const takeBackup = async (): Promise<void> => {
-    setRunning(true)
-    setError(null)
-    try {
+    await run(async () => {
       const record = await call('backups:run', {
         id: project.id,
         envId: envId || null,
@@ -77,22 +75,14 @@ export function BackupsRoute({
         keepLocal: storageId ? keepLocal : true
       })
       // A failed dump comes back as a record, not as a thrown error.
-      if (record.status === 'failed') setError(record.error)
-      backups.refresh()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setRunning(false)
-    }
+      if (record.status === 'failed') throw new Error(record.error ?? t('backups.status.failed'))
+      return record
+    })
+    backups.refresh()
   }
 
   const runJob = async (job: Job): Promise<void> => {
-    setError(null)
-    try {
-      await call('jobs:runNow', { jobId: job.id })
-    } catch (err) {
-      setError((err as Error).message)
-    }
+    await run(() => call('jobs:runNow', { jobId: job.id }), job.id)
   }
 
   return (
@@ -171,7 +161,7 @@ export function BackupsRoute({
                   <Toggle
                     checked={job.enabled}
                     onChange={(on) => {
-                      void call('jobs:setEnabled', { jobId: job.id, enabled: on }).then(
+                      void run(() => call('jobs:setEnabled', { jobId: job.id, enabled: on })).then(
                         jobs.refresh
                       )
                     }}
@@ -208,7 +198,10 @@ export function BackupsRoute({
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <Button loading={job.running} onClick={() => void runJob(job)}>
+                    <Button
+                      loading={job.running || runningLabel === job.id}
+                      onClick={() => void runJob(job)}
+                    >
                       {t('jobs.runNow')}
                     </Button>
                     <Button variant="ghost" onClick={() => setEditingJob(job)}>
@@ -283,7 +276,7 @@ export function BackupsRoute({
                     {row.path && (
                       <Button
                         variant="ghost"
-                        onClick={() => void call('backups:reveal', { backupId: row.id })}
+                        onClick={() => void run(() => call('backups:reveal', { backupId: row.id }))}
                       >
                         {t('backups.reveal')}
                       </Button>
@@ -334,7 +327,7 @@ export function BackupsRoute({
               <Button
                 variant="danger"
                 onClick={() => {
-                  void call('jobs:remove', { jobId: removingJob.id }).then(() => {
+                  void run(() => call('jobs:remove', { jobId: removingJob.id })).then(() => {
                     setRemovingJob(null)
                     jobs.refresh()
                   })
@@ -392,20 +385,13 @@ function RemoveBackupModal({
 }): ReactNode {
   const t = useT()
   const [deleteFile, setDeleteFile] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const { run, busy, error } = useAction()
 
   const remove = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
-      await call('backups:remove', { id: record.projectId, backupId: record.id, deleteFile })
-      onDone()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+    const ok = await run(() =>
+      call('backups:remove', { id: record.projectId, backupId: record.id, deleteFile })
+    )
+    if (ok !== undefined) onDone()
   }
 
   return (
@@ -444,20 +430,11 @@ function UploadModal({
 }): ReactNode {
   const t = useT()
   const [storageId, setStorageId] = useState(record.storageId ?? storages[0]?.id ?? '')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy, error } = useAction()
 
   const upload = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
-      await call('backups:upload', { backupId: record.id, storageId })
-      onDone()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+    const ok = await run(() => call('backups:upload', { backupId: record.id, storageId }))
+    if (ok !== undefined) onDone()
   }
 
   return (
@@ -512,8 +489,7 @@ function RestoreModal({
   const [envId, setEnvId] = useState(record.envId ?? '')
   const [clean, setClean] = useState(true)
   const [confirm, setConfirm] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy, error } = useAction()
   const [done, setDone] = useState<{
     name: string
     seconds: number
@@ -527,30 +503,23 @@ function RestoreModal({
   const fromStorage = !record.path && Boolean(record.storageKey)
 
   const restore = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
+    await run(async () => {
       const result = await call('backups:restore', {
         backupId: record.id,
         envId: envId || null,
         clean,
         confirm
       })
-      if (result.ok) {
-        setDone({
-          name: result.envName,
-          seconds: Math.round(result.durationMs / 1000),
-          output: result.output,
-          failed: result.failedStatements
-        })
-      } else {
-        setError(result.error)
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+      // A failed restore reports itself in the result rather than throwing.
+      if (!result.ok) throw new Error(result.error ?? t('backups.status.failed'))
+      setDone({
+        name: result.envName,
+        seconds: Math.round(result.durationMs / 1000),
+        output: result.output,
+        failed: result.failedStatements
+      })
+      return result
+    })
   }
 
   return (

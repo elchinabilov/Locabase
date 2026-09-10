@@ -11,6 +11,7 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Project, SqlErrorInfo, SqlRun } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import {
@@ -69,6 +70,8 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
   const [dialog, setDialog] = useState<'save' | 'migration' | 'rename' | 'delete' | null>(null)
   /** The saved query a rename/delete dialog acts on — not always the open one. */
   const [target, setTarget] = useState<string | null>(null)
+  // `run` is taken here by the SQL result, so the action helper keeps its own name.
+  const { run: runAction, error: actionError } = useAction()
 
   const editor = useRef<SqlEditorHandle | null>(null)
   // The percentage the results pane is measured against.
@@ -171,6 +174,11 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-1.5">
+          {actionError && (
+            <div className="mb-1.5">
+              <ErrorNote>{actionError}</ErrorNote>
+            </div>
+          )}
           {saved.loading && saved.data === null && <SkeletonRows rows={5} />}
           {saved.data !== null && saved.data.length === 0 && (
             <p className="px-2 py-3 text-small leading-relaxed text-muted">{t('sql.noSaved')}</p>
@@ -475,7 +483,10 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
               <Button
                 variant="danger"
                 onClick={() => {
-                  void call('queries:remove', { id: project.id, name: target }).then(() => {
+                  void runAction(() =>
+                    call('queries:remove', { id: project.id, name: target })
+                  ).then((ok) => {
+                    if (ok === undefined) return
                     if (activeName === target) setActiveName(null)
                     setDialog(null)
                     saved.refresh()

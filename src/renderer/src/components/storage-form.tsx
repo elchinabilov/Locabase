@@ -8,6 +8,7 @@
 import { useState, type ReactNode } from 'react'
 import type { StorageConnection, StorageTestReport } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { useT } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Input, Modal, Row, Select, SkeletonList } from './ui'
 
@@ -17,7 +18,7 @@ export function StorageCard(): ReactNode {
   const [editing, setEditing] = useState<StorageConnection | null | 'new'>(null)
   const [tests, setTests] = useState<Record<string, StorageTestReport | 'running'>>({})
   const [confirm, setConfirm] = useState<StorageConnection | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { run, error } = useAction()
 
   const items = list.data ?? []
 
@@ -38,14 +39,10 @@ export function StorageCard(): ReactNode {
   }
 
   const remove = async (conn: StorageConnection): Promise<void> => {
-    setError(null)
-    try {
-      await call('storage:remove', { storageId: conn.id })
-      setConfirm(null)
-      list.refresh()
-    } catch (err) {
-      setError((err as Error).message)
-    }
+    const ok = await run(() => call('storage:remove', { storageId: conn.id }))
+    if (ok === undefined) return
+    setConfirm(null)
+    list.refresh()
   }
 
   return (
@@ -158,14 +155,11 @@ function StorageModal({
   const [accessKeyId, setAccessKeyId] = useState(conn?.accessKeyId ?? '')
   const [secret, setSecret] = useState('')
   const [prefix, setPrefix] = useState(conn?.prefix ?? '')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy: saving, error } = useAction()
 
   const save = async (): Promise<void> => {
-    setSaving(true)
-    setError(null)
-    try {
-      await call('storage:upsert', {
+    const ok = await run(() =>
+      call('storage:upsert', {
         conn: {
           id: conn?.id,
           name,
@@ -178,12 +172,8 @@ function StorageModal({
         },
         secretAccessKey: secret || undefined
       })
-      onSaved()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
+    )
+    if (ok !== undefined) onSaved()
   }
 
   return (

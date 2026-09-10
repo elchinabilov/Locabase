@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { ManagedEnv, Project, RemoteEnv, SelfHostedEnv } from '@shared/types'
 import { call } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { useT } from '../i18n'
 import { Button, ErrorNote, Input, Modal, Row, Select } from './ui'
 
@@ -42,8 +43,7 @@ export function EnvForm({
   const t = useT()
   const [env, setEnv] = useState<RemoteEnv>(initial ?? emptyManaged())
   const [token, setToken] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy, error } = useAction()
 
   const setKind = (kind: string): void => {
     setEnv((prev) =>
@@ -56,20 +56,16 @@ export function EnvForm({
   const patch = <T extends RemoteEnv>(p: Partial<T>): void => setEnv((prev) => ({ ...prev, ...p }))
 
   const save = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
+    const ok = await run(async () => {
       await call('envs:upsert', { id: project.id, env })
       if (env.kind === 'managed' && token.trim()) {
         await call('envs:setToken', { id: project.id, envId: env.id, token: token.trim() })
       }
-      onSaved()
-      onClose()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+      return true
+    })
+    if (!ok) return
+    onSaved()
+    onClose()
   }
 
   const valid =

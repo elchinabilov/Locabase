@@ -639,6 +639,8 @@ const az = {
     create: 'Yarat'
   },
   sync: {
+    dryRunResult: 'Dry run nəticəsi',
+    dryRunEmpty: 'Dry run heç nə qaytarmadı.',
     noEnv: {
       title: 'Remote mühit yoxdur',
       hint: 'Managed (supabase.com) və ya self-hosted (SSH + Docker) mühit əlavə et — sonra lokal ilə arasındakı fərqi bir ekranda görəcəksən.'

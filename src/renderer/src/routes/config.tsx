@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { ConfigField, ConfigPatch, PatchPreview, Project } from '@shared/types'
 import { CONFIG_FIELDS, CONFIG_GROUPS } from '@shared/config-schema'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { cx } from '../lib/format'
 import { useI18n } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Modal, Skeleton } from '../components/ui'
@@ -33,8 +34,7 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
   const [group, setGroup] = useState<string>('General')
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [preview, setPreview] = useState<PatchPreview | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  const { run, busy: saving, error } = useAction()
   const [savedRestart, setSavedRestart] = useState(false)
   const [restarting, setRestarting] = useState(false)
   const [filter, setFilter] = useState('')
@@ -57,29 +57,18 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
   }, [])
 
   const openPreview = useCallback(async () => {
-    setError(null)
-    try {
-      setPreview(await call('config:preview', { id: project.id, patches }))
-    } catch (err) {
-      setError((err as Error).message)
-    }
-  }, [project.id, patches])
+    const p = await run(() => call('config:preview', { id: project.id, patches }))
+    if (p) setPreview(p)
+  }, [project.id, patches, run])
 
   const save = useCallback(async () => {
-    setSaving(true)
-    setError(null)
-    try {
-      const res = await call('config:write', { id: project.id, patches })
-      setPreview(null)
-      setDrafts({})
-      doc.refresh()
-      setSavedRestart(res.restartRequired)
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }, [project.id, patches, doc])
+    const res = await run(() => call('config:write', { id: project.id, patches }))
+    if (!res) return
+    setPreview(null)
+    setDrafts({})
+    doc.refresh()
+    setSavedRestart(res.restartRequired)
+  }, [project.id, patches, doc, run])
 
   const restart = useCallback(async () => {
     setRestarting(true)

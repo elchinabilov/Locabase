@@ -1,6 +1,14 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import type { DeployStep, HealthReport, Project, RemoteEnv, SyncReport } from '@shared/types'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import type {
+  DeployStep,
+  HealthReport,
+  Project,
+  RemoteEnv,
+  SyncReport,
+  TaskResult
+} from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { cx, timeAgo } from '../lib/format'
 import { useI18n, useT } from '../i18n'
 import {
@@ -110,8 +118,9 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
   const t = useT()
   const { locale } = useI18n()
   const [report, setReport] = useState<SyncReport | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy: loading, error } = useAction()
+  /** The output of the last dry run — otherwise the button looks inert. */
+  const [dryRun, setDryRun] = useState<TaskResult | null>(null)
   const health = useQuery('envs:ping', { id: project.id, envId: env.id })
 
   const [pickedMigrations, setPickedMigrations] = useState<Set<string>>(new Set())
@@ -122,30 +131,22 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
   const [diffFn, setDiffFn] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const r = await call('sync:report', { id: project.id, envId: env.id })
-      setReport(r)
-      setPickedMigrations(
-        new Set(
-          r.migrations.items.filter((m) => m.state === 'pending-remote').map((m) => m.version)
-        )
+    const r = await run(() => call('sync:report', { id: project.id, envId: env.id }))
+    if (!r) return
+    setReport(r)
+    setDryRun(null)
+    setPickedMigrations(
+      new Set(r.migrations.items.filter((m) => m.state === 'pending-remote').map((m) => m.version))
+    )
+    setPickedFunctions(
+      new Set(
+        r.functions.items
+          .filter((f) => f.path !== '' && (f.drift === 'local-only' || f.drift === 'changed'))
+          .map((f) => f.name)
       )
-      setPickedFunctions(
-        new Set(
-          r.functions.items
-            .filter((f) => f.path !== '' && (f.drift === 'local-only' || f.drift === 'changed'))
-            .map((f) => f.name)
-        )
-      )
-      setPickedSecrets(new Set())
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [project.id, env.id])
+    )
+    setPickedSecrets(new Set())
+  }, [project.id, env.id, run])
 
   const plan = useMemo(() => {
     const steps: DeployStep[] = ['backup']
@@ -192,10 +193,14 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
             <>
               <Button
                 onClick={() =>
-                  void call('sync:deploy', {
-                    id: project.id,
-                    confirm: project.name,
-                    plan: { ...plan, dryRun: true }
+                  void run(async () => {
+                    const res = await call('sync:deploy', {
+                      id: project.id,
+                      confirm: project.name,
+                      plan: { ...plan, dryRun: true }
+                    })
+                    setDryRun(res)
+                    return res
                   })
                 }
               >
@@ -209,6 +214,21 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
         </div>
 
         {error && <ErrorNote>{error}</ErrorNote>}
+
+        {dryRun && (
+          <Card
+            title={t('sync.dryRunResult')}
+            actions={
+              <Button onClick={() => setDryRun(null)} aria-label={t('common.close')}>
+                ✕
+              </Button>
+            }
+          >
+            <pre className="max-h-64 overflow-auto px-3.5 py-3 font-mono text-small leading-relaxed whitespace-pre-wrap text-muted">
+              {dryRun.output.trim() || dryRun.error || t('sync.dryRunEmpty')}
+            </pre>
+          </Card>
+        )}
 
         {!report && !loading && (
           <p className="px-1 py-6 text-center text-note text-muted">{t('sync.beforeReport')}</p>
@@ -510,26 +530,25 @@ function DeployModal({
 }): ReactNode {
   const t = useT()
   const [text, setText] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy, error } = useAction()
   const [result, setResult] = useState<string | null>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  // This dialog is keyed by environment id, so it can be unmounted before the
+  // timer fires; without the cleanup `onDone` would reload a panel that is gone.
+  useEffect(() => () => clearTimeout(closeTimer.current), [])
 
   const go = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await call('sync:deploy', { id: project.id, plan, confirm: text })
-      if (res.ok) {
-        setResult(res.output)
-        setTimeout(onDone, 1200)
-      } else {
-        setError(res.error ?? t('dashboard.reset.genericError'))
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+    const res = await run(async () => {
+      const r = await call('sync:deploy', { id: project.id, plan, confirm: text })
+      // A refused deploy reports itself in the result rather than throwing.
+      if (!r.ok) throw new Error(r.error ?? t('dashboard.reset.genericError'))
+      return r
+    })
+    if (!res) return
+    setResult(res.output)
+    // A beat on the result before the dialog closes itself.
+    closeTimer.current = setTimeout(onDone, 1200)
   }
 
   return (

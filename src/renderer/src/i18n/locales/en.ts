@@ -646,6 +646,8 @@ const en = {
     create: 'Create'
   },
   sync: {
+    dryRunResult: 'Dry run result',
+    dryRunEmpty: 'The dry run returned no output.',
     noEnv: {
       title: 'No remote environment',
       hint: 'Add a managed (supabase.com) or self-hosted (SSH + Docker) environment — then you’ll see the diff against local in one screen.'
