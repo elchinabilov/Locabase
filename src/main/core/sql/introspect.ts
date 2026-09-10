@@ -5,9 +5,9 @@
  * doesn't report `attidentity`/`attgenerated` cleanly, has no row estimate, and
  * is noticeably slower.
  */
+import type { DbColumn, DbCompletion, DbRelKind, DbSchema, DbTable } from '@shared/types.js'
 import { rowsOf, targetFor } from './target.js'
 import { qualify } from './ident.js'
-import type { DbColumn, DbCompletion, DbRelKind, DbSchema, DbTable } from '@shared/types.js'
 
 /** Supabase's own schemas — not filtered out, just collapsed in the UI. */
 const SUPABASE_SCHEMAS = new Set([
@@ -51,9 +51,7 @@ export async function schemas(
     owner: r.owner,
     comment: r.comment,
     system:
-      SUPABASE_SCHEMAS.has(r.name) ||
-      r.name === 'information_schema' ||
-      r.name.startsWith('pg_')
+      SUPABASE_SCHEMAS.has(r.name) || r.name === 'information_schema' || r.name.startsWith('pg_')
   }))
 }
 
@@ -84,11 +82,7 @@ interface TableRaw extends Record<string, unknown> {
   has_pk: boolean
 }
 
-export async function tables(
-  id: string,
-  envId: string | null,
-  schema: string
-): Promise<DbTable[]> {
+export async function tables(id: string, envId: string | null, schema: string): Promise<DbTable[]> {
   const rows = await rowsOf<TableRaw>(targetFor(id, envId), TABLES_SQL, [schema])
   return rows.map((r) => {
     const kind = r.kind as DbRelKind

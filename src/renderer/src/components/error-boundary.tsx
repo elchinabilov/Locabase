@@ -7,8 +7,8 @@
  * lost, not the sidebar they need in order to navigate away from it.
  */
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { Button, ErrorNote } from './ui'
 import { useT } from '../i18n'
+import { Button, ErrorNote } from './ui'
 
 interface Props {
   children: ReactNode

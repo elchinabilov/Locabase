@@ -1,4 +1,9 @@
-import type { ReactNode, InputHTMLAttributes, ButtonHTMLAttributes } from 'react'
+import type {
+  ReactNode,
+  InputHTMLAttributes,
+  ButtonHTMLAttributes,
+  KeyboardEvent as ReactKeyboardEvent
+} from 'react'
 import { useEffect, useRef } from 'react'
 import { cx } from '../lib/format'
 import { useI18n, useT } from '../i18n'
@@ -115,10 +120,7 @@ export function Dot({ tone }: { tone: 'ok' | 'warn' | 'danger' | 'muted' }): Rea
 
 /* ------------------------------------------------------------------ Inputs */
 
-export function Input({
-  className,
-  ...rest
-}: InputHTMLAttributes<HTMLInputElement>): ReactNode {
+export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>): ReactNode {
   return (
     <input
       {...rest}
@@ -209,6 +211,11 @@ export function Select({
 
 /* ------------------------------------------------------------------- Modal */
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+let modalSeq = 0
+
 export function Modal({
   title,
   onClose,
@@ -224,14 +231,43 @@ export function Modal({
 }): ReactNode {
   const t = useT()
   const ref = useRef<HTMLDivElement>(null)
+  const titleId = useRef(`modal-title-${++modalSeq}`).current
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
+    const dialog = ref.current
+    // Where focus was before the dialog opened, so it can be handed back. Without
+    // this the caret lands at the top of the document on close.
+    const opener = document.activeElement as HTMLElement | null
+    dialog?.focus()
+    return () => opener?.focus?.()
+  }, [])
+
+  /**
+   * Escape and Tab are handled ON the dialog rather than on `window`: a nested
+   * dialog (the grid's value zoom inside a row editor) would otherwise see one
+   * Escape close both. Tab is cycled inside, so focus cannot wander into the
+   * sidebar behind the overlay.
+   */
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (e.key === 'Escape') {
+      e.stopPropagation()
+      onClose()
+      return
     }
-    window.addEventListener('keydown', onKey)
-    ref.current?.focus()
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+    if (e.key !== 'Tab') return
+    const items = [...(ref.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])]
+    if (items.length === 0) return
+    const first = items[0]!
+    const last = items[items.length - 1]!
+    const active = document.activeElement
+    if (e.shiftKey && (active === first || active === ref.current)) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
 
   return (
     <div
@@ -239,18 +275,35 @@ export function Modal({
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
+      // Presentational: it exists to catch a click outside the dialog. It must
+      // NOT be `aria-hidden` — that would hide the dialog inside it from screen
+      // readers. Escape on the dialog is the keyboard equivalent of this click.
+      role="presentation"
     >
+      {/* A dialog handling its own Escape and Tab is the point of a focus trap;
+          the rule classes `dialog` as non-interactive and cannot see that. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
         ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         tabIndex={-1}
+        onKeyDown={onKeyDown}
         className={cx(
           'flex max-h-full w-full flex-col rounded-lg border border-line bg-panel shadow-2xl outline-none',
           wide ? 'max-w-4xl' : 'max-w-lg'
         )}
       >
         <header className="flex items-center justify-between border-b border-line-soft px-4 py-3">
-          <h2 className="text-card font-medium">{title}</h2>
-          <button onClick={onClose} className="text-muted hover:text-text" aria-label={t('common.close')}>
+          <h2 id={titleId} className="text-card font-medium">
+            {title}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-muted hover:text-text"
+            aria-label={t('common.close')}
+          >
             ✕
           </button>
         </header>
@@ -344,7 +397,6 @@ export function formatCount(n: number, locale: 'az' | 'en'): string {
   return n.toLocaleString(locale === 'az' ? 'az-AZ' : 'en-US')
 }
 
-
 /* ---------------------------------------------------------------- Skeleton */
 
 /**
@@ -391,7 +443,11 @@ export function SkeletonText({
 }): ReactNode {
   const t = useT()
   return (
-    <div className={cx('flex flex-col gap-2', className)} role="status" aria-label={t('common.loading')}>
+    <div
+      className={cx('flex flex-col gap-2', className)}
+      role="status"
+      aria-label={t('common.loading')}
+    >
       {Array.from({ length: lines }, (_, i) => (
         <Skeleton
           key={i}
@@ -429,10 +485,7 @@ export function SkeletonList({
       aria-label={t('common.loading')}
     >
       {Array.from({ length: rows }, (_, i) => (
-        <li
-          key={i}
-          className={cx('flex items-center gap-3 px-3.5', compact ? 'py-2' : 'py-2.5')}
-        >
+        <li key={i} className={cx('flex items-center gap-3 px-3.5', compact ? 'py-2' : 'py-2.5')}>
           {avatar && <Skeleton w={14} h={14} round delay={i * 80} />}
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <Skeleton h={10} w={`${58 - (i % 3) * 11}%`} delay={i * 80} />
@@ -455,7 +508,11 @@ export function SkeletonRows({
 }): ReactNode {
   const t = useT()
   return (
-    <div className={cx('flex flex-col gap-0.5', className)} role="status" aria-label={t('common.loading')}>
+    <div
+      className={cx('flex flex-col gap-0.5', className)}
+      role="status"
+      aria-label={t('common.loading')}
+    >
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-2 rounded-md px-2.5 py-2">
           <Skeleton w={6} h={6} round delay={i * 80} />

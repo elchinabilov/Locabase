@@ -6,13 +6,6 @@
  * verify**. When a schema change touches application code the migration has to
  * land first, which is why functions come after it.
  */
-import { readMap } from './envfile.js'
-import { logBus } from './log.js'
-import { listFiles, report as migrationReport } from './migrations.js'
-import { list as listFunctions } from './functions.js'
-import { get as getProject, getEnv, paths } from './projects.js'
-import { adapterFor } from './remote/index.js'
-import { diff as schemaDiff } from './migrations.js'
 import type {
   DeployPlan,
   FunctionInfo,
@@ -22,6 +15,13 @@ import type {
   SyncReport,
   TaskResult
 } from '@shared/types.js'
+import { readMap } from './envfile.js'
+import { logBus } from './log.js'
+import { listFiles, report as migrationReport } from './migrations.js'
+import { list as listFunctions } from './functions.js'
+import { get as getProject, getEnv, paths } from './projects.js'
+import { adapterFor } from './remote/index.js'
+import { diff as schemaDiff } from './migrations.js'
 
 function axis<T>(items: T[], dirty: boolean, error: string | null = null): SyncAxis<T> {
   return { items, dirty, error }
@@ -42,7 +42,9 @@ export async function report(id: string, envId: string): Promise<SyncReport> {
 
   /* --- miqrasiyalar --- */
   const migrations = await migrationReport(id, envId)
-  const pending = migrations.rows.filter((r) => r.state === 'pending-remote' || r.state === 'remote-only')
+  const pending = migrations.rows.filter(
+    (r) => r.state === 'pending-remote' || r.state === 'remote-only'
+  )
 
   /* --- sxem diffi --- */
   const [schema, schemaErr] = await safe(async () => (await schemaDiff(id)).sql, '')

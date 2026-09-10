@@ -2,10 +2,12 @@
  * The IPC router. Every channel is one handler typed by `IpcContract`; an
  * exception thrown here shows up on the renderer side as `{ ok: false, error }`.
  */
+import { readFileSync } from 'node:fs'
 import { dialog, ipcMain, nativeTheme, shell, BrowserWindow } from 'electron'
 import { IPC_CHANNELS, type IpcChannel, type IpcContract } from '@shared/ipc.js'
 import { ZodError } from 'zod'
 import { describeIpcError, parseIpcRequest } from '@shared/ipc-schemas.js'
+import type { EnvEntry } from '@shared/types.js'
 import { logBus, redact } from '../core/log.js'
 import * as projects from '../core/projects.js'
 import * as scaffold from '../core/scaffold.js'
@@ -21,16 +23,16 @@ import * as secrets from '../core/secrets.js'
 import * as sql from '../core/sql/index.js'
 import * as queries from '../core/queries.js'
 import { adapterFor } from '../core/remote/index.js'
-import type { EnvEntry } from '@shared/types.js'
 import { scanToml } from '../core/toml/scan.js'
 import * as prefs from '../core/prefs.js'
 import * as storage from '../core/storage/index.js'
 import * as backups from '../core/backup/index.js'
 import * as scheduler from '../core/scheduler/index.js'
 import * as authUsers from '../core/sql/authusers.js'
-import { readFileSync } from 'node:fs'
 
-type Handlers = { [C in IpcChannel]: (req: IpcContract[C]['req']) => Promise<IpcContract[C]['res']> }
+type Handlers = {
+  [C in IpcChannel]: (req: IpcContract[C]['req']) => Promise<IpcContract[C]['res']>
+}
 
 /** Which keys in `config.toml` reference this env variable. */
 function envReferences(projectPath: string): Map<string, string[]> {

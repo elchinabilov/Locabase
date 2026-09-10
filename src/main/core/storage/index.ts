@@ -76,12 +76,17 @@ export function upsert(input: StorageConnectionInput, secretAccessKey?: string):
   const accessKeyId = clean(input.accessKeyId)
 
   if (!name) throw new StorageError('A name is required')
-  if (input.provider !== 'r2') throw new StorageError(`Unknown provider: ${input.provider}`)
+  if (input.provider !== 'r2') throw new StorageError(`Unknown provider: ${String(input.provider)}`)
   if (!/^[a-f0-9]{8,}$/i.test(accountId)) throw new StorageError('The R2 account id looks wrong')
-  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket)) throw new StorageError('Invalid bucket name')
+  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket))
+    throw new StorageError('Invalid bucket name')
   if (!accessKeyId) throw new StorageError('An access key id is required')
 
-  const existing = input.id ? store().get('connections').find((c) => c.id === input.id) : undefined
+  const existing = input.id
+    ? store()
+        .get('connections')
+        .find((c) => c.id === input.id)
+    : undefined
   if (input.id && !existing) throw new StorageError(`Storage connection not found: ${input.id}`)
 
   const id = existing?.id ?? randomUUID()
@@ -105,7 +110,9 @@ export function upsert(input: StorageConnectionInput, secretAccessKey?: string):
     throw new StorageError('A secret access key is required')
   }
 
-  const rest = store().get('connections').filter((c) => c.id !== id)
+  const rest = store()
+    .get('connections')
+    .filter((c) => c.id !== id)
   store().set('connections', [...rest, conn])
   return { ...conn, hasSecret: true }
 }
@@ -114,7 +121,9 @@ export function remove(id: string): void {
   secrets.remove(secretKey(id))
   store().set(
     'connections',
-    store().get('connections').filter((c) => c.id !== id)
+    store()
+      .get('connections')
+      .filter((c) => c.id !== id)
   )
 }
 

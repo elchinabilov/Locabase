@@ -6,10 +6,10 @@
  *  - remote: Management API / `psql`, where `$n` cannot be bound, so literals are
  *    pasted in with `inlineParams()` before the call.
  */
-import { poolFor } from './pool.js'
-import { inlineParams } from './ident.js'
 import { get as getProject, getEnv } from '../projects.js'
 import { adapterFor, type RemoteAdapter } from '../remote/index.js'
+import { poolFor } from './pool.js'
+import { inlineParams } from './ident.js'
 
 export interface Target {
   id: string

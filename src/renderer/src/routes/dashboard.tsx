@@ -4,7 +4,19 @@ import { formatBytes, SERVICE_GROUPS } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
 import { cx, timeAgo } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
-import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Row, Skeleton, Toggle } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  Dot,
+  Empty,
+  ErrorNote,
+  Input,
+  Modal,
+  Row,
+  Skeleton,
+  Toggle
+} from '../components/ui'
 import type { RouteId } from '../app'
 
 /** `SERVICE_GROUPS` carries no `note` (so `shared/` stays free of i18n) — the key lives here. */
@@ -35,7 +47,8 @@ export function Dashboard({
           <div className="flex flex-col items-center gap-3">
             <p>
               {t('dashboard.empty.hintBefore')}{' '}
-              <code className="text-accent">supabase/config.toml</code> {t('dashboard.empty.hintAfter')}
+              <code className="text-accent">supabase/config.toml</code>{' '}
+              {t('dashboard.empty.hintAfter')}
             </p>
             <div className="flex gap-2">
               <Button variant="primary" onClick={onNew}>
@@ -62,9 +75,13 @@ function ProjectView({
 }): ReactNode {
   const t = useT()
   const { locale } = useI18n()
-  const status = useQuery('stack:status', { id: project.id, withStats: true }, {
-    pollMs: 8000
-  })
+  const status = useQuery(
+    'stack:status',
+    { id: project.id, withStats: true },
+    {
+      pollMs: 8000
+    }
+  )
   const config = useQuery('config:read', { id: project.id })
   const conflicts = useQuery('ports:conflicts', undefined, { pollMs: 30000 })
   const [busy, setBusy] = useState<string | null>(null)
@@ -177,7 +194,11 @@ function ProjectView({
       )}
 
       {confirmReset && (
-        <ResetModal project={project} onClose={() => setConfirmReset(false)} onDone={status.refresh} />
+        <ResetModal
+          project={project}
+          onClose={() => setConfirmReset(false)}
+          onDone={status.refresh}
+        />
       )}
     </div>
   )
@@ -204,7 +225,7 @@ function Services({
 }): ReactNode {
   const t = useT()
   const noteFor = (configPath: string | null): string | undefined =>
-    configPath ? SERVICE_NOTE_KEY[configPath] && t(SERVICE_NOTE_KEY[configPath]!) : undefined
+    configPath ? SERVICE_NOTE_KEY[configPath] && t(SERVICE_NOTE_KEY[configPath]) : undefined
   const [tailing, setTailing] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [saving, setSaving] = useState<string | null>(null)
@@ -568,7 +589,8 @@ function ResetModal({
       }
     >
       <p className="mb-3 text-ui leading-relaxed">
-        {t('dashboard.reset.body')} <span className="text-danger">{t('dashboard.reset.dataLoss')}</span>
+        {t('dashboard.reset.body')}{' '}
+        <span className="text-danger">{t('dashboard.reset.dataLoss')}</span>
       </p>
       <Row label={t('dashboard.reset.confirmLabel', { name: project.name })}>
         <Input value={text} onChange={(e) => setText(e.target.value)} autoFocus />

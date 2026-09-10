@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { ZodError } from 'zod'
 import { IPC_CHANNELS } from '../src/shared/ipc.js'
 import { IPC_SCHEMAS, describeIpcError, parseIpcRequest } from '../src/shared/ipc-schemas.js'
-import { ZodError } from 'zod'
 
 describe('IPC schema coverage', () => {
   it('has a schema for every registered channel', () => {

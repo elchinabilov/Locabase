@@ -13,14 +13,14 @@ function leafPaths(node: Node, prefix = ''): string[] {
 describe('i18n locales', () => {
   it('en.ts covers every key in az.ts (no translation gap)', () => {
     const azKeys = new Set(leafPaths(az))
-    const enKeys = new Set(leafPaths(en as Node))
+    const enKeys = new Set(leafPaths(en))
     const missing = [...azKeys].filter((k) => !enKeys.has(k))
     expect(missing).toEqual([])
   })
 
   it('en.ts has no key that az.ts lacks (no dead key)', () => {
     const azKeys = new Set(leafPaths(az))
-    const enKeys = new Set(leafPaths(en as Node))
+    const enKeys = new Set(leafPaths(en))
     const extra = [...enKeys].filter((k) => !azKeys.has(k))
     expect(extra).toEqual([])
   })
@@ -34,6 +34,6 @@ describe('i18n locales', () => {
       }
     }
     check(az)
-    check(en as Node)
+    check(en)
   })
 })

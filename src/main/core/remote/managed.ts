@@ -17,9 +17,6 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { supabase, supabaseJson } from '../cli.js'
-import { get as getSecret, keys } from '../secrets.js'
-import { readTree } from '../filetree.js'
 import type {
   BackupFormat,
   BackupInfo,
@@ -35,9 +32,12 @@ import type {
   SqlRun,
   VerifyReport
 } from '@shared/types.js'
+import { supabase, supabaseJson } from '../cli.js'
+import { get as getSecret, keys } from '../secrets.js'
+import { readTree } from '../filetree.js'
 import type { MigrationFile } from '../migrations.js'
-import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 import { toSqlError } from '../sql/build.js'
+import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 
 const API = 'https://api.supabase.com'
 
@@ -261,11 +261,9 @@ export class ManagedAdapter implements RemoteAdapter {
     const dir = mkdtempSync(join(tmpdir(), 'supagui-'))
     const file = join(dir, '.env')
     try {
-      writeFileSync(
-        file,
-        entries.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join('\n'),
-        { mode: 0o600 }
-      )
+      writeFileSync(file, entries.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join('\n'), {
+        mode: 0o600
+      })
       log(`Sending ${entries.length} secret(s): ${entries.map(([k]) => k).join(', ')}`)
       const res = await supabase(
         ['secrets', 'set', '--project-ref', this.env.projectRef, '--env-file', file],
@@ -279,7 +277,13 @@ export class ManagedAdapter implements RemoteAdapter {
 
   async listFunctions(): Promise<RemoteFunctionInfo[]> {
     const rows = await this.api<
-      Array<{ slug: string; version: number; status: string; updated_at: number; verify_jwt: boolean }>
+      Array<{
+        slug: string
+        version: number
+        status: string
+        updated_at: number
+        verify_jwt: boolean
+      }>
     >(`/v1/projects/${this.env.projectRef}/functions`)
     return rows.map((r) => ({
       name: r.slug,
@@ -303,7 +307,15 @@ export class ManagedAdapter implements RemoteAdapter {
     try {
       mkdirSync(join(work, 'supabase'), { recursive: true })
       writeFileSync(join(work, 'supabase', 'config.toml'), `project_id = "download"\n`, 'utf8')
-      const args = ['functions', 'download', name, '--project-ref', this.env.projectRef, '--workdir', work]
+      const args = [
+        'functions',
+        'download',
+        name,
+        '--project-ref',
+        this.env.projectRef,
+        '--workdir',
+        work
+      ]
       const opts = { cwd: work, env: this.cliEnv(), stream: this.stream, timeoutMs: 5 * 60 * 1000 }
       // `--use-api` unbundles server-side — no Docker required.
       // Older CLIs don't know the flag, in which case we retry the normal way.
@@ -324,7 +336,12 @@ export class ManagedAdapter implements RemoteAdapter {
       log(`deploy: ${name}`)
       const res = await supabase(
         ['functions', 'deploy', name, '--project-ref', this.env.projectRef],
-        { cwd: this.project.path, env: this.cliEnv(), stream: this.stream, timeoutMs: 10 * 60 * 1000 }
+        {
+          cwd: this.project.path,
+          env: this.cliEnv(),
+          stream: this.stream,
+          timeoutMs: 10 * 60 * 1000
+        }
       )
       if (!res.ok) throw new Error(`${name}: ${res.error ?? res.output}`)
     }
@@ -382,7 +399,10 @@ export class ManagedAdapter implements RemoteAdapter {
    * `read_only` is enforced SERVER-side: that is our only protection here, because
    * this transport has no way to send `begin read only`.
    */
-  private async queryApi(query: string, readOnly: boolean): Promise<Array<Record<string, unknown>>> {
+  private async queryApi(
+    query: string,
+    readOnly: boolean
+  ): Promise<Array<Record<string, unknown>>> {
     return this.api<Array<Record<string, unknown>>>(
       `/v1/projects/${this.env.projectRef}/database/query`,
       { method: 'POST', body: JSON.stringify({ query, read_only: readOnly }) }

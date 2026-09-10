@@ -8,9 +8,9 @@
  */
 import { spawn, type SpawnOptions } from 'node:child_process'
 import { createReadStream, createWriteStream, rmSync, statSync } from 'node:fs'
+import type { TaskResult } from '@shared/types.js'
 import { logBus } from './log.js'
 import { resolvedPath, whichBin } from './env-path.js'
-import type { TaskResult } from '@shared/types.js'
 
 export interface RunOptions {
   cwd?: string
@@ -164,11 +164,7 @@ function balancedSlice(text: string, start: number): string | null {
  * contain brackets itself (`Stopped services: [supabase_imgproxy_...]`). So every
  * candidate position is tried and the first slice that **parses** wins.
  */
-export async function runJson<T>(
-  cmd: string,
-  args: string[],
-  opts: RunOptions = {}
-): Promise<T> {
+export async function runJson<T>(cmd: string, args: string[], opts: RunOptions = {}): Promise<T> {
   const res = await run(cmd, args, { ...opts, quiet: true })
   const text = res.output
   let last: string | null = null
@@ -282,13 +278,12 @@ export async function runToFile(
         try {
           resolve({ bytes: statSync(file).size })
         } catch (err) {
-          reject(err as Error)
+          reject(err instanceof Error ? err : new Error(String(err)))
         }
       })
     })
   })
 }
-
 
 /**
  * Like `run()`, but stdin is **streamed from a file**.
@@ -345,23 +340,20 @@ export function runFromFile(
     }
     child.stdout?.on('data', collect('stdout'))
     child.stderr?.on('data', collect('stderr'))
-    child.on('error', (err) => finish(null, (err as Error).message))
+    child.on('error', (err) => finish(null, err.message))
     child.on('close', (code) => finish(code, null))
 
     const input = createReadStream(file)
     // EPIPE: the command gave up early (a bad dump) — its own exit code and
     // stderr are the real error, so the broken pipe itself is not reported.
-    input.on('error', (err) => finish(null, (err as Error).message))
+    input.on('error', (err) => finish(null, err.message))
     child.stdin?.on('error', () => undefined)
-    input.pipe(child.stdin!)
+    input.pipe(child.stdin)
   })
 }
 
 /** Run the `supabase` CLI inside the project folder. */
-export function supabase(
-  args: string[],
-  opts: RunOptions & { cwd: string }
-): Promise<TaskResult> {
+export function supabase(args: string[], opts: RunOptions & { cwd: string }): Promise<TaskResult> {
   return run('supabase', args, opts)
 }
 

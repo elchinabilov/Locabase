@@ -5,10 +5,19 @@
  * as ordinary files. Nothing is added to `.gitignore` — anyone who wants them
  * private can add the `supabase/.locabase/` line themselves.
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { get as getProject, paths } from './projects.js'
 import type { Project, SavedQuery } from '@shared/types.js'
+import { get as getProject, paths } from './projects.js'
 
 /**
  * The dot is left out DELIBERATELY: that kills `..`, `a.b`, `/abs` and NUL tricks
@@ -22,7 +31,9 @@ export function dirFor(project: Project): string {
 
 export function fileFor(project: Project, name: string): string {
   if (!NAME_RE.test(name)) {
-    throw new Error('The name may only contain letters, digits, spaces, `_` and `-` (64 characters max).')
+    throw new Error(
+      'The name may only contain letters, digits, spaces, `_` and `-` (64 characters max).'
+    )
   }
   const dir = dirFor(project)
   const file = resolve(dir, `${name}.sql`)
@@ -87,7 +98,8 @@ export function renameFor(project: Project, name: string, to: string): SavedQuer
   const from = fileFor(project, name)
   const dest = fileFor(project, to)
   if (!existsSync(from)) throw new Error(`Query not found: ${name}`)
-  if (existsSync(dest) && from !== dest) throw new Error(`A query with this name already exists: ${to}`)
+  if (existsSync(dest) && from !== dest)
+    throw new Error(`A query with this name already exists: ${to}`)
   renameSync(from, dest)
   return describe(dest, to)
 }

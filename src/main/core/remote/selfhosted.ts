@@ -6,9 +6,7 @@
  * second configuration to keep in sync.
  */
 import { basename } from 'node:path'
-import { run, runFromFile, runToFile } from '../cli.js'
-import { paths } from '../projects.js'
-import { MAX_FILE_BYTES } from '../filetree.js'
+import { randomUUID } from 'node:crypto'
 import { parseBytes } from '@shared/services.js'
 import type {
   BackupFormat,
@@ -24,12 +22,14 @@ import type {
   SqlRun,
   VerifyReport
 } from '@shared/types.js'
+import { run, runFromFile, runToFile } from '../cli.js'
+import { paths } from '../projects.js'
+import { MAX_FILE_BYTES } from '../filetree.js'
 import type { MigrationFile } from '../migrations.js'
 import { readMigration } from '../migrations.js'
-import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 import { parsePsqlCsv, parsePsqlError } from '../sql/csv.js'
 import { quoteLiteral } from '../sql/ident.js'
-import { randomUUID } from 'node:crypto'
+import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 
 /** A string that is safe to paste into a remote shell. */
 function sq(value: string): string {
@@ -220,7 +220,11 @@ export class SelfHostedAdapter implements RemoteAdapter {
     }
     try {
       const out = await this.psql('select version();', ['-At'])
-      details.push({ label: 'Postgres', ok: true, info: out.trim().split('\n')[0]?.slice(0, 60) ?? '' })
+      details.push({
+        label: 'Postgres',
+        ok: true,
+        info: out.trim().split('\n')[0]?.slice(0, 60) ?? ''
+      })
     } catch (err) {
       details.push({ label: 'Postgres', ok: false, info: (err as Error).message })
     }
@@ -304,8 +308,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
     log: LogFn
   ): Promise<{ bytes: number; format: BackupFormat }> {
     const only = scope === 'schema' ? ' --schema-only' : scope === 'data' ? ' --data-only' : ''
-    const cmd =
-      `docker exec -i ${sq(this.env.dbContainer)} pg_dump -U postgres -d postgres -Fc${only}`
+    const cmd = `docker exec -i ${sq(this.env.dbContainer)} pg_dump -U postgres -d postgres -Fc${only}`
     log(`${this.env.name}: pg_dump over ssh → ${basename(file)}`)
     const res = await runToFile('ssh', [...this.sshArgs(), this.env.sshHost, cmd], file, {
       stream: this.stream,
@@ -386,10 +389,9 @@ export class SelfHostedAdapter implements RemoteAdapter {
   async listFunctions(): Promise<RemoteFunctionInfo[]> {
     if (!this.env.functionsContainer) return []
     const dir = `${this.env.remoteDir}/volumes/functions`
-    const out = await this.ssh(
-      `ls -1 ${sq(dir)} 2>/dev/null | grep -v '^_' || true`,
-      { quiet: true }
-    )
+    const out = await this.ssh(`ls -1 ${sq(dir)} 2>/dev/null | grep -v '^_' || true`, {
+      quiet: true
+    })
     const names = out
       .split('\n')
       .map((l) => l.trim())
@@ -485,7 +487,14 @@ export class SelfHostedAdapter implements RemoteAdapter {
       log('rsync: _shared')
       await run(
         'rsync',
-        ['-az', '--delete', '-e', sshCmd, `${sharedLocal}/`, `${this.env.sshHost}:${remoteDir}/_shared/`],
+        [
+          '-az',
+          '--delete',
+          '-e',
+          sshCmd,
+          `${sharedLocal}/`,
+          `${this.env.sshHost}:${remoteDir}/_shared/`
+        ],
         { stream: this.stream, timeoutMs: 5 * 60 * 1000 }
       )
     }

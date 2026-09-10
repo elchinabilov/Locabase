@@ -17,11 +17,11 @@
  * `banned_until` in the future, a delete is a row removal that the auth schema's
  * own foreign keys cascade. See `setBanned()` and `remove()`.
  */
+import type { AuthUser, AuthUserDetail, AuthUsersPage, AuthUsersQuery } from '@shared/types.js'
 import { rowsOf, targetFor, type Target } from './target.js'
 import { poolFor } from './pool.js'
 import { inlineParams } from './ident.js'
 import { clampInt } from './build.js'
-import type { AuthUser, AuthUserDetail, AuthUsersPage, AuthUsersQuery } from '@shared/types.js'
 
 /** Sorting is never interpolated from the request — only these are allowed through. */
 const SORTS: Record<string, string> = {
@@ -310,7 +310,11 @@ function asJson(v: unknown): string | null {
   try {
     return JSON.stringify(v, null, 2)
   } catch {
-    return String(v)
+    // Circular metadata, or a BigInt. A primitive still stringifies usefully;
+    // anything else would only produce '[object Object]', so say so instead.
+    return typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint'
+      ? String(v)
+      : '[unserializable]'
   }
 }
 
@@ -336,7 +340,9 @@ export async function setBanned(
   const target = targetFor(id, envId)
   const has = await columnsOf(target, 'users')
   if (!has.has('banned_until')) {
-    throw new Error('This stack’s auth.users has no banned_until column — it is too old to ban users.')
+    throw new Error(
+      'This stack’s auth.users has no banned_until column — it is too old to ban users.'
+    )
   }
 
   const updated = await exec(

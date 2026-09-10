@@ -53,8 +53,7 @@ export function EnvForm({
     )
   }
 
-  const patch = <T extends RemoteEnv>(p: Partial<T>): void =>
-    setEnv((prev) => ({ ...prev, ...p }) as RemoteEnv)
+  const patch = <T extends RemoteEnv>(p: Partial<T>): void => setEnv((prev) => ({ ...prev, ...p }))
 
   const save = async (): Promise<void> => {
     setBusy(true)
@@ -120,7 +119,9 @@ export function EnvForm({
             </Row>
             <Row
               label={t('envForm.accessToken.label')}
-              hint={env.hasToken ? t('envForm.accessToken.hintSaved') : t('envForm.accessToken.hintNew')}
+              hint={
+                env.hasToken ? t('envForm.accessToken.hintSaved') : t('envForm.accessToken.hintNew')
+              }
             >
               <Input
                 type="password"
@@ -172,10 +173,15 @@ export function EnvForm({
                 className="font-mono"
               />
             </Row>
-            <Row label={t('envForm.functionsContainer.label')} hint={t('envForm.functionsContainer.hint')}>
+            <Row
+              label={t('envForm.functionsContainer.label')}
+              hint={t('envForm.functionsContainer.hint')}
+            >
               <Input
                 value={env.functionsContainer}
-                onChange={(e) => patch<SelfHostedEnv>({ functionsContainer: e.target.value.trim() })}
+                onChange={(e) =>
+                  patch<SelfHostedEnv>({ functionsContainer: e.target.value.trim() })
+                }
                 className="font-mono"
                 placeholder="supabase-edge-functions-xxxxxxxx"
               />

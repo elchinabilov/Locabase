@@ -10,7 +10,7 @@ export async function call<C extends IpcChannel>(
 ): Promise<IpcContract[C]['res']> {
   const res = await window.api.invoke<IpcContract[C]['res']>(channel, req)
   if (!res.ok) throw new IpcError(res.error ?? 'Unknown error')
-  return res.data as IpcContract[C]['res']
+  return res.data
 }
 
 export interface QueryState<T> {
@@ -111,11 +111,15 @@ export function useQuery<C extends IpcChannel>(
  * normalized so that two spellings of the same request are one dependency.
  */
 function stableKey(value: unknown): string {
-  return JSON.stringify(value, (_k, v: unknown) =>
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1)))
-      : v
-  ) ?? 'undefined'
+  return (
+    JSON.stringify(value, (_k, v: unknown) =>
+      v && typeof v === 'object' && !Array.isArray(v)
+        ? Object.fromEntries(
+            Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1))
+          )
+        : v
+    ) ?? 'undefined'
+  )
 }
 
 export function useEvent<E extends IpcEventName>(

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import { join, resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
 import { containedPath, isContained, PathError } from '../src/main/core/safe-path.js'
 
 const ROOT = resolve('/tmp/locabase-project')

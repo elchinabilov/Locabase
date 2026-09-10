@@ -4,10 +4,6 @@
  */
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { parse as parseToml } from 'smol-toml'
-import { applyPatches } from './toml/patch.js'
-import { scanToml } from './toml/scan.js'
-import { mask, readMap } from './envfile.js'
-import { get as getProject, paths } from './projects.js'
 import { CONFIG_FIELDS, FIELD_BY_PATH, needsRestart } from '@shared/config-schema.js'
 import { AUTH_PROVIDERS } from '@shared/providers.js'
 import type {
@@ -17,6 +13,10 @@ import type {
   FieldValue,
   PatchPreview
 } from '@shared/types.js'
+import { applyPatches } from './toml/patch.js'
+import { scanToml } from './toml/scan.js'
+import { mask, readMap } from './envfile.js'
+import { get as getProject, paths } from './projects.js'
 
 const ENV_REF = /^env\(([A-Za-z_][A-Za-z0-9_]*)\)$/
 
@@ -43,11 +43,7 @@ export function knownPaths(configText: string): string[] {
   return [...out]
 }
 
-function toFieldValue(
-  raw: unknown,
-  env: Map<string, string>,
-  secret: boolean
-): FieldValue {
+function toFieldValue(raw: unknown, env: Map<string, string>, secret: boolean): FieldValue {
   if (raw === undefined) return { kind: 'literal', value: '', present: false }
   if (typeof raw === 'string') {
     const m = ENV_REF.exec(raw)
