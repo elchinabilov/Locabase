@@ -8,15 +8,18 @@
  * They share nothing but the sidebar: one reads the database, the other edits a
  * file. Keeping them apart is what lets each be simple.
  */
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
+import { z } from 'zod'
 import type { Project } from '@shared/types'
+import { useUiState } from '../lib/ui-state'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import { Splitter, useStoredSize } from '../components/splitter'
 import { AuthUsers } from './auth-users'
 import { AuthProviders } from './auth-providers'
 
-type Section = 'users' | 'providers'
+const SECTION_IDS = ['users', 'providers'] as const
+type Section = (typeof SECTION_IDS)[number]
 
 const SECTIONS: Array<{ id: Section; key: TranslationKey; icon: string }> = [
   { id: 'users', key: 'auth.section.users', icon: '👤' },
@@ -27,7 +30,9 @@ const SIDEBAR = { default: 200, min: 160, max: 360 }
 
 export function AuthRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
-  const [section, setSection] = useState<Section>('users')
+  // Which of the two pages was open is navigation, not project data: it is
+  // remembered for the window, the way the route itself is.
+  const [section, setSection] = useUiState('auth.section', z.enum(SECTION_IDS), 'users')
   const [width, setWidth] = useStoredSize('locabase.auth.sidebarWidth', SIDEBAR.default)
 
   return (

@@ -63,7 +63,7 @@ Two conventions matter:
 
 ## State in the renderer
 
-There is no state library. Three hooks in `renderer/src/lib/` carry the
+There is no state library. A handful of hooks in `renderer/src/lib/` carry the
 patterns that would otherwise be rewritten per screen:
 
 - **`useQuery(channel, req, options)`** calls on mount and whenever the request
@@ -77,10 +77,50 @@ patterns that would otherwise be rewritten per screen:
   nothing on screen.
 - **`useStackStatus(projectId)`** shares one `stack:status` poll per project
   across every screen watching it, refcounted.
+- **`useUiState(key, schema, initial)`** is `useState` that survives leaving the
+  screen and closing the app — see below.
+- **`useOnChange(value, effect)`** is `useEffect` minus the mount run. Once a
+  screen starts _restored_, an effect that resets state when a value changes has
+  to tell "changed" from "was set", or it undoes the restore on the first render.
 
 Failures that get past all of that hit an `ErrorBoundary` — one at the root and
 one per route, so a screen that throws leaves the sidebar usable and navigating
 away clears it.
+
+### Where the user left off
+
+A route unmounts the moment you leave it, so every screen's _place_ — the
+environment picked, the schema, the selected table, the filters, the query being
+written — lives in [`lib/ui-state.ts`](../src/renderer/src/lib/ui-state.ts)
+instead of in the component that renders it.
+
+It is one `localStorage` entry, for the same reason the theme and the pane sizes
+are: the read has to be **synchronous**, or a screen mounts on a default and
+jumps a frame later. That entry is read and parsed **once**, at module load, and
+then served from memory; a write updates the memory copy and arms a 250 ms
+trailing flush, so a keystroke in a filter box costs a property assignment and
+the whole bag is serialized at most four times a second. The pending flush is
+forced on `pagehide`.
+
+Every value is validated against a Zod schema on the way back in. This is a file
+a user can edit and a format that changes between releases, so a stale schema
+name, a filter on a dropped column or a hand-typed `"pageSize": "lots"` has to
+fall back to the default rather than reach React. Ids are re-derived on top of
+that: a remembered environment or storage connection that no longer exists
+resolves to local, the way `MigrationsRoute` already did it.
+
+Growth is bounded in three places. Values that belong to one project are keyed
+`p.<projectId>.<name>` and dropped when the project leaves the registry. State
+that belongs to a table — its sort, filters and page size — is kept per table
+with only the twenty most recent remembered. A single text value over 200 KB is
+not remembered at all, so one runaway paste in the SQL editor cannot take the
+rest of the bag down with it.
+
+Four things are deliberately **not** remembered, each with the reason at its call
+site: SQL's read-only switch (it resets on every open by design), unsaved drafts
+in Configuration and Secrets (a pending write the user never saved, against a
+file that may have moved under it), "reveal secrets", and the page number of a
+paged list (page 4 of yesterday's rows is not page 4 today).
 
 ## The comment-preserving TOML patcher
 

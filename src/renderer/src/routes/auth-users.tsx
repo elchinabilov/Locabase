@@ -8,8 +8,10 @@
  * password hashing and identity rows, which is the admin API's job.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { AuthUser, AuthUserSort, AuthUserStatus, Project, RemoteEnv } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { useCopy } from '../lib/use-copy'
 import { cx, stamp } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
@@ -46,25 +48,42 @@ const SORTS: Array<{ id: AuthUserSort; key: TranslationKey }> = [
   { id: 'email_asc', key: 'authUsers.sort.emailAsc' }
 ]
 
+/* What the screen restores. The status and the sort are checked against the very
+   lists rendered above, so a value from an older release cannot select an option
+   that is not there. */
+const ENV_ID = z.string().min(1).max(200).nullable()
+const STATUS = z.custom<AuthUserStatus>((v) => STATUSES.some((s) => s.id === v))
+const SORT = z.custom<AuthUserSort>((v) => SORTS.some((s) => s.id === v))
+const PROVIDER = z.string().min(1).max(200).nullable()
+const PAGE_SIZE = z.number().refine((n) => PAGE_SIZES.includes(n))
+
 export function AuthUsers({ project }: { project: Project }): ReactNode {
   const t = useT()
   const { locale } = useI18n()
-  const [envId, setEnvId] = useState<string | null>(null)
+  /* The filters are where the user was, so they come back with the screen. The
+     environment id is re-derived every render: this screen is not remounted when
+     the project changes, and a remembered id belongs to one project only. */
+  const [pickedEnv, setEnvId] = useUiState(projectKey(project.id, 'authUsers.env'), ENV_ID, null)
+  const envId = pickedEnv !== null && envOf(project, pickedEnv) ? pickedEnv : null
   const { ready, blocked } = useDbGate(project.id, envId)
   const env = envOf(project, envId)
 
-  const [search, setSearch] = useState('')
-  const [provider, setProvider] = useState<string | null>(null)
-  const [status, setStatus] = useState<AuthUserStatus>('all')
-  const [sort, setSort] = useState<AuthUserSort>('created_desc')
-  const [pageSize, setPageSize] = useState(50)
+  const stateKey = (name: string): string => projectKey(project.id, `authUsers.${name}`)
+  const [search, setSearch] = useUiState(stateKey('search'), z.string(), '')
+  const [provider, setProvider] = useUiState(stateKey('provider'), PROVIDER, null)
+  const [status, setStatus] = useUiState<AuthUserStatus>(stateKey('status'), STATUS, 'all')
+  const [sort, setSort] = useUiState<AuthUserSort>(stateKey('sort'), SORT, 'created_desc')
+  const [pageSize, setPageSize] = useUiState(stateKey('pageSize'), PAGE_SIZE, 50)
+  /** The page is not remembered: it means nothing against tomorrow's rows. */
   const [page, setPage] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<PendingAction | null>(null)
 
   // Typing shouldn't fire a query per keystroke; the list catches up shortly
   // after the typing stops.
-  const [debounced, setDebounced] = useState('')
+  // Seeded from `search`, not from '': a restored term has already been typed, so
+  // the first query must carry it instead of loading the unfiltered list first.
+  const [debounced, setDebounced] = useState(search)
   useEffect(() => {
     const id = setTimeout(() => setDebounced(search), 250)
     return () => clearTimeout(id)

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { Project } from '@shared/types'
 import { call, useQuery } from './lib/ipc'
+import { pruneUiState, useUiState } from './lib/ui-state'
 import { useStackStatus } from './lib/stack-status'
 import { cx, shortPath } from './lib/format'
 import { useT, type TranslationKey } from './i18n'
@@ -18,19 +20,30 @@ import { MigrationsRoute } from './routes/migrations'
 import { EdgeFunctionsRoute } from './routes/edge-functions'
 import { SyncRoute } from './routes/sync'
 import { BackupsRoute } from './routes/backups'
-import { SettingsRoute, type SettingsSection } from './routes/settings'
+import { SettingsRoute, SETTINGS_SECTIONS, type SettingsSection } from './routes/settings'
 
-export type RouteId =
-  | 'dashboard'
-  | 'config'
-  | 'auth'
-  | 'tables'
-  | 'sql'
-  | 'migrations'
-  | 'functions'
-  | 'sync'
-  | 'backups'
-  | 'settings'
+/* The list is the runtime side of `RouteId`: the remembered route comes back
+   from storage as an unknown string and has to be checked against something. */
+const ROUTE_IDS = [
+  'dashboard',
+  'config',
+  'auth',
+  'tables',
+  'sql',
+  'migrations',
+  'functions',
+  'sync',
+  'backups',
+  'settings'
+] as const
+
+export type RouteId = (typeof ROUTE_IDS)[number]
+
+/* What the window is allowed to restore. A route that no longer exists, or an
+   id left over from a hand-edited store, falls back to the default. */
+const ROUTE = z.enum(ROUTE_IDS)
+const SETTINGS_SECTION = z.enum(SETTINGS_SECTIONS)
+const PROJECT_ID = z.string().min(1).max(200).nullable()
 
 const NAV: Array<{ id: RouteId; labelKey: TranslationKey; icon: string; needsProject: boolean }> = [
   { id: 'dashboard', labelKey: 'app.nav.dashboard', icon: '▣', needsProject: false },
@@ -47,11 +60,18 @@ const NAV: Array<{ id: RouteId; labelKey: TranslationKey; icon: string; needsPro
 
 export function App(): ReactNode {
   const projects = useQuery('projects:list', undefined)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [route, setRoute] = useState<RouteId>('dashboard')
+  /* Where the user was: the project, the screen and the drawer all come back as
+     they were left. The project id is checked against the registry below, so a
+     folder removed between two launches falls back instead of querying a ghost. */
+  const [selectedId, setSelectedId] = useUiState('projectId', PROJECT_ID, null)
+  const [route, setRoute] = useUiState('route', ROUTE, 'dashboard')
   /** Which Settings page is open — kept here so other screens can link into one. */
-  const [settingsSection, setSettingsSection] = useState<SettingsSection>('appearance')
-  const [logOpen, setLogOpen] = useState(false)
+  const [settingsSection, setSettingsSection] = useUiState(
+    'settingsSection',
+    SETTINGS_SECTION,
+    'appearance'
+  )
+  const [logOpen, setLogOpen] = useUiState('logOpen', z.boolean(), false)
   /** «+» → the new/existing choice */
   const [addOpen, setAddOpen] = useState(false)
   /** the folder chosen for «New project»; the modal opens on top of it */
@@ -63,7 +83,13 @@ export function App(): ReactNode {
   useEffect(() => {
     if (!selectedId && list.length > 0) setSelectedId(list[0]!.id)
     if (selectedId && !list.some((p) => p.id === selectedId)) setSelectedId(list[0]?.id ?? null)
-  }, [list, selectedId])
+  }, [list, selectedId, setSelectedId])
+
+  // The screens remember themselves per project; a project that is gone would
+  // otherwise keep its schema, filters and editor buffer forever.
+  useEffect(() => {
+    if (projects.data) pruneUiState(projects.data.map((p) => p.id))
+  }, [projects.data])
 
   const openProject = useCallback(async () => {
     const path = await call('projects:pickFolder')
@@ -71,7 +97,7 @@ export function App(): ReactNode {
     const project = await call('projects:add', { path })
     projects.refresh()
     setSelectedId(project.id)
-  }, [projects])
+  }, [projects, setSelectedId])
 
   const newProject = useCallback(async () => {
     const path = await call('projects:pickFolder')
@@ -100,6 +126,7 @@ export function App(): ReactNode {
               <Content
                 route={route}
                 project={selected}
+                loading={projects.loading && projects.data === null}
                 onProjectsChanged={projects.refresh}
                 onOpen={() => void openProject()}
                 onNew={() => void newProject()}
@@ -109,7 +136,7 @@ export function App(): ReactNode {
               />
             </ErrorBoundary>
           </div>
-          <LogDrawer open={logOpen} onToggle={() => setLogOpen((v) => !v)} />
+          <LogDrawer open={logOpen} onToggle={() => setLogOpen(!logOpen)} />
         </main>
       </div>
       {addOpen && (
@@ -137,6 +164,7 @@ export function App(): ReactNode {
 function Content({
   route,
   project,
+  loading,
   onProjectsChanged,
   onOpen,
   onNew,
@@ -146,6 +174,8 @@ function Content({
 }: {
   route: RouteId
   project: Project | null
+  /** The registry itself is still loading — no screen can say anything yet. */
+  loading: boolean
   onProjectsChanged: () => void
   onOpen: () => void
   onNew: () => void
@@ -158,6 +188,11 @@ function Content({
   // `useContext`, which takes no slot in the fiber's hook list — the moment
   // `useI18n` gains a `useState`, navigating here would throw.
   const t = useT()
+
+  // The remembered route can be one that needs a project, and the registry has
+  // not arrived yet: an empty state here would show for a frame and then be
+  // replaced by the screen. The sidebar is already showing its skeleton.
+  if (loading && !project && route !== 'settings') return null
 
   if (route === 'settings') {
     return <SettingsRoute section={settingsSection} onSection={onSettingsSection} />

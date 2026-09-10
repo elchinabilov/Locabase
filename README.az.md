@@ -175,6 +175,20 @@ yamaqsız keçid bayt-bayt eyni nəticə verməli, `auth.jwt_expiry` dəyişikli
 - `db reset` və remote deploy layihə adının yazılması ilə təsdiqlənir.
 - Remote sxem dəyişikliyindən əvvəl **həmişə** yedək alınır.
 
+## Qaldığın yer
+
+Ekranlar qaldığın yerdən açılır: layihə və bölmə, hər ekranda seçilmiş mühit,
+sxem və seçili cədvəl, hər cədvəlin öz sıralaması və filtrləri, «İstifadəçilər»
+və «Konfiqurasiya» filtrləri, həmçinin SQL redaktorunun mətni — yadda saxlanmış
+olsa da, olmasa da.
+
+Bunun üçün bir `localStorage` yazısı işlədilir: açılışda bir dəfə oxunur, yazı isə
+250 ms-lik gecikmə ilə toplanır — yəni filtr sətrinə basılan hər hərf serializasiya
+deyil, sadəcə bir dəyər təyini deməkdir. Geri oxunan hər dəyər yoxlanılır, ona
+görə silinmiş sxem və ya mühit sorğulanmır, defolta qayıdır. Üç şey qəsdən yadda
+saxlanmır: SQL-in **read-only** açarı (hər açılışda yenidən qoşulur), yadda
+saxlanmamış `config.toml` və `.env` dəyişiklikləri, və «secret-ləri göstər».
+
 ## Testlər
 
 ```bash

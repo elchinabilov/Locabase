@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Every screen comes back where you left it.** The project, the route, the open
+  Settings, Authentication and Edge Functions page, the log drawer, the
+  environment picked on SQL, Tables, Users, Migrations, Functions, Sync and
+  Backups, the schema and selected table with its tab, each table's own sort,
+  filters and page size, the Users filters, the Configuration group and search,
+  the open provider panel, the expanded service row on Overview, the backup scope
+  and target, and the SQL buffer itself — saved or not — are all restored on the
+  next visit and the next launch.
+
+  It is one `localStorage` entry, read once at startup and written on a 250 ms
+  trailing timer, so a keystroke in a filter box costs a property assignment
+  rather than a serialize. Everything is validated on the way back in, and ids
+  are re-derived, so a removed environment, a dropped schema or a deleted storage
+  connection falls back instead of being queried. Remembered state is dropped
+  when its project leaves the registry.
+
+  Four things stay deliberately unremembered: SQL's read-only switch, which still
+  resets on every open; unsaved Configuration and Secrets drafts; "reveal
+  secrets"; and the page number of a paged list.
+
 ### Security
 
 - The IPC boundary is validated at runtime. `IpcContract` is erased at build

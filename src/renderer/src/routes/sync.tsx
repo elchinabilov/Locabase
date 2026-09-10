@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type {
   DeployStep,
   HealthReport,
@@ -9,6 +10,7 @@ import type {
 } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { cx, timeAgo } from '../lib/format'
 import { useI18n, useT } from '../i18n'
 import {
@@ -26,6 +28,9 @@ import { EnvForm } from '../components/env-form'
 import { RemoteServices } from '../components/remote-services'
 import { DRIFT, FunctionDiffModal } from '../components/function-diff'
 
+/** The remembered environment choice; null falls through to the first one. */
+const ENV_ID = z.string().min(1).max(200).nullable()
+
 export function SyncRoute({
   project,
   onChanged
@@ -36,8 +41,9 @@ export function SyncRoute({
   const t = useT()
   // Derived, not seeded from props: seeding at mount left `envId` empty forever
   // when the first environment was added from the empty state below, so the
-  // panel never appeared. `picked` is only what the user chose explicitly.
-  const [picked, setPicked] = useState<string | null>(null)
+  // panel never appeared. `picked` is only what the user chose explicitly — it is
+  // remembered, and an id that has since been removed falls through to the first.
+  const [picked, setPicked] = useUiState(projectKey(project.id, 'sync.env'), ENV_ID, null)
   const [editing, setEditing] = useState<RemoteEnv | null | 'new'>(null)
   const env = project.environments.find((e) => e.id === picked) ?? project.environments[0] ?? null
   const envId = env?.id ?? ''

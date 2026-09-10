@@ -1,7 +1,9 @@
 import { useCallback, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { cx } from '../lib/format'
 import { useT } from '../i18n'
 import {
@@ -18,12 +20,15 @@ import {
 import { envOptions } from '../components/env-picker'
 import { DRIFT, FunctionDiffModal } from '../components/function-diff'
 
+/** The remembered environment choice; '' is the local stack. */
+const ENV_ID = z.string().max(200)
+
 export function FunctionsRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
-  // `picked` is the explicit choice; the id is re-derived every render so a
-  // removed environment falls back to local instead of being queried after it
-  // has stopped existing. Empty string = the local stack.
-  const [picked, setPicked] = useState<string>('')
+  // `picked` is the explicit choice, remembered between visits; the id is
+  // re-derived every render so a removed environment falls back to local instead
+  // of being queried after it has stopped existing. Empty string = the local stack.
+  const [picked, setPicked] = useUiState(projectKey(project.id, 'functions.env'), ENV_ID, '')
   const envId = project.environments.some((e) => e.id === picked) ? picked : ''
   const setEnvId = setPicked
   const list = useQuery('functions:list', { id: project.id, envId: envId || null })

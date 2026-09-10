@@ -6,11 +6,13 @@
  * one thing the config editor must never do.
  */
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { ConfigField, ConfigPatch, FieldValue, PatchPreview, Project } from '@shared/types'
 import { AUTH_PROVIDERS, callbackUrl, envVarName } from '@shared/providers'
 import { call, useQuery } from '../lib/ipc'
 import { useCopy } from '../lib/use-copy'
 import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Modal, SkeletonList, Toggle } from '../components/ui'
@@ -58,12 +60,25 @@ function fieldFor(providerId: string, name: string, t: (k: TranslationKey) => st
   }
 }
 
+/** The open provider panel, checked against the catalog that renders them. */
+const OPEN_PROVIDER = z.custom<string>((v) => AUTH_PROVIDERS.some((p) => p.id === v)).nullable()
+
 export function AuthProviders({ project }: { project: Project }): ReactNode {
   const t = useT()
   const doc = useQuery('config:read', { id: project.id })
+  /**
+   * Drafts are deliberately NOT remembered, on the same grounds as the
+   * Configuration screen: they are unsaved edits to `config.toml`, and the file
+   * may have moved underneath them since.
+   */
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [enabledOverride, setEnabledOverride] = useState<Record<string, boolean>>({})
-  const [open, setOpen] = useState<string | null>(null)
+  /** Which provider panel is open is where the user was, so it does come back. */
+  const [open, setOpen] = useUiState(
+    projectKey(project.id, 'authProviders.open'),
+    OPEN_PROVIDER,
+    null
+  )
   const [preview, setPreview] = useState<PatchPreview | null>(null)
   const { run, busy: saving, error } = useAction()
   const { copied, copy } = useCopy()

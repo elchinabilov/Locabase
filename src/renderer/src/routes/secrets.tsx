@@ -8,6 +8,12 @@ import { Badge, Button, Card, ErrorNote, Input, Modal, SkeletonList } from '../c
 
 export function SecretsRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
+  /**
+   * Neither of these is remembered, and both on purpose: "reveal" starts masked
+   * every time — a shoulder-surfable `.env` should not be one restart away — and
+   * `edits` are values the user never saved, against a file that may have changed
+   * since.
+   */
   const [reveal, setReveal] = useState(false)
   const entries = useQuery('env:read', { id: project.id, reveal })
   const doc = useQuery('config:read', { id: project.id })

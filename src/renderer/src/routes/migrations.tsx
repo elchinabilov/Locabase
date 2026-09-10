@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { MigrationRow, MigrationState, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import {
@@ -27,12 +29,15 @@ const STATE_META: Record<
   'local-only': { tone: 'danger', labelKey: 'migrations.state.localOnly' }
 }
 
+/** The remembered environment choice; '' is the local stack. */
+const ENV_ID = z.string().max(200)
+
 export function MigrationsRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
-  // `picked` is the explicit choice; the id is re-derived every render so a
-  // removed environment falls back to local instead of being queried after it
-  // has stopped existing. Empty string = the local stack.
-  const [picked, setPicked] = useState<string>('')
+  // `picked` is the explicit choice, remembered between visits; the id is
+  // re-derived every render so a removed environment falls back to local instead
+  // of being queried after it has stopped existing. Empty string = the local stack.
+  const [picked, setPicked] = useUiState(projectKey(project.id, 'migrations.env'), ENV_ID, '')
   const envId = project.environments.some((e) => e.id === picked) ? picked : ''
   const setEnvId = setPicked
   const report = useQuery('migrations:report', { id: project.id, envId: envId || null })

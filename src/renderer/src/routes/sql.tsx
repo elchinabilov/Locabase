@@ -9,9 +9,11 @@
  *     not writing it to the ledger is exactly the drift this app tries to prevent.
  */
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { Project, SqlErrorInfo, SqlRun } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import {
@@ -32,6 +34,20 @@ import { SavedQueriesPanel } from '../components/sql/saved-queries-panel'
 
 const MAX_ROWS = [100, 500, 1000, 5000]
 
+const TIMEOUTS: Array<{ value: number; labelKey: TranslationKey }> = [
+  { value: 5_000, labelKey: 'sql.timeout.5s' },
+  { value: 30_000, labelKey: 'sql.timeout.30s' },
+  { value: 120_000, labelKey: 'sql.timeout.2m' }
+]
+const TIMEOUT_MS = TIMEOUTS.map((tm) => tm.value)
+
+/* What the screen restores. The row limit and the timeout drive `<Select>`s, so
+   a value outside their options would render as a blank box. */
+const ENV_ID = z.string().min(1).max(200).nullable()
+const MAX_ROWS_VALUE = z.number().refine((n) => MAX_ROWS.includes(n))
+const TIMEOUT_VALUE = z.number().refine((n) => TIMEOUT_MS.includes(n))
+const QUERY_NAME = z.string().min(1).max(512).nullable()
+
 /* The three panes are user-resizable; these are where they start. The queries
    list is in pixels — a sidebar should keep its width when the window grows —
    while the results pane is a share of the height, so the editor and the grid
@@ -45,24 +61,42 @@ function starterDoc(t: (k: TranslationKey) => string): string {
 
 export function SqlRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
-  const TIMEOUTS: Array<{ value: number; label: string }> = [
-    { value: 5_000, label: t('sql.timeout.5s') },
-    { value: 30_000, label: t('sql.timeout.30s') },
-    { value: 120_000, label: t('sql.timeout.2m') }
-  ]
-  // Local by default — a remote environment only on an explicit choice
-  const [envId, setEnvId] = useState<string | null>(null)
+  // Local by default — a remote environment only on an explicit choice. `picked`
+  // is the choice; the id is re-derived, so an environment removed since the last
+  // visit falls back to local instead of being queried.
+  const [pickedEnv, setEnvId] = useUiState(projectKey(project.id, 'sql.env'), ENV_ID, null)
+  const envId = pickedEnv !== null && envOf(project, pickedEnv) ? pickedEnv : null
   const { ready, blocked } = useDbGate(project.id, envId)
   const env = envOf(project, envId)
 
+  /**
+   * NOT remembered, and the one thing on this screen that must not be: a session
+   * that ended in write mode has to start the next one read-only. See the note at
+   * the top of the file.
+   */
   const [readOnly, setReadOnly] = useState(true)
-  const [maxRows, setMaxRows] = useState(500)
-  const [timeoutMs, setTimeoutMs] = useState(30_000)
+  const [maxRows, setMaxRows] = useUiState(
+    projectKey(project.id, 'sql.maxRows'),
+    MAX_ROWS_VALUE,
+    500
+  )
+  const [timeoutMs, setTimeoutMs] = useUiState(
+    projectKey(project.id, 'sql.timeoutMs'),
+    TIMEOUT_VALUE,
+    30_000
+  )
 
-  const [doc, setDoc] = useState(() => starterDoc(t))
+  /* The buffer itself comes back, saved or not — an unsaved query is often the
+     reason the app is still open. A query past the 200 KB cap in `ui-state.ts` is
+     not remembered at all, and the next open starts from the starter query. */
+  const [doc, setDoc] = useUiState(projectKey(project.id, 'sql.doc'), z.string(), starterDoc(t))
   const [docKey, setDocKey] = useState(0)
-  const [activeName, setActiveName] = useState<string | null>(null)
-  const [dirty, setDirty] = useState(false)
+  const [activeName, setActiveName] = useUiState(
+    projectKey(project.id, 'sql.activeName'),
+    QUERY_NAME,
+    null
+  )
+  const [dirty, setDirty] = useUiState(projectKey(project.id, 'sql.dirty'), z.boolean(), false)
 
   const [run, setRun] = useState<SqlRun | null>(null)
   const [tab, setTab] = useState(0)
@@ -139,7 +173,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
       setActiveName(name)
       setDirty(false)
     },
-    [project.id]
+    [project.id, setActiveName, setDirty, setDoc]
   )
 
   const save = useCallback(
@@ -149,7 +183,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
       setDirty(false)
       saved.refresh()
     },
-    [project.id, doc, saved]
+    [project.id, doc, saved, setActiveName, setDirty]
   )
 
   const statements = useMemo(() => countStatements(doc), [doc])
@@ -222,7 +256,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
             <Select
               value={String(timeoutMs)}
               onChange={(v) => setTimeoutMs(Number(v))}
-              options={TIMEOUTS.map((tm) => ({ value: String(tm.value), label: tm.label }))}
+              options={TIMEOUTS.map((tm) => ({ value: String(tm.value), label: t(tm.labelKey) }))}
             />
           </div>
 

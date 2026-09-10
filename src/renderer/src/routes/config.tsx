@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { ConfigField, ConfigPatch, PatchPreview, Project } from '@shared/types'
 import { CONFIG_FIELDS, CONFIG_GROUPS } from '@shared/config-schema'
 import { call, useQuery } from '../lib/ipc'
 import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { cx } from '../lib/format'
 import { useI18n } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Modal, Skeleton } from '../components/ui'
@@ -28,16 +30,25 @@ function localize(field: ConfigField, tDynamic: (k: string) => string | undefine
   return { ...field, label: label ?? field.label, help: help ?? field.help }
 }
 
+/** The open group, checked against the file's own group list. */
+const GROUP = z.custom<string>((v) => CONFIG_GROUPS.some((g) => g === v))
+
 export function ConfigRoute({ project }: { project: Project }): ReactNode {
   const { t, tDynamic } = useI18n()
   const doc = useQuery('config:read', { id: project.id })
-  const [group, setGroup] = useState<string>('General')
+  const [group, setGroup] = useUiState(projectKey(project.id, 'config.group'), GROUP, 'General')
+  /**
+   * Drafts are deliberately NOT remembered. They are edits to `config.toml` that
+   * were never saved, and the file may have moved underneath them since — a
+   * restored draft would be a silent, invisible pending write against a document
+   * it no longer describes. Losing them is the safe direction.
+   */
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [preview, setPreview] = useState<PatchPreview | null>(null)
   const { run, busy: saving, error } = useAction()
   const [savedRestart, setSavedRestart] = useState(false)
   const [restarting, setRestarting] = useState(false)
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useUiState(projectKey(project.id, 'config.search'), z.string(), '')
 
   const values = doc.data?.values
 

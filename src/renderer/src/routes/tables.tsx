@@ -5,9 +5,12 @@
  * file, otherwise the ledger and the database drift apart.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { DbFilter, DbRow, DbTable, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { useAction } from '../lib/use-action'
+import { useOnChange } from '../lib/use-on-change'
+import { projectKey, useRecentUiState, useUiState } from '../lib/ui-state'
 import { cx } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
 import {
@@ -37,6 +40,35 @@ const PAGE_SIZES = [25, 50, 100, 500]
    grows — schema names are what decides how wide it wants to be, not the window. */
 const SIDEBAR = { default: 248, min: 180, max: 460 }
 
+/* What the screen is allowed to restore. Everything here outlives the database
+   it describes — a schema can be dropped, a column renamed, an environment
+   removed — so each value is checked on the way in and the screen falls back to
+   its default rather than querying something that is no longer there. */
+const ENV_ID = z.string().min(1).max(200).nullable()
+const NAME = z.string().min(1).max(512)
+const SELECTION = z.object({ schema: NAME, table: NAME }).nullable()
+const TAB = z.enum(['rows', 'structure'])
+
+const GRID_SORT = z.object({ column: NAME, dir: z.enum(['asc', 'desc']) }).nullable()
+const DB_FILTER = z.object({
+  column: NAME,
+  op: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'isnull', 'notnull']),
+  value: z.string().max(100_000).nullable()
+})
+
+/** The row view of one table: how it was sorted, filtered and paged. */
+const ROW_VIEW = z.object({
+  sort: GRID_SORT,
+  filters: z.array(DB_FILTER).max(20),
+  // Off-list sizes are rejected: the value drives a `<Select>`, and a size that
+  // is not one of its options renders as a blank box.
+  pageSize: z.number().refine((n) => PAGE_SIZES.includes(n))
+})
+
+type RowView = z.infer<typeof ROW_VIEW>
+
+const DEFAULT_ROW_VIEW: RowView = { sort: null, filters: [], pageSize: 50 }
+
 const KIND_LABEL_KEY: Record<string, TranslationKey> = {
   r: 'tables.kind.table',
   p: 'tables.kind.partitioned',
@@ -47,21 +79,35 @@ const KIND_LABEL_KEY: Record<string, TranslationKey> = {
 
 export function TablesRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
-  // Local by default — a remote environment only on an explicit choice
-  const [envId, setEnvId] = useState<string | null>(null)
+  // Local by default — a remote environment only on an explicit choice. `picked`
+  // is that choice; the id is re-derived every render, so an environment removed
+  // since the last visit falls back to local instead of being queried.
+  const [pickedEnv, setEnvId] = useUiState(projectKey(project.id, 'tables.env'), ENV_ID, null)
+  const envId = pickedEnv !== null && envOf(project, pickedEnv) ? pickedEnv : null
   const { ready, blocked } = useDbGate(project.id, envId)
   const env = envOf(project, envId)
-  const [includeSystem, setIncludeSystem] = useState(false)
-  const [schema, setSchema] = useState('public')
+  const [includeSystem, setIncludeSystem] = useUiState(
+    projectKey(project.id, 'tables.includeSystem'),
+    z.boolean(),
+    false
+  )
+  const [pickedSchema, setSchema] = useUiState(
+    projectKey(project.id, 'tables.schema'),
+    NAME,
+    'public'
+  )
   /**
    * The selection carries the schema it belongs to. Keeping them apart meant a
    * cross-schema jump from a foreign key (`setSchema` then `setTable`) tripped
    * the "schema changed, clear the table" effect and landed on nothing.
    */
-  const [selection, setSelection] = useState<{ schema: string; table: string } | null>(null)
-  const table = selection && selection.schema === schema ? selection.table : null
-  const [tab, setTab] = useState<'rows' | 'structure'>('rows')
-  const [filter, setFilter] = useState('')
+  const [selection, setSelection] = useUiState(
+    projectKey(project.id, 'tables.selection'),
+    SELECTION,
+    null
+  )
+  const [tab, setTab] = useUiState(projectKey(project.id, 'tables.tab'), TAB, 'rows')
+  const [filter, setFilter] = useUiState(projectKey(project.id, 'tables.search'), z.string(), '')
   const [sidebarWidth, setSidebarWidth] = useStoredSize(
     'locabase.tables.sidebarWidth',
     SIDEBAR.default
@@ -72,6 +118,14 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
     { id: project.id, envId, includeSystem },
     { enabled: ready }
   )
+  /* Same treatment as the environment: a remembered schema that this database
+     does not have (another environment, a dropped schema) resolves to the first
+     one the server reported rather than to an empty table list. */
+  const schema =
+    schemas.data && !schemas.data.some((s) => s.name === pickedSchema)
+      ? (schemas.data[0]?.name ?? pickedSchema)
+      : pickedSchema
+  const table = selection && selection.schema === schema ? selection.table : null
   const tables = useQuery(
     'db:tables',
     { id: project.id, envId, schema },
@@ -85,18 +139,23 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
   }, [tables.data, filter])
 
   // A different environment is a different database — nothing carries over.
-  useEffect(() => setSelection(null), [envId])
+  // `useOnChange`, not `useEffect`: on mount the environment has not changed,
+  // it has been *restored*, and clearing here would undo the restore.
+  useOnChange(envId, () => setSelection(null))
 
   const active = useMemo(
     () => (tables.data ?? []).find((tbl) => tbl.name === table) ?? null,
     [tables.data, table]
   )
 
-  const goTo = useCallback((nextSchema: string, nextTable: string) => {
-    setSchema(nextSchema)
-    setSelection({ schema: nextSchema, table: nextTable })
-    setTab('rows')
-  }, [])
+  const goTo = useCallback(
+    (nextSchema: string, nextTable: string) => {
+      setSchema(nextSchema)
+      setSelection({ schema: nextSchema, table: nextTable })
+      setTab('rows')
+    },
+    [setSchema, setSelection, setTab]
+  )
 
   return (
     <div className="flex h-full min-h-0">
@@ -243,10 +302,25 @@ function RowsPane({
   table: DbTable
 }): ReactNode {
   const t = useT()
-  const [pageSize, setPageSize] = useState(50)
+  /**
+   * Sort, filters and page size belong to *this* table, not to the screen: the
+   * filter that makes sense on `orders` is meaningless on `auth.users`. They are
+   * kept per table and per environment, with only the twenty most recently used
+   * tables remembered — a large database has thousands, and the ones before that
+   * are not coming back.
+   */
+  const [view, setView] = useRecentUiState(
+    projectKey(project.id, 'tables.rowView'),
+    `${envId ?? 'local'}.${table.schema}.${table.name}`,
+    ROW_VIEW,
+    DEFAULT_ROW_VIEW
+  )
+  const { pageSize, sort, filters } = view
+  const setPageSize = (n: number): void => setView({ ...view, pageSize: n })
+  const setSort = (next: GridSort | null): void => setView({ ...view, sort: next })
+  const setFilters = (next: DbFilter[]): void => setView({ ...view, filters: next })
+  /** The page is not remembered: page 4 of yesterday's rows is not page 4 today. */
   const [page, setPage] = useState(0)
-  const [sort, setSort] = useState<GridSort | null>(null)
-  const [filters, setFilters] = useState<DbFilter[]>([])
   /**
    * Selection and the open editor are keyed by PRIMARY KEY, not by row index.
    * An index is only meaningful for the page that produced it, so paging with

@@ -6,9 +6,11 @@
  * started it — lands in the same list underneath.
  */
 import { useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { BackupRecord, BackupScope, Job, Project } from '@shared/types'
 import { call, useEvent, useQuery } from '../lib/ipc'
 import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { stamp } from '../lib/format'
 import { useI18n, useT } from '../i18n'
 import { Button, ErrorNote, Input, Modal, Row, Select, Toggle } from '../components/ui'
@@ -17,6 +19,14 @@ import { JobList } from '../components/backups/job-list'
 import { BackupList } from '../components/backups/backup-list'
 import { shortFile } from '../components/backups/labels'
 import { JobFormModal, scopeOptions } from '../components/job-form'
+
+/* What the top bar restores. The environment and the storage connection are both
+   ids that can disappear between two visits, so each is re-derived against the
+   list actually on screen — a `<Select>` holding an id that is not one of its
+   options renders as a blank box. */
+const ENV_ID = z.string().max(200)
+const SCOPE = z.enum(['full', 'schema', 'data'])
+const STORAGE_ID = z.string().max(200)
 
 export function BackupsRoute({
   project,
@@ -32,10 +42,26 @@ export function BackupsRoute({
   const jobs = useQuery('jobs:list', { id: project.id })
   const storages = useQuery('storage:list', undefined)
 
-  const [envId, setEnvId] = useState('')
-  const [scope, setScope] = useState<BackupScope>('full')
-  const [storageId, setStorageId] = useState('')
-  const [keepLocal, setKeepLocal] = useState(true)
+  const [pickedEnv, setEnvId] = useUiState(projectKey(project.id, 'backups.env'), ENV_ID, '')
+  const envId =
+    pickedEnv !== '' && !project.environments.some((e) => e.id === pickedEnv) ? '' : pickedEnv
+  const [scope, setScope] = useUiState<BackupScope>(
+    projectKey(project.id, 'backups.scope'),
+    SCOPE,
+    'full'
+  )
+  const [pickedStorage, setStorageId] = useUiState(
+    projectKey(project.id, 'backups.storage'),
+    STORAGE_ID,
+    ''
+  )
+  const storageId =
+    storages.data && !storages.data.some((c) => c.id === pickedStorage) ? '' : pickedStorage
+  const [keepLocal, setKeepLocal] = useUiState(
+    projectKey(project.id, 'backups.keepLocal'),
+    z.boolean(),
+    true
+  )
   const { run, busy: running, runningLabel, error } = useAction()
 
   const [editingJob, setEditingJob] = useState<Job | null | 'new'>(null)

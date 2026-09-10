@@ -172,6 +172,18 @@ More detail: [architecture](docs/architecture.md) · [security model](docs/secur
 English by default, Azerbaijani available in Settings. The choice is stored in
 `localStorage`. See [docs/i18n.md](docs/i18n.md) to add a language.
 
+## Where you left off
+
+Screens come back as you left them: the project and the route, the environment
+picked on each screen, the schema and selected table, each table's own sort and
+filters, the Users and Configuration filters, and the SQL buffer — saved or not.
+
+It costs one `localStorage` entry, read once at startup and written on a 250 ms
+trailing timer, and everything is validated on the way back in, so a dropped
+schema or a removed environment falls back instead of being queried. Three things
+are deliberately not remembered: SQL's **read-only** switch, which resets on
+every open; unsaved `config.toml` and `.env` drafts; and "reveal secrets".
+
 ## Tests
 
 ```bash

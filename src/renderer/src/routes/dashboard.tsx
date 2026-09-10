@@ -1,9 +1,11 @@
 import { useCallback, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { FieldValue, Project, ServiceStatus, StackStatus } from '@shared/types'
 import { formatBytes, SERVICE_GROUPS } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
 import { useStackStatus } from '../lib/stack-status'
 import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { useCopy } from '../lib/use-copy'
 import { cx, timeAgo } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
@@ -193,6 +195,9 @@ function ProjectView({
   )
 }
 
+/** The expanded service row, by group key — an unknown key just opens nothing. */
+const EXPANDED = z.string().min(1).max(200).nullable()
+
 /**
  * The service list: each row maps to one `config.toml` key. Switching one off
  * doesn't stop its container — it tells the CLI never to bring it up, so the
@@ -215,8 +220,14 @@ function Services({
   const t = useT()
   const noteFor = (configPath: string | null): string | undefined =>
     configPath ? SERVICE_NOTE_KEY[configPath] && t(SERVICE_NOTE_KEY[configPath]) : undefined
+  /** A live log tail is not restored — it belongs to the session that started it. */
   const [tailing, setTailing] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState<string | null>(null)
+  // Which service row is open, on the other hand, is where the user was looking.
+  const [expanded, setExpanded] = useUiState(
+    projectKey(projectId, 'dashboard.expanded'),
+    EXPANDED,
+    null
+  )
   const { run, runningLabel: saving, error } = useAction()
   const services = status?.services ?? []
   const byKey = new Map(services.map((s) => [s.key, s]))

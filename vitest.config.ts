@@ -42,7 +42,7 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov'],
       include: ['src/main/**', 'src/shared/**', 'src/renderer/src/lib/**'],
       // Thresholds start at what is covered today, so the number can only go up.
-      thresholds: { statements: 42, branches: 86, functions: 74, lines: 42 }
+      thresholds: { statements: 43, branches: 87, functions: 76, lines: 43 }
     }
   }
 })
