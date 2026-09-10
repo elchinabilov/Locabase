@@ -2,9 +2,22 @@ import { useCallback, useState, type ReactNode } from 'react'
 import type { FieldValue, Project, ServiceStatus, StackStatus } from '@shared/types'
 import { formatBytes, SERVICE_GROUPS } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
+import { useStackStatus } from '../lib/stack-status'
+import { useAction } from '../lib/use-action'
+import { useCopy } from '../lib/use-copy'
 import { cx, timeAgo } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
-import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Row, Skeleton, Toggle } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  Dot,
+  Empty,
+  ErrorNote,
+  ConfirmModal,
+  Skeleton,
+  Toggle
+} from '../components/ui'
 import type { RouteId } from '../app'
 
 /** `SERVICE_GROUPS` carries no `note` (so `shared/` stays free of i18n) — the key lives here. */
@@ -15,13 +28,11 @@ const SERVICE_NOTE_KEY: Record<string, TranslationKey | undefined> = {
 
 export function Dashboard({
   project,
-  onChanged,
   onOpen,
   onNew,
   onRoute
 }: {
   project: Project | null
-  onChanged: () => void
   onOpen: () => void
   onNew: () => void
   onRoute: (r: RouteId) => void
@@ -35,7 +46,8 @@ export function Dashboard({
           <div className="flex flex-col items-center gap-3">
             <p>
               {t('dashboard.empty.hintBefore')}{' '}
-              <code className="text-accent">supabase/config.toml</code> {t('dashboard.empty.hintAfter')}
+              <code className="text-accent">supabase/config.toml</code>{' '}
+              {t('dashboard.empty.hintAfter')}
             </p>
             <div className="flex gap-2">
               <Button variant="primary" onClick={onNew}>
@@ -48,44 +60,37 @@ export function Dashboard({
       />
     )
   }
-  return <ProjectView key={project.id} project={project} onChanged={onChanged} onRoute={onRoute} />
+  return <ProjectView key={project.id} project={project} onRoute={onRoute} />
 }
 
 function ProjectView({
   project,
-  onChanged,
   onRoute
 }: {
   project: Project
-  onChanged: () => void
   onRoute: (r: RouteId) => void
 }): ReactNode {
   const t = useT()
   const { locale } = useI18n()
-  const status = useQuery('stack:status', { id: project.id, withStats: true }, [project.id], {
-    pollMs: 8000
-  })
-  const config = useQuery('config:read', { id: project.id }, [project.id])
-  const conflicts = useQuery('ports:conflicts', undefined, [], { pollMs: 30000 })
-  const [busy, setBusy] = useState<string | null>(null)
+  const status = useStackStatus(project.id, { withStats: true })
+  const config = useQuery('config:read', { id: project.id })
+  const conflicts = useQuery('ports:conflicts', undefined, { pollMs: 30000 })
+  const { run, runningLabel: busy, error: actionError } = useAction()
   const [confirmReset, setConfirmReset] = useState(false)
   const [needsRestart, setNeedsRestart] = useState(false)
 
   const act = useCallback(
     async (kind: 'start' | 'stop' | 'restart') => {
-      setBusy(kind)
-      try {
-        const channel = (
-          { start: 'stack:start', stop: 'stack:stop', restart: 'stack:restart' } as const
-        )[kind]
-        await call(channel, { id: project.id })
-        setNeedsRestart(false)
-      } finally {
-        setBusy(null)
-        status.refresh()
-      }
+      const channel = (
+        { start: 'stack:start', stop: 'stack:stop', restart: 'stack:restart' } as const
+      )[kind]
+      // Previously uncaught: a stack that refused to start produced an unhandled
+      // rejection and no change on screen at all.
+      const res = await run(() => call(channel, { id: project.id }), kind)
+      if (res) setNeedsRestart(false)
+      status.refresh()
     },
-    [project.id, status]
+    [project.id, status, run]
   )
 
   const s: StackStatus | null = status.data
@@ -128,6 +133,7 @@ function ProjectView({
         </div>
       </header>
 
+      {actionError && <ErrorNote>{actionError}</ErrorNote>}
       {status.error && <ErrorNote>{status.error}</ErrorNote>}
       {s?.error && !status.error && <ErrorNote>{s.error}</ErrorNote>}
 
@@ -166,7 +172,7 @@ function ProjectView({
             running={running}
             loading={status.loading && status.data === null}
           />
-          <Environments project={project} onRoute={onRoute} onChanged={onChanged} />
+          <Environments project={project} onRoute={onRoute} />
         </div>
       </div>
 
@@ -177,7 +183,11 @@ function ProjectView({
       )}
 
       {confirmReset && (
-        <ResetModal project={project} onClose={() => setConfirmReset(false)} onDone={status.refresh} />
+        <ResetModal
+          project={project}
+          onClose={() => setConfirmReset(false)}
+          onDone={status.refresh}
+        />
       )}
     </div>
   )
@@ -204,38 +214,35 @@ function Services({
 }): ReactNode {
   const t = useT()
   const noteFor = (configPath: string | null): string | undefined =>
-    configPath ? SERVICE_NOTE_KEY[configPath] && t(SERVICE_NOTE_KEY[configPath]!) : undefined
+    configPath ? SERVICE_NOTE_KEY[configPath] && t(SERVICE_NOTE_KEY[configPath]) : undefined
   const [tailing, setTailing] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [saving, setSaving] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { run, runningLabel: saving, error } = useAction()
   const services = status?.services ?? []
   const byKey = new Map(services.map((s) => [s.key, s]))
 
   const toggleTail = useCallback(
     async (container: string) => {
       const on = tailing !== container
-      if (tailing) await call('stack:tailLogs', { id: projectId, container: tailing, on: false })
-      if (on) await call('stack:tailLogs', { id: projectId, container, on: true })
-      setTailing(on ? container : null)
+      const ok = await run(async () => {
+        if (tailing) await call('stack:tailLogs', { id: projectId, container: tailing, on: false })
+        if (on) await call('stack:tailLogs', { id: projectId, container, on: true })
+        return true
+      })
+      if (ok) setTailing(on ? container : null)
     },
-    [projectId, tailing]
+    [projectId, tailing, run]
   )
 
   const setGroup = useCallback(
     async (configPath: string, on: boolean) => {
-      setSaving(configPath)
-      setError(null)
-      try {
-        await call('stack:setService', { id: projectId, configPath, on })
-        onToggled()
-      } catch (err) {
-        setError((err as Error).message)
-      } finally {
-        setSaving(null)
-      }
+      const ok = await run(
+        () => call('stack:setService', { id: projectId, configPath, on }),
+        configPath
+      )
+      if (ok !== undefined) onToggled()
     },
-    [projectId, onToggled]
+    [projectId, onToggled, run]
   )
 
   const total = services.reduce((sum, s) => sum + (s.memory ?? 0), 0)
@@ -422,16 +429,16 @@ function QuickLinks({
   loading?: boolean
 }): ReactNode {
   const t = useT()
-  const [copied, setCopied] = useState<string | null>(null)
-
-  const copy = useCallback((key: string, value: string) => {
-    void navigator.clipboard.writeText(value)
-    setCopied(key)
-    setTimeout(() => setCopied((c) => (c === key ? null : c)), 1200)
-  }, [])
+  const { run, error } = useAction()
+  const { copied, copy } = useCopy()
 
   return (
     <Card title={t('dashboard.quickLinks.title')}>
+      {error && (
+        <div className="px-3.5 pt-3">
+          <ErrorNote>{error}</ErrorNote>
+        </div>
+      )}
       {loading ? (
         <ul className="divide-y divide-line-soft" role="status" aria-label={t('common.loading')}>
           {[0, 1, 2, 3].map((i) => (
@@ -454,14 +461,14 @@ function QuickLinks({
                 {l.key.endsWith('KEY') ? `${vars[l.key]!.slice(0, 18)}…` : vars[l.key]}
               </span>
               <button
-                onClick={() => copy(l.key, vars[l.key]!)}
+                onClick={() => copy(vars[l.key]!, l.key)}
                 className="text-badge text-muted hover:text-accent"
               >
                 {copied === l.key ? '✓' : t('dashboard.quickLinks.copy')}
               </button>
               {l.open && (
                 <button
-                  onClick={() => void call('stack:openUrl', { url: vars[l.key]! })}
+                  onClick={() => void run(() => call('stack:openUrl', { url: vars[l.key]! }))}
                   className="text-badge text-muted hover:text-accent"
                 >
                   {t('dashboard.quickLinks.open')}
@@ -481,7 +488,6 @@ function Environments({
 }: {
   project: Project
   onRoute: (r: RouteId) => void
-  onChanged: () => void
 }): ReactNode {
   const t = useT()
   return (
@@ -530,50 +536,32 @@ function ResetModal({
   onDone: () => void
 }): ReactNode {
   const t = useT()
-  const [text, setText] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy, error } = useAction()
 
   const go = useCallback(async () => {
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await call('stack:reset', { id: project.id, confirm: text })
-      if (!res.ok) setError(res.error ?? t('dashboard.reset.genericError'))
-      else onClose()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-      onDone()
-    }
-  }, [project.id, text, onClose, onDone, t])
+    const res = await run(async () => {
+      const r = await call('stack:reset', { id: project.id, confirm: project.name })
+      // A refused reset reports itself in the result rather than throwing.
+      if (!r.ok) throw new Error(r.error ?? t('dashboard.reset.genericError'))
+      return r
+    })
+    if (res) onClose()
+    onDone()
+  }, [project.id, project.name, onClose, onDone, t, run])
 
   return (
-    <Modal
+    <ConfirmModal
       title={t('dashboard.reset.title')}
+      expected={project.name}
+      confirmLabel={t('dashboard.reset.confirmButton')}
+      hint={t('dashboard.reset.confirmLabel', { name: project.name })}
+      busy={busy}
+      error={error}
       onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="danger"
-            onClick={() => void go()}
-            loading={busy}
-            disabled={text !== project.name}
-          >
-            {t('dashboard.reset.confirmButton')}
-          </Button>
-        </>
-      }
+      onConfirm={() => void go()}
     >
-      <p className="mb-3 text-ui leading-relaxed">
-        {t('dashboard.reset.body')} <span className="text-danger">{t('dashboard.reset.dataLoss')}</span>
-      </p>
-      <Row label={t('dashboard.reset.confirmLabel', { name: project.name })}>
-        <Input value={text} onChange={(e) => setText(e.target.value)} autoFocus />
-      </Row>
-      {error && <ErrorNote>{error}</ErrorNote>}
-    </Modal>
+      {t('dashboard.reset.body')}{' '}
+      <span className="text-danger">{t('dashboard.reset.dataLoss')}</span>
+    </ConfirmModal>
   )
 }

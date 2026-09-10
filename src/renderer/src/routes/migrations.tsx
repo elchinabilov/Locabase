@@ -1,9 +1,20 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { MigrationRow, MigrationState, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
-import { Badge, Button, Card, ErrorNote, Input, Modal, Select, SkeletonTable } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorNote,
+  Modal,
+  NameModal,
+  Select,
+  SkeletonTable
+} from '../components/ui'
+import { envOptions } from '../components/env-picker'
 
 const STATE_META: Record<
   MigrationState,
@@ -18,14 +29,14 @@ const STATE_META: Record<
 
 export function MigrationsRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
-  const [envId, setEnvId] = useState<string>(project.environments[0]?.id ?? '')
-  const report = useQuery(
-    'migrations:report',
-    { id: project.id, envId: envId || null },
-    [project.id, envId]
-  )
-  const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  // `picked` is the explicit choice; the id is re-derived every render so a
+  // removed environment falls back to local instead of being queried after it
+  // has stopped existing. Empty string = the local stack.
+  const [picked, setPicked] = useState<string>('')
+  const envId = project.environments.some((e) => e.id === picked) ? picked : ''
+  const setEnvId = setPicked
+  const report = useQuery('migrations:report', { id: project.id, envId: envId || null })
+  const { run, runningLabel: busy, error } = useAction()
   const [creating, setCreating] = useState(false)
   const [diff, setDiff] = useState<string | null>(null)
   const [repairRow, setRepairRow] = useState<MigrationRow | null>(null)
@@ -39,19 +50,15 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
 
   const runTask = useCallback(
     async (label: string, fn: () => Promise<{ ok: boolean; error: string | null }>) => {
-      setBusy(label)
-      setError(null)
-      try {
+      await run(async () => {
         const res = await fn()
-        if (!res.ok) setError(res.error ?? t('dashboard.reset.genericError'))
-      } catch (err) {
-        setError((err as Error).message)
-      } finally {
-        setBusy(null)
-        report.refresh()
-      }
+        // These handlers report a refusal in the result rather than throwing.
+        if (!res.ok) throw new Error(res.error ?? t('dashboard.reset.genericError'))
+        return res
+      }, label)
+      report.refresh()
     },
-    [report, t]
+    [report, t, run]
   )
 
   return (
@@ -62,10 +69,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
           <Select
             value={envId}
             onChange={setEnvId}
-            options={[
-              { value: '', label: t('functions.localOnly') },
-              ...project.environments.map((e) => ({ value: e.id, label: `↔ ${e.name}` }))
-            ]}
+            options={envOptions(project, t('functions.localOnly'))}
           />
         </div>
         <div className="flex-1" />
@@ -100,13 +104,17 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
           <div className="flex flex-wrap items-center gap-2 text-small">
             <Badge tone={report.data?.localReachable ? 'ok' : 'muted'}>
               {t('migrations.localLedger', {
-                status: report.data?.localReachable ? t('migrations.read') : t('migrations.unreachable')
+                status: report.data?.localReachable
+                  ? t('migrations.read')
+                  : t('migrations.unreachable')
               })}
             </Badge>
             {envId && (
               <Badge tone={report.data?.remoteReachable ? 'ok' : 'danger'}>
                 {t('migrations.remoteLedger', {
-                  status: report.data?.remoteReachable ? t('migrations.read') : t('migrations.unreachable')
+                  status: report.data?.remoteReachable
+                    ? t('migrations.read')
+                    : t('migrations.unreachable')
                 })}
               </Badge>
             )}
@@ -125,18 +133,32 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
               <SkeletonTable rows={6} cols={5} widths={['26%', '30%', 42, 42, 42]} />
             )}
             {!report.loading && rows.length === 0 && (
-              <p className="px-3.5 py-6 text-center text-note text-muted">{t('migrations.empty')}</p>
+              <p className="px-3.5 py-6 text-center text-note text-muted">
+                {t('migrations.empty')}
+              </p>
             )}
             {rows.length > 0 && (
               <table className="w-full text-note">
                 <thead>
                   <tr className="border-b border-line-soft text-badge tracking-wide text-muted uppercase">
-                    <th className="px-3.5 py-1.5 text-left font-medium">{t('migrations.col.version')}</th>
-                    <th className="px-2 py-1.5 text-left font-medium">{t('migrations.col.name')}</th>
-                    <th className="px-2 py-1.5 text-center font-medium">{t('migrations.col.file')}</th>
-                    <th className="px-2 py-1.5 text-center font-medium">{t('migrations.col.local')}</th>
-                    <th className="px-2 py-1.5 text-center font-medium">{t('migrations.col.remote')}</th>
-                    <th className="px-3.5 py-1.5 text-right font-medium">{t('migrations.col.state')}</th>
+                    <th className="px-3.5 py-1.5 text-left font-medium">
+                      {t('migrations.col.version')}
+                    </th>
+                    <th className="px-2 py-1.5 text-left font-medium">
+                      {t('migrations.col.name')}
+                    </th>
+                    <th className="px-2 py-1.5 text-center font-medium">
+                      {t('migrations.col.file')}
+                    </th>
+                    <th className="px-2 py-1.5 text-center font-medium">
+                      {t('migrations.col.local')}
+                    </th>
+                    <th className="px-2 py-1.5 text-center font-medium">
+                      {t('migrations.col.remote')}
+                    </th>
+                    <th className="px-3.5 py-1.5 text-right font-medium">
+                      {t('migrations.col.state')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -149,13 +171,17 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
                       )}
                     >
                       <td className="px-3.5 py-1.5 font-mono text-small">{r.version}</td>
-                      <td className="max-w-[280px] truncate px-2 py-1.5 text-muted">{r.name || '—'}</td>
+                      <td className="max-w-[280px] truncate px-2 py-1.5 text-muted">
+                        {r.name || '—'}
+                      </td>
                       <Cell on={r.inFiles} />
                       <Cell on={r.appliedLocal} />
                       <Cell on={r.appliedRemote} />
                       <td className="px-3.5 py-1.5 text-right">
                         {r.state === 'synced' ? (
-                          <span className="text-meta text-muted">{t('migrations.state.synced')}</span>
+                          <span className="text-meta text-muted">
+                            {t('migrations.state.synced')}
+                          </span>
                         ) : (
                           <button
                             onClick={() => setRepairRow(r)}
@@ -180,9 +206,14 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
       </div>
 
       {creating && (
-        <NewMigration
+        <NameModal
+          title={t('migrations.newTitle')}
+          placeholder="add_feedback_table"
+          hint={t('migrations.nameHint', { name: t('functions.namePlaceholder') })}
+          confirmLabel={t('functions.create')}
+          valid={(v) => /^[a-z0-9_]+$/.test(v)}
           onClose={() => setCreating(false)}
-          onCreate={async (name) => {
+          onSubmit={async (name) => {
             const res = await call('migrations:new', { id: project.id, name })
             setCreating(false)
             report.refresh()
@@ -232,63 +263,6 @@ function Cell({ on }: { on: boolean | null }): ReactNode {
         <span className="text-warn-dim">·</span>
       )}
     </td>
-  )
-}
-
-function NewMigration({
-  onClose,
-  onCreate
-}: {
-  onClose: () => void
-  onCreate: (name: string) => Promise<string>
-}): ReactNode {
-  const t = useT()
-  const [name, setName] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const valid = /^[a-z0-9_]+$/.test(name)
-
-  return (
-    <Modal
-      title={t('migrations.newTitle')}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={!valid}
-            loading={busy}
-            onClick={() => {
-              setBusy(true)
-              setError(null)
-              void onCreate(name)
-                .catch((e: Error) => setError(e.message))
-                .finally(() => setBusy(false))
-            }}
-          >
-            {t('functions.create')}
-          </Button>
-        </>
-      }
-    >
-      <label className="mb-1 block text-note text-muted">{t('newProject.name.label')}</label>
-      <Input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="add_feedback_table"
-        className="font-mono"
-        autoFocus
-      />
-      <p className="mt-2 text-small text-muted">
-        {t('migrations.nameHint', { name: name || t('functions.namePlaceholder') })}
-      </p>
-      {error && (
-        <div className="mt-3">
-          <ErrorNote>{error}</ErrorNote>
-        </div>
-      )}
-    </Modal>
   )
 }
 

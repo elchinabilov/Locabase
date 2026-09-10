@@ -8,15 +8,10 @@
  * password hashing and identity rows, which is the admin API's job.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import type {
-  AuthUser,
-  AuthUserSort,
-  AuthUserStatus,
-  Project,
-  RemoteEnv
-} from '@shared/types'
+import type { AuthUser, AuthUserSort, AuthUserStatus, Project, RemoteEnv } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
-import { cx } from '../lib/format'
+import { useCopy } from '../lib/use-copy'
+import { cx, stamp } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
 import {
   Badge,
@@ -82,7 +77,6 @@ export function AuthUsers({ project }: { project: Project }): ReactNode {
   const users = useQuery(
     'auth:users',
     { id: project.id, envId, search: debounced, provider, status, sort, page, pageSize },
-    [project.id, envId, debounced, provider, status, sort, page, pageSize],
     { enabled: ready }
   )
 
@@ -102,9 +96,7 @@ export function AuthUsers({ project }: { project: Project }): ReactNode {
       <header className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
         <h1 className="text-h3 font-medium">{t('authUsers.title')}</h1>
         {users.data && (
-          <span className="text-small text-muted">
-            {formatCount(users.data.total, locale)}
-          </span>
+          <span className="text-small text-muted">{formatCount(users.data.total, locale)}</span>
         )}
         <EnvPicker project={project} envId={envId} onChange={setEnvId} />
         <div className="flex-1" />
@@ -282,7 +274,11 @@ function UserRow({
         {stamp(user.createdAt, locale)}
       </td>
       <td className="px-3 py-2 text-meta whitespace-nowrap text-muted">
-        {user.lastSignInAt ? stamp(user.lastSignInAt, locale) : <span className="text-faint">—</span>}
+        {user.lastSignInAt ? (
+          stamp(user.lastSignInAt, locale)
+        ) : (
+          <span className="text-faint">—</span>
+        )}
       </td>
       <td className="px-3 py-2 font-mono text-meta text-faint">{user.id}</td>
       {/* Stops the click from also opening the detail modal behind the menu. */}
@@ -336,8 +332,8 @@ function UserDetail({
 }): ReactNode {
   const t = useT()
   const { locale } = useI18n()
-  const [copied, setCopied] = useState(false)
-  const detail = useQuery('auth:user', { id: projectId, envId, userId }, [projectId, envId, userId])
+  const { copied, copy } = useCopy()
+  const detail = useQuery('auth:user', { id: projectId, envId, userId })
   const u = detail.data
 
   return (
@@ -347,13 +343,7 @@ function UserDetail({
       onClose={onClose}
       footer={
         <>
-          <Button
-            onClick={() => {
-              void navigator.clipboard.writeText(userId)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 1200)
-            }}
-          >
+          <Button onClick={() => copy(userId)}>
             {copied ? t('auth.copied') : t('authUsers.copyUid')}
           </Button>
           <Button variant="primary" onClick={onClose}>
@@ -403,9 +393,14 @@ function UserDetail({
                 </thead>
                 <tbody>
                   {u.identities.map((i) => (
-                    <tr key={`${i.provider}-${i.providerId}`} className="border-b border-line-soft last:border-0">
+                    <tr
+                      key={`${i.provider}-${i.providerId}`}
+                      className="border-b border-line-soft last:border-0"
+                    >
                       <td className="px-3 py-1.5">
-                        <Badge tone={i.provider === 'email' || i.provider === 'phone' ? 'muted' : 'info'}>
+                        <Badge
+                          tone={i.provider === 'email' || i.provider === 'phone' ? 'muted' : 'info'}
+                        >
                           {providerLabel(i.provider)}
                         </Badge>
                       </td>
@@ -528,11 +523,7 @@ function ConfirmAction({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant={kind === 'delete' ? 'danger' : 'primary'}
-            loading={busy}
-            onClick={run}
-          >
+          <Button variant={kind === 'delete' ? 'danger' : 'primary'} loading={busy} onClick={run}>
             {kind === 'delete'
               ? t('common.delete')
               : kind === 'ban'
@@ -568,46 +559,36 @@ function isBanned(user: AuthUser): boolean {
   return user.bannedUntil !== null && new Date(user.bannedUntil) > new Date()
 }
 
-/** `linkedin_oidc` → `LinkedIn OIDC`; anything unknown is title-cased as-is. */
-function providerLabel(id: string): string {
-  const known: Record<string, string> = {
-    email: 'Email',
-    phone: 'Phone',
-    anonymous: 'Anonymous',
-    linkedin_oidc: 'LinkedIn OIDC',
-    github: 'GitHub',
-    gitlab: 'GitLab',
-    google: 'Google',
-    apple: 'Apple',
-    azure: 'Azure',
-    bitbucket: 'Bitbucket',
-    discord: 'Discord',
-    facebook: 'Facebook',
-    figma: 'Figma',
-    kakao: 'Kakao',
-    keycloak: 'Keycloak',
-    notion: 'Notion',
-    slack: 'Slack',
-    spotify: 'Spotify',
-    twitch: 'Twitch',
-    twitter: 'Twitter',
-    workos: 'WorkOS',
-    zoom: 'Zoom'
-  }
-  return known[id] ?? id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+/**
+ * Module scope: this was rebuilt for every provider badge on every row, so a
+ * page of 50 users allocated it a few hundred times per render.
+ */
+const PROVIDER_LABELS: Record<string, string> = {
+  email: 'Email',
+  phone: 'Phone',
+  anonymous: 'Anonymous',
+  linkedin_oidc: 'LinkedIn OIDC',
+  github: 'GitHub',
+  gitlab: 'GitLab',
+  google: 'Google',
+  apple: 'Apple',
+  azure: 'Azure',
+  bitbucket: 'Bitbucket',
+  discord: 'Discord',
+  facebook: 'Facebook',
+  figma: 'Figma',
+  kakao: 'Kakao',
+  keycloak: 'Keycloak',
+  notion: 'Notion',
+  slack: 'Slack',
+  spotify: 'Spotify',
+  twitch: 'Twitch',
+  twitter: 'Twitter',
+  workos: 'WorkOS',
+  zoom: 'Zoom'
 }
 
-/** Absolute, not relative: "3 days ago" is useless when comparing two sign-ups. */
-function stamp(iso: string | null, locale: 'az' | 'en'): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleString(locale === 'az' ? 'az-AZ' : 'en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  })
+/** `linkedin_oidc` → `LinkedIn OIDC`; anything unknown is title-cased as-is. */
+function providerLabel(id: string): string {
+  return PROVIDER_LABELS[id] ?? id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }

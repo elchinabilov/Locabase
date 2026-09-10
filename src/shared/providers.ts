@@ -10,7 +10,7 @@
  * `id`, `label`, `fields` and `docs` are pure data.
  * strukturdur.
  */
-import type { AuthProviderMeta } from './types.js'
+import type { AuthProviderMeta } from './types/index.js'
 
 const BASE: Array<'client_id' | 'secret' | 'redirect_uri'> = ['client_id', 'secret', 'redirect_uri']
 

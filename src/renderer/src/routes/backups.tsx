@@ -8,22 +8,15 @@
 import { useState, type ReactNode } from 'react'
 import type { BackupRecord, BackupScope, Job, Project } from '@shared/types'
 import { call, useEvent, useQuery } from '../lib/ipc'
-import { bytes as humanBytes, cx, stamp } from '../lib/format'
+import { useAction } from '../lib/use-action'
+import { stamp } from '../lib/format'
 import { useI18n, useT } from '../i18n'
-import {
-  Badge,
-  Button,
-  Card,
-  Dot,
-  ErrorNote,
-  Input,
-  Modal,
-  Row,
-  Select,
-  SkeletonList,
-  Toggle
-} from '../components/ui'
-import { describeSchedule, JobFormModal, scopeOptions } from '../components/job-form'
+import { Button, ErrorNote, Input, Modal, Row, Select, Toggle } from '../components/ui'
+import { envOptions } from '../components/env-picker'
+import { JobList } from '../components/backups/job-list'
+import { BackupList } from '../components/backups/backup-list'
+import { shortFile } from '../components/backups/labels'
+import { JobFormModal, scopeOptions } from '../components/job-form'
 
 export function BackupsRoute({
   project,
@@ -34,18 +27,16 @@ export function BackupsRoute({
   onOpenSettings: () => void
 }): ReactNode {
   const t = useT()
-  const { locale } = useI18n()
 
-  const backups = useQuery('backups:list', { id: project.id }, [project.id])
-  const jobs = useQuery('jobs:list', { id: project.id }, [project.id])
+  const backups = useQuery('backups:list', { id: project.id })
+  const jobs = useQuery('jobs:list', { id: project.id })
   const storages = useQuery('storage:list', undefined)
 
   const [envId, setEnvId] = useState('')
   const [scope, setScope] = useState<BackupScope>('full')
   const [storageId, setStorageId] = useState('')
   const [keepLocal, setKeepLocal] = useState(true)
-  const [running, setRunning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy: running, runningLabel, error } = useAction()
 
   const [editingJob, setEditingJob] = useState<Job | null | 'new'>(null)
   const [removingJob, setRemovingJob] = useState<Job | null>(null)
@@ -66,9 +57,7 @@ export function BackupsRoute({
   const jobRows = jobs.data ?? []
 
   const takeBackup = async (): Promise<void> => {
-    setRunning(true)
-    setError(null)
-    try {
+    await run(async () => {
       const record = await call('backups:run', {
         id: project.id,
         envId: envId || null,
@@ -77,22 +66,14 @@ export function BackupsRoute({
         keepLocal: storageId ? keepLocal : true
       })
       // A failed dump comes back as a record, not as a thrown error.
-      if (record.status === 'failed') setError(record.error)
-      backups.refresh()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setRunning(false)
-    }
+      if (record.status === 'failed') throw new Error(record.error ?? t('backups.status.failed'))
+      return record
+    })
+    backups.refresh()
   }
 
   const runJob = async (job: Job): Promise<void> => {
-    setError(null)
-    try {
-      await call('jobs:runNow', { jobId: job.id })
-    } catch (err) {
-      setError((err as Error).message)
-    }
+    await run(() => call('jobs:runNow', { jobId: job.id }), job.id)
   }
 
   return (
@@ -103,13 +84,7 @@ export function BackupsRoute({
           <Select
             value={envId}
             onChange={setEnvId}
-            options={[
-              { value: '', label: `⌂ ${t('backups.localTarget')}` },
-              ...project.environments.map((e) => ({
-                value: e.id,
-                label: `${e.kind === 'managed' ? '☁' : '⛁'} ${e.name}`
-              }))
-            ]}
+            options={envOptions(project, t('backups.localTarget'))}
           />
         </div>
         <div className="w-44">
@@ -156,148 +131,30 @@ export function BackupsRoute({
             </div>
           )}
 
-          <Card
-            title={t('jobs.title')}
-            subtitle={t('jobs.subtitle')}
-            actions={<Button onClick={() => setEditingJob('new')}>{t('jobs.new')}</Button>}
-          >
-            {jobs.loading && <SkeletonList rows={2} avatar trailing />}
-            {!jobs.loading && jobRows.length === 0 && (
-              <p className="px-3.5 py-6 text-center text-note text-muted">{t('jobs.empty')}</p>
-            )}
-            <ul className="divide-y divide-line-soft">
-              {jobRows.map((job) => (
-                <li key={job.id} className="flex items-center gap-3 px-3.5 py-2.5">
-                  <Toggle
-                    checked={job.enabled}
-                    onChange={(on) => {
-                      void call('jobs:setEnabled', { jobId: job.id, enabled: on }).then(
-                        jobs.refresh
-                      )
-                    }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-ui text-text">{job.name}</span>
-                      <Badge tone="muted">{envLabel(project, job.envId, t('backups.localTarget'))}</Badge>
-                      {job.running && <Badge tone="info">{t('jobs.running')}</Badge>}
-                      {job.lastStatus && (
-                        <Badge tone={job.lastStatus === 'ok' ? 'ok' : 'danger'}>
-                          {t(job.lastStatus === 'ok' ? 'jobs.status.ok' : 'jobs.status.failed')}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-3 text-badge text-faint">
-                      <span>{describeSchedule(job.schedule, t)}</span>
-                      <span>
-                        {t('jobs.next', {
-                          time: job.nextRunAt ? stamp(job.nextRunAt, locale) : t('jobs.off')
-                        })}
-                      </span>
-                      <span>
-                        {t('jobs.last', {
-                          time: job.lastRunAt ? stamp(job.lastRunAt, locale) : t('jobs.never')
-                        })}
-                      </span>
-                      {job.storageId && <span>↥ {storageName(conns, job.storageId)}</span>}
-                    </div>
-                    {job.lastError && (
-                      <div className="mt-1 text-meta text-danger-soft">{job.lastError}</div>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <Button loading={job.running} onClick={() => void runJob(job)}>
-                      {t('jobs.runNow')}
-                    </Button>
-                    <Button variant="ghost" onClick={() => setEditingJob(job)}>
-                      {t('common.edit')}
-                    </Button>
-                    <Button variant="danger" onClick={() => setRemovingJob(job)}>
-                      {t('common.delete')}
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
+          <JobList
+            project={project}
+            jobs={jobRows}
+            loading={jobs.loading}
+            conns={conns}
+            runningLabel={runningLabel}
+            onRun={(job) => void runJob(job)}
+            onSetEnabled={(job, enabled) => {
+              void run(() => call('jobs:setEnabled', { jobId: job.id, enabled })).then(jobs.refresh)
+            }}
+            onNew={() => setEditingJob('new')}
+            onEdit={setEditingJob}
+            onRemove={setRemovingJob}
+          />
 
-          <Card
-            title={t('backups.count', { count: rows.length })}
-            subtitle={t('backups.restoreHint')}
-          >
-            {backups.loading && <SkeletonList rows={4} avatar trailing />}
-            {!backups.loading && rows.length === 0 && (
-              <p className="px-3.5 py-6 text-center text-note text-muted">{t('backups.empty')}</p>
-            )}
-            <ul className="divide-y divide-line-soft">
-              {rows.map((row) => (
-                <li key={row.id} className="flex items-center gap-3 px-3.5 py-2.5">
-                  <Dot
-                    tone={row.status === 'ok' ? 'ok' : row.status === 'running' ? 'warn' : 'danger'}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-ui text-text">{stamp(row.startedAt, locale)}</span>
-                      <Badge tone={row.kind === 'local' ? 'muted' : 'info'}>{row.envName}</Badge>
-                      <Badge tone="muted">{t(scopeKey(row.scope))}</Badge>
-                      <Badge tone={row.trigger === 'job' ? 'info' : 'muted'}>
-                        {row.trigger === 'job'
-                          ? (row.jobName ?? t('backups.trigger.job'))
-                          : t('backups.trigger.manual')}
-                      </Badge>
-                      {row.status !== 'ok' && (
-                        <Badge tone={row.status === 'running' ? 'warn' : 'danger'}>
-                          {t(
-                            row.status === 'running'
-                              ? 'backups.status.running'
-                              : 'backups.status.failed'
-                          )}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-3 font-mono text-badge text-faint">
-                      <span>{humanBytes(row.bytes)}</span>
-                      {row.durationMs !== null && (
-                        <span>{t('backups.seconds', { count: Math.round(row.durationMs / 1000) })}</span>
-                      )}
-                      <span className={cx(!row.path && 'text-warn')}>
-                        {row.path ? shortFile(row.path) : t('backups.fileGone')}
-                      </span>
-                      {row.storageKey ? (
-                        <span>
-                          ↥ {row.storageName} · {row.storageKey}
-                        </span>
-                      ) : (
-                        <span>{t('backups.localOnly')}</span>
-                      )}
-                    </div>
-                    {row.error && <div className="mt-1 text-meta text-danger-soft">{row.error}</div>}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {row.path && (
-                      <Button
-                        variant="ghost"
-                        onClick={() => void call('backups:reveal', { backupId: row.id })}
-                      >
-                        {t('backups.reveal')}
-                      </Button>
-                    )}
-                    {row.path && conns.length > 0 && (
-                      <Button variant="ghost" onClick={() => setUploading(row)}>
-                        {t('backups.upload')}
-                      </Button>
-                    )}
-                    {row.status === 'ok' && (row.path || row.storageKey) && (
-                      <Button onClick={() => setRestoring(row)}>{t('backups.restore')}</Button>
-                    )}
-                    <Button variant="danger" onClick={() => setRemovingBackup(row)}>
-                      {t('backups.remove')}
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </Card>
+          <BackupList
+            rows={rows}
+            loading={backups.loading}
+            conns={conns}
+            onReveal={(row) => void run(() => call('backups:reveal', { backupId: row.id }))}
+            onUpload={setUploading}
+            onRestore={setRestoring}
+            onRemove={setRemovingBackup}
+          />
         </div>
       </div>
 
@@ -328,7 +185,7 @@ export function BackupsRoute({
               <Button
                 variant="danger"
                 onClick={() => {
-                  void call('jobs:remove', { jobId: removingJob.id }).then(() => {
+                  void run(() => call('jobs:remove', { jobId: removingJob.id })).then(() => {
                     setRemovingJob(null)
                     jobs.refresh()
                   })
@@ -355,11 +212,7 @@ export function BackupsRoute({
       )}
 
       {restoring && (
-        <RestoreModal
-          project={project}
-          record={restoring}
-          onClose={() => setRestoring(null)}
-        />
+        <RestoreModal project={project} record={restoring} onClose={() => setRestoring(null)} />
       )}
 
       {uploading && (
@@ -390,20 +243,11 @@ function RemoveBackupModal({
 }): ReactNode {
   const t = useT()
   const [deleteFile, setDeleteFile] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const { run, busy, error } = useAction()
 
   const remove = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
-      await call('backups:remove', { id: record.projectId, backupId: record.id, deleteFile })
-      onDone()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+    const ok = await run(() => call('backups:remove', { backupId: record.id, deleteFile }))
+    if (ok !== undefined) onDone()
   }
 
   return (
@@ -442,20 +286,11 @@ function UploadModal({
 }): ReactNode {
   const t = useT()
   const [storageId, setStorageId] = useState(record.storageId ?? storages[0]?.id ?? '')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy, error } = useAction()
 
   const upload = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
-      await call('backups:upload', { backupId: record.id, storageId })
-      onDone()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+    const ok = await run(() => call('backups:upload', { backupId: record.id, storageId }))
+    if (ok !== undefined) onDone()
   }
 
   return (
@@ -465,7 +300,12 @@ function UploadModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" loading={busy} disabled={!storageId} onClick={() => void upload()}>
+          <Button
+            variant="primary"
+            loading={busy}
+            disabled={!storageId}
+            onClick={() => void upload()}
+          >
             {t('backups.upload')}
           </Button>
         </>
@@ -505,8 +345,7 @@ function RestoreModal({
   const [envId, setEnvId] = useState(record.envId ?? '')
   const [clean, setClean] = useState(true)
   const [confirm, setConfirm] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy, error } = useAction()
   const [done, setDone] = useState<{
     name: string
     seconds: number
@@ -520,30 +359,23 @@ function RestoreModal({
   const fromStorage = !record.path && Boolean(record.storageKey)
 
   const restore = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
+    await run(async () => {
       const result = await call('backups:restore', {
         backupId: record.id,
         envId: envId || null,
         clean,
         confirm
       })
-      if (result.ok) {
-        setDone({
-          name: result.envName,
-          seconds: Math.round(result.durationMs / 1000),
-          output: result.output,
-          failed: result.failedStatements
-        })
-      } else {
-        setError(result.error)
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+      // A failed restore reports itself in the result rather than throwing.
+      if (!result.ok) throw new Error(result.error ?? t('backups.status.failed'))
+      setDone({
+        name: result.envName,
+        seconds: Math.round(result.durationMs / 1000),
+        output: result.output,
+        failed: result.failedStatements
+      })
+      return result
+    })
   }
 
   return (
@@ -607,13 +439,7 @@ function RestoreModal({
                 setEnvId(v)
                 setConfirm('')
               }}
-              options={[
-                { value: '', label: `⌂ ${t('backups.localTarget')}` },
-                ...project.environments.map((e) => ({
-                  value: e.id,
-                  label: `${e.kind === 'managed' ? '☁' : '⛁'} ${e.name}`
-                }))
-              ]}
+              options={envOptions(project, t('backups.localTarget'))}
             />
           </Row>
 
@@ -629,43 +455,18 @@ function RestoreModal({
             </p>
           )}
 
-          <Row label={t('backups.restoreConfirm', { name: expected })} hint={t('backups.restoreWarning')}>
+          <Row
+            label={t('backups.restoreConfirm', { name: expected })}
+            hint={t('backups.restoreWarning')}
+          >
             <Input
               value={confirm}
               placeholder={expected}
               onChange={(e) => setConfirm(e.target.value)}
             />
           </Row>
-
         </div>
       )}
     </Modal>
   )
-}
-
-/* ------------------------------------------------------------------ helpers */
-
-function envLabel(project: Project, envId: string | null, localLabel: string): string {
-  if (!envId) return localLabel
-  return project.environments.find((e) => e.id === envId)?.name ?? envId
-}
-
-function storageName(
-  storages: Array<{ id: string; name: string }>,
-  storageId: string
-): string {
-  return storages.find((s) => s.id === storageId)?.name ?? storageId
-}
-
-function scopeKey(scope: BackupScope): 'backups.scope.full' | 'backups.scope.schema' | 'backups.scope.data' {
-  return scope === 'schema'
-    ? 'backups.scope.schema'
-    : scope === 'data'
-      ? 'backups.scope.data'
-      : 'backups.scope.full'
-}
-
-/** `…/supabase/.backups/prod/app-prod-20260909-030000.dump` → the file name. */
-function shortFile(path: string): string {
-  return path.split('/').pop() ?? path
 }

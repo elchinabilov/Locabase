@@ -76,6 +76,6 @@ describe('inlineParams', () => {
   })
 
   it('throws on a missing parameter', () => {
-    expect(() => inlineParams('$2', ['a'])).toThrow(/Parametr yoxdur/)
+    expect(() => inlineParams('$2', ['a'])).toThrow(/No such parameter/)
   })
 })

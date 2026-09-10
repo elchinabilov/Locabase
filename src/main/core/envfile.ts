@@ -22,7 +22,10 @@ function unquote(raw: string): { value: string; quote: string } {
     const q = trimmed[0]!
     if ((q === '"' || q === "'") && trimmed.endsWith(q)) {
       const inner = trimmed.slice(1, -1)
-      return { value: q === '"' ? inner.replace(/\\n/g, '\n').replace(/\\"/g, '"') : inner, quote: q }
+      return {
+        value: q === '"' ? inner.replace(/\\n/g, '\n').replace(/\\"/g, '"') : inner,
+        quote: q
+      }
     }
   }
   // an unquoted value may carry an inline comment: `KEY=value # comment`

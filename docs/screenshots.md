@@ -25,13 +25,13 @@ When you are done:
 `scripts/capture-screenshots.mjs` runs `electron-vite dev` once per screenshot
 with three environment variables read by `src/main/index.ts`:
 
-| Variable | Meaning |
-| --- | --- |
-| `LOCABASE_SHOT` | file to write the PNG to |
-| `LOCABASE_SHOT_JS` | JavaScript evaluated in the page first — it opens the screen |
-| `LOCABASE_SHOT_DELAY` | how long to wait before running that JavaScript |
-| `LOCABASE_SHOT_WAIT` | how long to wait after it, before capturing |
-| `LOCABASE_SHOT_WIDTH` | downscales the Retina-sized capture (1360 for the README) |
+| Variable              | Meaning                                                      |
+| --------------------- | ------------------------------------------------------------ |
+| `LOCABASE_SHOT`       | file to write the PNG to                                     |
+| `LOCABASE_SHOT_JS`    | JavaScript evaluated in the page first — it opens the screen |
+| `LOCABASE_SHOT_DELAY` | how long to wait before running that JavaScript              |
+| `LOCABASE_SHOT_WAIT`  | how long to wait after it, before capturing                  |
+| `LOCABASE_SHOT_WIDTH` | downscales the Retina-sized capture (1360 for the README)    |
 
 Two details make it reproducible:
 

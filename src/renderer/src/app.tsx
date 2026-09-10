@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Project } from '@shared/types'
 import { call, useQuery } from './lib/ipc'
+import { useStackStatus } from './lib/stack-status'
 import { cx, shortPath } from './lib/format'
 import { useT, type TranslationKey } from './i18n'
 import { Badge, Button, Dot, Empty, ErrorNote, SkeletonRows } from './components/ui'
 import { LogDrawer } from './components/log-drawer'
+import { ErrorBoundary } from './components/error-boundary'
 import { Mark, Wordmark } from './components/brand'
 import { AddProjectModal, NewProjectModal } from './components/new-project'
 import { Dashboard } from './routes/dashboard'
@@ -56,10 +58,7 @@ export function App(): ReactNode {
   const [newProjectDir, setNewProjectDir] = useState<string | null>(null)
 
   const list = projects.data ?? []
-  const selected = useMemo(
-    () => list.find((p) => p.id === selectedId) ?? null,
-    [list, selectedId]
-  )
+  const selected = useMemo(() => list.find((p) => p.id === selectedId) ?? null, [list, selectedId])
 
   useEffect(() => {
     if (!selectedId && list.length > 0) setSelectedId(list[0]!.id)
@@ -95,16 +94,20 @@ export function App(): ReactNode {
         />
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-auto">
-            <Content
-              route={route}
-              project={selected}
-              onProjectsChanged={projects.refresh}
-              onOpen={() => void openProject()}
-              onNew={() => void newProject()}
-              onRoute={setRoute}
-              settingsSection={settingsSection}
-              onSettingsSection={setSettingsSection}
-            />
+            {/* Keyed by route: a screen that throws is contained, the sidebar
+                survives, and navigating away clears the failure. */}
+            <ErrorBoundary key={route}>
+              <Content
+                route={route}
+                project={selected}
+                onProjectsChanged={projects.refresh}
+                onOpen={() => void openProject()}
+                onNew={() => void newProject()}
+                onRoute={setRoute}
+                settingsSection={settingsSection}
+                onSettingsSection={setSettingsSection}
+              />
+            </ErrorBoundary>
           </div>
           <LogDrawer open={logOpen} onToggle={() => setLogOpen((v) => !v)} />
         </main>
@@ -150,21 +153,18 @@ function Content({
   settingsSection: SettingsSection
   onSettingsSection: (s: SettingsSection) => void
 }): ReactNode {
+  // Above every early return: a hook after a conditional return is a Rules of
+  // Hooks violation. It survives today only because `useT` bottoms out in
+  // `useContext`, which takes no slot in the fiber's hook list — the moment
+  // `useI18n` gains a `useState`, navigating here would throw.
+  const t = useT()
+
   if (route === 'settings') {
     return <SettingsRoute section={settingsSection} onSection={onSettingsSection} />
   }
   if (route === 'dashboard') {
-    return (
-      <Dashboard
-        project={project}
-        onChanged={onProjectsChanged}
-        onOpen={onOpen}
-        onNew={onNew}
-        onRoute={onRoute}
-      />
-    )
+    return <Dashboard project={project} onOpen={onOpen} onNew={onNew} onRoute={onRoute} />
   }
-  const t = useT()
   if (!project) {
     return <Empty title={t('app.selectProject.title')} hint={t('app.selectProject.hint')} />
   }
@@ -173,17 +173,20 @@ function Content({
       return <ConfigRoute project={project} />
     case 'auth':
       return <AuthRoute project={project} />
-    // key: reset schema/table/editor state when the project changes
+    // key: every screen below holds per-project state (a selected schema, an
+    // environment, an editor buffer) — remounting is how it is reset. Without
+    // it, a switch carries the previous project's environment id into the next
+    // project's queries.
     case 'tables':
       return <TablesRoute key={project.id} project={project} />
     case 'sql':
       return <SqlRoute key={project.id} project={project} />
     case 'migrations':
-      return <MigrationsRoute project={project} />
+      return <MigrationsRoute key={project.id} project={project} />
     case 'functions':
-      return <EdgeFunctionsRoute project={project} />
+      return <EdgeFunctionsRoute key={project.id} project={project} />
     case 'sync':
-      return <SyncRoute project={project} onChanged={onProjectsChanged} />
+      return <SyncRoute key={project.id} project={project} onChanged={onProjectsChanged} />
     case 'backups':
       return (
         <BackupsRoute
@@ -241,6 +244,7 @@ function Sidebar({
         <button
           onClick={onAdd}
           title={t('app.sidebar.addProject')}
+          aria-label={t('app.sidebar.addProject')}
           className="rounded px-1.5 text-h2 leading-none text-muted hover:bg-panel-2 hover:text-accent"
         >
           +
@@ -283,7 +287,9 @@ function Sidebar({
                 disabled && 'cursor-not-allowed opacity-35 hover:bg-transparent'
               )}
             >
-              <span className="w-3.5 text-center text-note opacity-80">{item.icon}</span>
+              <span aria-hidden className="w-3.5 text-center text-note opacity-80">
+                {item.icon}
+              </span>
               {t(item.labelKey)}
             </button>
           )
@@ -302,7 +308,7 @@ function ProjectItem({
   active: boolean
   onClick: () => void
 }): ReactNode {
-  const status = useQuery('stack:status', { id: project.id }, [project.id], { pollMs: 8000 })
+  const status = useStackStatus(project.id)
   const running = status.data?.running ?? false
   const unhealthy =
     status.data?.services.some((s) => s.state === 'running' && s.health === 'unhealthy') ?? false
@@ -320,9 +326,7 @@ function ProjectItem({
         <span className="block truncate text-ui text-text">{project.name}</span>
         <span className="block truncate text-badge text-muted">{shortPath(project.path, 1)}</span>
       </span>
-      {project.environments.length > 0 && (
-        <Badge tone="muted">{project.environments.length}</Badge>
-      )}
+      {project.environments.length > 0 && <Badge tone="muted">{project.environments.length}</Badge>}
     </button>
   )
 }

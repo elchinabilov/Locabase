@@ -23,7 +23,7 @@ export const LOCALES: Array<{ id: Locale; label: string }> = [
   { id: 'en', label: 'English' }
 ]
 
-const DICTS: Record<Locale, Dict> = { az, en: en as Dict }
+const DICTS: Record<Locale, Dict> = { az, en: en }
 const STORAGE_KEY = 'locabase.locale'
 
 export type TranslationKey = Keys<typeof az>
@@ -100,7 +100,10 @@ export function I18nProvider({ children }: { children: ReactNode }): ReactNode {
     document.documentElement.lang = locale
   }, [locale])
 
-  const value = useMemo(() => ({ locale, setLocale, t, tDynamic }), [locale, setLocale, t, tDynamic])
+  const value = useMemo(
+    () => ({ locale, setLocale, t, tDynamic }),
+    [locale, setLocale, t, tDynamic]
+  )
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 

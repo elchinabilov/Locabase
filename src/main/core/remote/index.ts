@@ -14,7 +14,7 @@ import type {
   RemoteService,
   SqlRun,
   VerifyReport
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import type { MigrationFile } from '../migrations.js'
 import { ManagedAdapter } from './managed.js'
 import { SelfHostedAdapter } from './selfhosted.js'
@@ -94,6 +94,28 @@ export interface RemoteAdapter {
    * user SQL never passes through here.
    */
   queryJson<T>(sql: string): Promise<T[]>
+}
+
+/**
+ * Reach each endpoint and report what came back. Both adapters had their own
+ * copy of this loop; they only ever differed in which URLs they built.
+ *
+ * A 5xx is a failure, anything below it is not: an unauthenticated `GET` on
+ * `/rest/v1/` legitimately answers 401, and that still proves the service is up.
+ */
+export async function checkEndpoints(
+  targets: Array<[label: string, url: string]>
+): Promise<VerifyReport> {
+  const checks: VerifyReport['checks'] = []
+  for (const [label, url] of targets) {
+    try {
+      const res = await fetch(url, { method: 'GET' })
+      checks.push({ label, ok: res.status < 500, info: `HTTP ${res.status}` })
+    } catch (err) {
+      checks.push({ label, ok: false, info: (err as Error).message })
+    }
+  }
+  return { ok: checks.every((c) => c.ok), checks }
 }
 
 export function adapterFor(project: Project, env: RemoteEnv): RemoteAdapter {

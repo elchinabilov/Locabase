@@ -3,7 +3,7 @@
  * steps) lands here and goes on to the renderer as a `log:line` event.
  */
 import { EventEmitter } from 'node:events'
-import type { LogLine, LogLevel } from '@shared/types.js'
+import type { LogLine, LogLevel } from '@shared/types/index.js'
 
 const RING_SIZE = 2000
 

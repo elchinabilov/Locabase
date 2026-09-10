@@ -46,7 +46,7 @@ import type {
   SyncReport,
   TaskResult,
   VerifyReport
-} from './types.js'
+} from './types/index.js'
 
 export interface IpcContract {
   /* --- projects --- */
@@ -82,7 +82,7 @@ export interface IpcContract {
   /** Start/stop streaming container logs as `log:line` events */
   'stack:tailLogs': { req: { id: string; container: string; on: boolean }; res: void }
 
-  /* --- portlar --- */
+  /* --- ports --- */
   'ports:conflicts': { req: void; res: PortConflict[] }
   /** Suggest a free block of 100, e.g. 573 → 573xx */
   'ports:suggestRange': { req: void; res: number }
@@ -97,7 +97,7 @@ export interface IpcContract {
   'env:write': { req: { id: string; entries: Array<{ key: string; value: string }> }; res: void }
   'env:delete': { req: { id: string; key: string }; res: void }
 
-  /* --- miqrasiyalar --- */
+  /* --- migrations --- */
   'migrations:report': { req: { id: string; envId: string | null }; res: MigrationReport }
   'migrations:new': { req: { id: string; name: string }; res: { file: string } }
   'migrations:up': { req: { id: string }; res: TaskResult }
@@ -107,7 +107,7 @@ export interface IpcContract {
     res: TaskResult
   }
 
-  /* --- funksiyalar --- */
+  /* --- functions --- */
   'functions:list': { req: { id: string; envId: string | null }; res: FunctionInfo[] }
   /** The local ↔ remote content diff of one function (file by file) */
   'functions:diff': { req: { id: string; envId: string; name: string }; res: FunctionDiff }
@@ -134,7 +134,7 @@ export interface IpcContract {
     res: TaskResult
   }
 
-  /* --- SQL redaktoru --- */
+  /* --- SQL editor --- */
   /**
    * Execute SQL. A failing query DOES NOT THROW — the error is in `res.error` so
    * that `position`/`hint`/`detail` survive (the router only returns `string`).
@@ -247,7 +247,7 @@ export interface IpcContract {
   'backups:list': { req: { id: string }; res: BackupRecord[] }
   /** Take one now — the same engine the scheduler uses. */
   'backups:run': { req: { id: string } & BackupOptions; res: BackupRecord }
-  'backups:remove': { req: { id: string; backupId: string; deleteFile: boolean }; res: void }
+  'backups:remove': { req: { backupId: string; deleteFile: boolean }; res: void }
   /** Show the dump in Finder / Explorer. */
   'backups:reveal': { req: { backupId: string }; res: void }
   /** Re-upload a kept local dump to a storage connection. */
@@ -266,7 +266,7 @@ export interface IpcContract {
   /** Run a job right now, outside its schedule. */
   'jobs:runNow': { req: { jobId: string }; res: BackupRecord }
 
-  /* --- sistem --- */
+  /* --- system --- */
   'system:doctor': {
     req: void
     res: Array<{ label: string; ok: boolean; info: string }>

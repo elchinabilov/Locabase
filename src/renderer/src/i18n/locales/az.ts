@@ -128,7 +128,8 @@ const az = {
     empty: {
       title: 'Layihə əlavə edilməyib',
       hintBefore: 'Boş qovluqda sıfırdan yeni layihə qur, ya da içində',
-      hintAfter: 'olan repo-nu aç. Mövcud layihədə tool heç nə kopyalamır — bütün fayllar olduğu yerdə qalır.',
+      hintAfter:
+        'olan repo-nu aç. Mövcud layihədə tool heç nə kopyalamır — bütün fayllar olduğu yerdə qalır.',
       newProject: 'Yeni layihə',
       openProject: 'Mövcud layihəni aç'
     },
@@ -142,9 +143,11 @@ const az = {
       start: 'Başlat',
       dbReset: 'db reset'
     },
-    portConflict: 'Port toqquşması: {ports} — eyni port bir neçə layihədə yazılıb. Konfiqurasiya ekranından portları başqa 100-lük aralığa keçir.',
+    portConflict:
+      'Port toqquşması: {ports} — eyni port bir neçə layihədə yazılıb. Konfiqurasiya ekranından portları başqa 100-lük aralığa keçir.',
     needsRestart: {
-      message: 'Servis keçidi `config.toml`-a yazıldı. Konteynerlər yalnız restartdan sonra dəyişəcək.',
+      message:
+        'Servis keçidi `config.toml`-a yazıldı. Konteynerlər yalnız restartdan sonra dəyişəcək.',
       now: 'İndi restart et',
       later: 'sonra'
     },
@@ -157,7 +160,8 @@ const az = {
       subtitle: '{running} / {total} işləyir',
       ramSuffix: ' · {size} RAM',
       logButton: 'log',
-      noContainers: 'Konteyner yoxdur — keçidlər `config.toml`-u göstərir, stack qalxanda vəziyyət də gələcək.',
+      noContainers:
+        'Konteyner yoxdur — keçidlər `config.toml`-u göstərir, stack qalxanda vəziyyət də gələcək.',
       note: {
         imgproxy: 'Şəkil çevirmə. Storage bağlıdırsa onsuz da qalxmır.',
         analytics: 'Lokalda ən ağır və ən tez sınan servis. Lazım deyilsə bağlı saxla.'
@@ -173,7 +177,8 @@ const az = {
       title: 'Remote mühitlər',
       add: 'Əlavə et',
       sync: 'Sync',
-      empty: 'Mühit yoxdur. Managed (supabase.com) və ya self-hosted (SSH) mühit əlavə edib lokal ilə fərqi görə bilərsən.',
+      empty:
+        'Mühit yoxdur. Managed (supabase.com) və ya self-hosted (SSH) mühit əlavə edib lokal ilə fərqi görə bilərsən.',
       managed: 'managed',
       selfHosted: 'self-hosted'
     },
@@ -249,6 +254,7 @@ const az = {
     }
   },
   auth: {
+    callbackUrl: 'Callback URL',
     resizeSidebar: 'Bölmə siyahısının enini dəyiş',
     section: { users: 'İstifadəçilər', providers: 'Giriş / Provayderlər' },
     title: 'Authentication',
@@ -266,7 +272,8 @@ const az = {
     defaultName: 'standart ad',
     diffTitle: 'Auth dəyişiklikləri',
     writeFile: 'Faylı yaz',
-    diffChangedLines: '{count} sətir dəyişir. Provider açarları `env()`-ə bağlıdırsa dəyərləri Secrets ekranından yaz.',
+    diffChangedLines:
+      '{count} sətir dəyişir. Provider açarları `env()`-ə bağlıdırsa dəyərləri Secrets ekranından yaz.',
     restartRequired: 'Restart tələb olunur.',
     fieldLabel: {
       clientId: 'Client ID',
@@ -277,13 +284,16 @@ const az = {
       emailOptional: 'E-poçt məcburi deyil'
     },
     providerHint: {
-      apple: 'Services ID `client_id`-dir, `secret` isə imzalanmış JWT-dir (6 ayda bir yenilənir). Native iOS girişi üçün `skip_nonce_check` lazım ola bilər.',
+      apple:
+        'Services ID `client_id`-dir, `secret` isə imzalanmış JWT-dir (6 ayda bir yenilənir). Native iOS girişi üçün `skip_nonce_check` lazım ola bilər.',
       azure: '`url` tenant endpoint-idir: https://login.microsoftonline.com/<tenant>/v2.0',
       github: 'GitHub Developer Settings → OAuth Apps → Authorization callback URL.',
       gitlab: 'Self-hosted GitLab üçün `url` instansiyanın ünvanıdır.',
-      google: 'Google Cloud Console → Credentials → OAuth 2.0 Client (Web) → Authorized redirect URI.',
+      google:
+        'Google Cloud Console → Credentials → OAuth 2.0 Client (Web) → Authorized redirect URI.',
       keycloak: '`url` realm ünvanıdır: https://<host>/realms/<realm>',
-      linkedinOidc: 'Provider adı `linkedin_oidc`-dir, köhnə `linkedin` deyil — tətbiq də bu adı göndərməlidir.'
+      linkedinOidc:
+        'Provider adı `linkedin_oidc`-dir, köhnə `linkedin` deyil — tətbiq də bu adı göndərməlidir.'
     }
   },
   fieldEditor: {
@@ -308,182 +318,210 @@ const az = {
     defaultHint: 'Faylda olmayan sahələr default dəyərlə göstərilir.',
     fieldNotFound: 'Sahə tapılmadı.',
     previewTitle: 'Dəyişikliklərin önizləməsi',
-    previewChangedLines: '{count} sətir dəyişir. Şərhlər və sıra olduğu kimi qalır; yazmazdan əvvəl',
+    previewChangedLines:
+      '{count} sətir dəyişir. Şərhlər və sıra olduğu kimi qalır; yazmazdan əvvəl',
     previewBackupSuffix: 'nüsxəsi götürülür.',
     previewRestartRequired: 'Dəyişiklik restart tələb edir.',
     fields: {
-  project_id: { label: 'Project ID', help: 'Konteyner və volume adlarını bağlayan açar. Dəyişsən köhnə baza sahibsiz qalır.' },
-  api: {
-    enabled: { label: 'API aktiv' },
-    port: { label: 'Port' },
-    schemas: { label: 'Açıq sxemlər', help: 'Data API-nin göstərdiyi sxemlər.' },
-    extra_search_path: { label: 'Əlavə search_path' },
-    max_rows: { label: 'Maks. sətir' },
-    tls: {
-      enabled: { label: 'TLS (https)' },
-    },
-  },
-  db: {
-    port: { label: 'Postgres portu' },
-    shadow_port: { label: 'Shadow port', help: '`db diff` üçün müvəqqəti baza.' },
-    major_version: { label: 'Postgres versiyası', help: 'Produksiya ilə eyni olmalıdır — fərq miqrasiyaların lokalda keçib produksiyada sınmasına gətirir.' },
-    health_timeout: { label: 'Sağlamlıq gözləmə müddəti' },
-    migrations: {
-      enabled: { label: 'Miqrasiyalar aktiv' },
-      schema_paths: { label: 'Deklarativ sxem yolları' },
-    },
-    seed: {
-      enabled: { label: 'Seed aktiv' },
-      sql_paths: { label: 'Seed faylları' },
-    },
-    pooler: {
-      enabled: { label: 'Pooler (Supavisor)' },
-      port: { label: 'Pooler portu' },
-      pool_mode: { label: 'Pool rejimi' },
-      default_pool_size: { label: 'Pool ölçüsü' },
-      max_client_conn: { label: 'Maks. klient bağlantısı' },
-    },
-    network_restrictions: {
-      enabled: { label: 'Şəbəkə məhdudiyyəti' },
-      allowed_cidrs: { label: 'İcazəli CIDR (v4)' },
-      allowed_cidrs_v6: { label: 'İcazəli CIDR (v6)' },
-    },
-  },
-  studio: {
-    enabled: { label: 'Studio aktiv' },
-    port: { label: 'Studio portu' },
-    api_url: { label: 'API URL' },
-    openai_api_key: { label: 'OpenAI açarı', help: 'Studio-dakı SQL köməkçisi üçün.' },
-  },
-  local_smtp: {
-    enabled: { label: 'Mailpit aktiv', help: 'Lokalda göndərilən e-poçtlar həqiqətən getmir, bu panelə düşür.' },
-    port: { label: 'Mailpit portu' },
-  },
-  auth: {
-    enabled: { label: 'Auth aktiv' },
-    site_url: { label: 'Site URL', help: 'Brauzer origin-i. Login sonrası buraya qayıdılır.' },
-    additional_redirect_urls: { label: 'Əlavə redirect URL-lər', help: 'Wildcard dəstəklənir: http://localhost:3000/**' },
-    external_url: { label: 'Xarici auth URL', help: 'Auth servisinin bayırdan görünən ünvanı (reverse proxy arxasında).' },
-    jwt_expiry: { label: 'JWT ömrü (san.)' },
-    enable_refresh_token_rotation: { label: 'Refresh token rotasiyası' },
-    refresh_token_reuse_interval: { label: 'Refresh yenidən istifadə pəncərəsi (san.)' },
-    enable_signup: { label: 'Qeydiyyat açıq' },
-    enable_anonymous_sign_ins: { label: 'Anonim giriş' },
-    enable_manual_linking: { label: 'Əl ilə hesab bağlama' },
-    minimum_password_length: { label: 'Min. parol uzunluğu' },
-    password_requirements: { label: 'Parol tələbləri' },
-    web3: {
-      solana: {
-        enabled: { label: 'Solana Web3 girişi' },
+      project_id: {
+        label: 'Project ID',
+        help: 'Konteyner və volume adlarını bağlayan açar. Dəyişsən köhnə baza sahibsiz qalır.'
       },
-    },
-    oauth_server: {
-      enabled: { label: 'OAuth server' },
-      authorization_url_path: { label: 'OAuth consent yolu' },
-      allow_dynamic_registration: { label: 'Dinamik qeydiyyat' },
-    },
-    email: {
-      enable_signup: { label: 'E-poçtla qeydiyyat' },
-      double_confirm_changes: { label: 'E-poçt dəyişikliyini iki dəfə təsdiqlə' },
-      enable_confirmations: { label: 'Təsdiq məktubu tələb et' },
-      secure_password_change: { label: 'Parol dəyişəndə köhnəni tələb et' },
-      max_frequency: { label: 'Maks. tezlik' },
-      otp_length: { label: 'OTP uzunluğu' },
-      otp_expiry: { label: 'OTP ömrü (san.)' },
-      smtp: {
-        enabled: { label: 'Xarici SMTP' },
-        host: { label: 'SMTP host' },
-        port: { label: 'SMTP port' },
-        user: { label: 'SMTP istifadəçi' },
-        pass: { label: 'SMTP parol' },
-        admin_email: { label: 'Göndərən e-poçt' },
-        sender_name: { label: 'Göndərən adı' },
+      api: {
+        enabled: { label: 'API aktiv' },
+        port: { label: 'Port' },
+        schemas: { label: 'Açıq sxemlər', help: 'Data API-nin göstərdiyi sxemlər.' },
+        extra_search_path: { label: 'Əlavə search_path' },
+        max_rows: { label: 'Maks. sətir' },
+        tls: {
+          enabled: { label: 'TLS (https)' }
+        }
       },
-    },
-    sms: {
-      enable_signup: { label: 'SMS ilə qeydiyyat' },
-      enable_confirmations: { label: 'SMS təsdiqi' },
-      template: { label: 'Şablon' },
-      max_frequency: { label: 'Maks. tezlik' },
-      twilio: {
-        enabled: { label: 'Twilio' },
-        account_sid: { label: 'Account SID' },
-        message_service_sid: { label: 'Message Service SID' },
-        auth_token: { label: 'Auth token' },
+      db: {
+        port: { label: 'Postgres portu' },
+        shadow_port: { label: 'Shadow port', help: '`db diff` üçün müvəqqəti baza.' },
+        major_version: {
+          label: 'Postgres versiyası',
+          help: 'Produksiya ilə eyni olmalıdır — fərq miqrasiyaların lokalda keçib produksiyada sınmasına gətirir.'
+        },
+        health_timeout: { label: 'Sağlamlıq gözləmə müddəti' },
+        migrations: {
+          enabled: { label: 'Miqrasiyalar aktiv' },
+          schema_paths: { label: 'Deklarativ sxem yolları' }
+        },
+        seed: {
+          enabled: { label: 'Seed aktiv' },
+          sql_paths: { label: 'Seed faylları' }
+        },
+        pooler: {
+          enabled: { label: 'Pooler (Supavisor)' },
+          port: { label: 'Pooler portu' },
+          pool_mode: { label: 'Pool rejimi' },
+          default_pool_size: { label: 'Pool ölçüsü' },
+          max_client_conn: { label: 'Maks. klient bağlantısı' }
+        },
+        network_restrictions: {
+          enabled: { label: 'Şəbəkə məhdudiyyəti' },
+          allowed_cidrs: { label: 'İcazəli CIDR (v4)' },
+          allowed_cidrs_v6: { label: 'İcazəli CIDR (v6)' }
+        }
       },
-    },
-    mfa: {
-      max_enrolled_factors: { label: 'Maks. faktor sayı' },
-      totp: {
-        enroll_enabled: { label: 'TOTP qeydiyyatı' },
-        verify_enabled: { label: 'TOTP yoxlaması' },
+      studio: {
+        enabled: { label: 'Studio aktiv' },
+        port: { label: 'Studio portu' },
+        api_url: { label: 'API URL' },
+        openai_api_key: { label: 'OpenAI açarı', help: 'Studio-dakı SQL köməkçisi üçün.' }
       },
-      phone: {
-        enroll_enabled: { label: 'Telefon qeydiyyatı' },
-        verify_enabled: { label: 'Telefon yoxlaması' },
-        otp_length: { label: 'OTP uzunluğu' },
-        template: { label: 'SMS şablonu' },
-        max_frequency: { label: 'Maks. tezlik' },
+      local_smtp: {
+        enabled: {
+          label: 'Mailpit aktiv',
+          help: 'Lokalda göndərilən e-poçtlar həqiqətən getmir, bu panelə düşür.'
+        },
+        port: { label: 'Mailpit portu' }
       },
-    },
-    rate_limit: {
-      email_sent: { label: 'E-poçt / saat' },
-      sms_sent: { label: 'SMS / saat' },
-      anonymous_users: { label: 'Anonim istifadəçi / saat' },
-      token_refresh: { label: 'Token refresh / 5 dəq.' },
-      sign_in_sign_ups: { label: 'Giriş/qeydiyyat / 5 dəq.' },
-      token_verifications: { label: 'Token yoxlaması / 5 dəq.' },
-      web3: { label: 'Web3 / 5 dəq.' },
-    },
-  },
-  storage: {
-    enabled: { label: 'Storage aktiv' },
-    file_size_limit: { label: 'Fayl həcmi limiti' },
-    s3_protocol: {
-      enabled: { label: 'S3 protokolu' },
-    },
-    image_transformation: {
-      enabled: { label: 'Şəkil çevirmə (imgproxy)', help: 'Ayrıca konteyner qaldırır. Şəkil resize/format çevirməsi lazım deyilsə bağlı saxla.' },
-    },
-    analytics: {
-      enabled: { label: 'Analytics bucket-ləri (Iceberg)' },
-      max_catalogs: { label: 'Maks. katalog' },
-      max_namespaces: { label: 'Maks. namespace' },
-      max_tables: { label: 'Maks. cədvəl' },
-    },
-    vector: {
-      enabled: { label: 'Vector bucket-ləri' },
-      max_buckets: { label: 'Maks. bucket' },
-      max_indexes: { label: 'Maks. indeks' },
-    },
-  },
-  realtime: {
-    enabled: { label: 'Realtime aktiv' },
-    ip_version: { label: 'IP versiyası' },
-    max_header_length: { label: 'Maks. başlıq uzunluğu' },
-  },
-  edge_runtime: {
-    enabled: { label: 'Edge runtime aktiv' },
-    policy: { label: 'Sorğu siyasəti', help: '`per_worker` hot reload verir; simlink çox olan repo-larda `oneshot`-a keç.' },
-    inspector_port: { label: 'İnspektor portu' },
-    deno_version: { label: 'Deno versiyası' },
-  },
-  analytics: {
-    enabled: { label: 'Analytics (Logflare)', help: 'Lokalda ən tez sınan hissədir; lazım deyilsə bağlı saxla.' },
-    port: { label: 'Port' },
-    backend: { label: 'Backend' },
-  },
-  experimental: {
-    orioledb_version: { label: 'OrioleDB versiyası' },
-    s3_host: { label: 'S3 host' },
-    s3_region: { label: 'S3 region' },
-    s3_access_key: { label: 'S3 access key' },
-    s3_secret_key: { label: 'S3 secret key' },
-    pgdelta: {
-      enabled: { label: 'pg-delta diff mühərriki', help: 'Bağlansa köhnə `migra` mühərrikinə qayıdılır.' },
-    },
-  },
-}
+      auth: {
+        enabled: { label: 'Auth aktiv' },
+        site_url: { label: 'Site URL', help: 'Brauzer origin-i. Login sonrası buraya qayıdılır.' },
+        additional_redirect_urls: {
+          label: 'Əlavə redirect URL-lər',
+          help: 'Wildcard dəstəklənir: http://localhost:3000/**'
+        },
+        external_url: {
+          label: 'Xarici auth URL',
+          help: 'Auth servisinin bayırdan görünən ünvanı (reverse proxy arxasında).'
+        },
+        jwt_expiry: { label: 'JWT ömrü (san.)' },
+        enable_refresh_token_rotation: { label: 'Refresh token rotasiyası' },
+        refresh_token_reuse_interval: { label: 'Refresh yenidən istifadə pəncərəsi (san.)' },
+        enable_signup: { label: 'Qeydiyyat açıq' },
+        enable_anonymous_sign_ins: { label: 'Anonim giriş' },
+        enable_manual_linking: { label: 'Əl ilə hesab bağlama' },
+        minimum_password_length: { label: 'Min. parol uzunluğu' },
+        password_requirements: { label: 'Parol tələbləri' },
+        web3: {
+          solana: {
+            enabled: { label: 'Solana Web3 girişi' }
+          }
+        },
+        oauth_server: {
+          enabled: { label: 'OAuth server' },
+          authorization_url_path: { label: 'OAuth consent yolu' },
+          allow_dynamic_registration: { label: 'Dinamik qeydiyyat' }
+        },
+        email: {
+          enable_signup: { label: 'E-poçtla qeydiyyat' },
+          double_confirm_changes: { label: 'E-poçt dəyişikliyini iki dəfə təsdiqlə' },
+          enable_confirmations: { label: 'Təsdiq məktubu tələb et' },
+          secure_password_change: { label: 'Parol dəyişəndə köhnəni tələb et' },
+          max_frequency: { label: 'Maks. tezlik' },
+          otp_length: { label: 'OTP uzunluğu' },
+          otp_expiry: { label: 'OTP ömrü (san.)' },
+          smtp: {
+            enabled: { label: 'Xarici SMTP' },
+            host: { label: 'SMTP host' },
+            port: { label: 'SMTP port' },
+            user: { label: 'SMTP istifadəçi' },
+            pass: { label: 'SMTP parol' },
+            admin_email: { label: 'Göndərən e-poçt' },
+            sender_name: { label: 'Göndərən adı' }
+          }
+        },
+        sms: {
+          enable_signup: { label: 'SMS ilə qeydiyyat' },
+          enable_confirmations: { label: 'SMS təsdiqi' },
+          template: { label: 'Şablon' },
+          max_frequency: { label: 'Maks. tezlik' },
+          twilio: {
+            enabled: { label: 'Twilio' },
+            account_sid: { label: 'Account SID' },
+            message_service_sid: { label: 'Message Service SID' },
+            auth_token: { label: 'Auth token' }
+          }
+        },
+        mfa: {
+          max_enrolled_factors: { label: 'Maks. faktor sayı' },
+          totp: {
+            enroll_enabled: { label: 'TOTP qeydiyyatı' },
+            verify_enabled: { label: 'TOTP yoxlaması' }
+          },
+          phone: {
+            enroll_enabled: { label: 'Telefon qeydiyyatı' },
+            verify_enabled: { label: 'Telefon yoxlaması' },
+            otp_length: { label: 'OTP uzunluğu' },
+            template: { label: 'SMS şablonu' },
+            max_frequency: { label: 'Maks. tezlik' }
+          }
+        },
+        rate_limit: {
+          email_sent: { label: 'E-poçt / saat' },
+          sms_sent: { label: 'SMS / saat' },
+          anonymous_users: { label: 'Anonim istifadəçi / saat' },
+          token_refresh: { label: 'Token refresh / 5 dəq.' },
+          sign_in_sign_ups: { label: 'Giriş/qeydiyyat / 5 dəq.' },
+          token_verifications: { label: 'Token yoxlaması / 5 dəq.' },
+          web3: { label: 'Web3 / 5 dəq.' }
+        }
+      },
+      storage: {
+        enabled: { label: 'Storage aktiv' },
+        file_size_limit: { label: 'Fayl həcmi limiti' },
+        s3_protocol: {
+          enabled: { label: 'S3 protokolu' }
+        },
+        image_transformation: {
+          enabled: {
+            label: 'Şəkil çevirmə (imgproxy)',
+            help: 'Ayrıca konteyner qaldırır. Şəkil resize/format çevirməsi lazım deyilsə bağlı saxla.'
+          }
+        },
+        analytics: {
+          enabled: { label: 'Analytics bucket-ləri (Iceberg)' },
+          max_catalogs: { label: 'Maks. katalog' },
+          max_namespaces: { label: 'Maks. namespace' },
+          max_tables: { label: 'Maks. cədvəl' }
+        },
+        vector: {
+          enabled: { label: 'Vector bucket-ləri' },
+          max_buckets: { label: 'Maks. bucket' },
+          max_indexes: { label: 'Maks. indeks' }
+        }
+      },
+      realtime: {
+        enabled: { label: 'Realtime aktiv' },
+        ip_version: { label: 'IP versiyası' },
+        max_header_length: { label: 'Maks. başlıq uzunluğu' }
+      },
+      edge_runtime: {
+        enabled: { label: 'Edge runtime aktiv' },
+        policy: {
+          label: 'Sorğu siyasəti',
+          help: '`per_worker` hot reload verir; simlink çox olan repo-larda `oneshot`-a keç.'
+        },
+        inspector_port: { label: 'İnspektor portu' },
+        deno_version: { label: 'Deno versiyası' }
+      },
+      analytics: {
+        enabled: {
+          label: 'Analytics (Logflare)',
+          help: 'Lokalda ən tez sınan hissədir; lazım deyilsə bağlı saxla.'
+        },
+        port: { label: 'Port' },
+        backend: { label: 'Backend' }
+      },
+      experimental: {
+        orioledb_version: { label: 'OrioleDB versiyası' },
+        s3_host: { label: 'S3 host' },
+        s3_region: { label: 'S3 region' },
+        s3_access_key: { label: 'S3 access key' },
+        s3_secret_key: { label: 'S3 secret key' },
+        pgdelta: {
+          enabled: {
+            label: 'pg-delta diff mühərriki',
+            help: 'Bağlansa köhnə `migra` mühərrikinə qayıdılır.'
+          }
+        }
+      }
+    }
   },
   diffView: {
     noDiff: 'Fərq yoxdur.'
@@ -509,7 +547,8 @@ const az = {
     localBadge: 'lokal',
     managedLine1: 'Management API ilə işləyir: sütun tipləri yoxdur, eyniadlı sütunlar birləşir.',
     managedLine2: '«Yalnız oxu» Supabase-in API-si tərəfindən tətbiq olunur.',
-    selfHostedLine1: 'SSH + psql ilə işləyir: bir nəticə bloku göstərilir, xəta mövqeyi işarələnmir.',
+    selfHostedLine1:
+      'SSH + psql ilə işləyir: bir nəticə bloku göstərilir, xəta mövqeyi işarələnmir.',
     selfHostedLine2: '«Yalnız oxu» serverdə `begin read only` ilə tətbiq olunur.',
     cancelHint: 'Sorğunu ləğv etmək yalnız lokalda mümkündür.',
     checkingDb: 'baza yoxlanılır…',
@@ -600,6 +639,8 @@ const az = {
     create: 'Yarat'
   },
   sync: {
+    dryRunResult: 'Dry run nəticəsi',
+    dryRunEmpty: 'Dry run heç nə qaytarmadı.',
     noEnv: {
       title: 'Remote mühit yoxdur',
       hint: 'Managed (supabase.com) və ya self-hosted (SSH + Docker) mühit əlavə et — sonra lokal ilə arasındakı fərqi bir ekranda görəcəksən.'
@@ -609,7 +650,8 @@ const az = {
     computeDiff: 'Fərqi hesabla',
     computedAt: 'hesablandı: {time}',
     dryRun: 'Quru rejim (dry-run)',
-    beforeReport: '«Fərqi hesabla» ilə beş ox oxunur: miqrasiyalar, sxem, funksiyalar, secret adları, auth.',
+    beforeReport:
+      '«Fərqi hesabla» ilə beş ox oxunur: miqrasiyalar, sxem, funksiyalar, secret adları, auth.',
     schema: 'Sxem (db diff)',
     schemaClean: 'Lokal sxem miqrasiyalarla üst-üstə düşür.',
     viewDiff: 'fərqə bax',
@@ -636,7 +678,8 @@ const az = {
     showValues: 'dəyərləri göstər',
     addVar: '+ dəyişən',
     write: 'Yaz',
-    missingHeading: '{count} referens boşdur — `config.toml` bu dəyişənləri gözləyir, `.env`-də yoxdur:',
+    missingHeading:
+      '{count} referens boşdur — `config.toml` bu dəyişənləri gözləyir, `.env`-də yoxdur:',
     cardTitle: 'Lokal backend dəyişənləri',
     cardSubtitle: 'Supabase CLI `config.toml`-dakı hər env() referensini buradan oxuyur',
     fileEmpty: '{file} faylı boşdur və ya yoxdur.',
@@ -676,7 +719,8 @@ const az = {
       'SQL-i Studio-dan tətbiq etmə: ledger sətri yazılmır və növbəti deploy ya faylı təkrar işlədir, ya da heç vaxt olmamış işi atlayır. Bir dəyişiklik = bir versiya nömrəsi.',
     diffTitle: 'db diff — lokal sxemdə tutulmayan dəyişikliklər',
     newTitle: 'Yeni miqrasiya',
-    nameHint: 'Yalnız kiçik hərf, rəqəm və alt xətt. Fayl `supabase/migrations/<versiya>_{name}.sql` kimi yaranır.',
+    nameHint:
+      'Yalnız kiçik hərf, rəqəm və alt xətt. Fayl `supabase/migrations/<versiya>_{name}.sql` kimi yaranır.',
     repairTitle: 'Ledger təmiri — {version}',
     repairBodyBefore: '«{env}» mühitinin ledger-i düzəldilir.',
     repairBodyBold: 'Heç bir SQL işə düşmür',
@@ -684,6 +728,11 @@ const az = {
       '— yalnız `supabase_migrations.schema_migrations` cədvəlindəki sətir dəyişir. Yalnız obyektlərin həqiqətən bazada olub-olmadığını təsdiqlədikdən sonra istifadə et.',
     markApplied: '«tətbiq olunub» kimi işarələ (sətri əlavə et)',
     markReverted: '«geri qaytarılıb» kimi işarələ (sətri sil)'
+  },
+  errorBoundary: {
+    title: 'Bu ekran açılmadı',
+    retry: 'Yenidən cəhd et',
+    reload: 'Tətbiqi yenilə'
   },
   dataGrid: {
     noRows: 'Sətir yoxdur',
@@ -713,7 +762,8 @@ const az = {
     rowsAffected: '{command} — {count} sətir təsirləndi.',
     notInLedger: 'Burada işlədilən SQL miqrasiya ledger-inə yazılmır.',
     saveQueryTitle: 'Sorğunu saxla',
-    saveQueryHint: 'Hərf, rəqəm, boşluq, `_` və `-`. Fayl `supabase/.locabase/queries/<ad>.sql` kimi yaranır.',
+    saveQueryHint:
+      'Hərf, rəqəm, boşluq, `_` və `-`. Fayl `supabase/.locabase/queries/<ad>.sql` kimi yaranır.',
     renameQueryTitle: '«{name}» adını dəyiş',
     deleteConfirmTitle: '«{name}» silinsin?',
     fileDeletedFromDisk: 'Fayl diskdən silinir.',
@@ -729,6 +779,11 @@ const az = {
     goToError: 'Səhv yerə keç'
   },
   tables: {
+    editableReason: {
+      'no-pk': 'PK yoxdur',
+      view: 'View redaktə edilə bilməz',
+      'foreign-table': 'Foreign table redaktə edilə bilməz'
+    },
     resizeSidebar: 'Cədvəl siyahısının enini dəyiş',
     op: { isnull: 'boşdur', notnull: 'boş deyil' },
     kind: {
@@ -824,8 +879,7 @@ const az = {
     uploadTitle: 'Storage-ə yüklə',
     remove: 'Sil',
     removeTitle: 'Backup silinsin?',
-    removeHint:
-      'Qeyd siyahıdan çıxır. Faylı və bucket-dəki obyekti də silmək üçün seçimi işarələ.',
+    removeHint: 'Qeyd siyahıdan çıxır. Faylı və bucket-dəki obyekti də silmək üçün seçimi işarələ.',
     removeFiles: 'Faylı və bucket obyektini də sil',
     noStorage: 'Storage qoşulmayıb — «Ayarlar» səhifəsindən R2 əlavə et.',
     seconds: '{count} san',

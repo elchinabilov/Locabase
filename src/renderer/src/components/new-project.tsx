@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { Project } from '@shared/types'
 import { sanitizeProjectId } from '@shared/naming'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { useT } from '../i18n'
 import { Button, ErrorNote, Input, Modal, Row } from './ui'
 
@@ -92,11 +93,10 @@ export function NewProjectModal({
 }): ReactNode {
   const t = useT()
   const suggested = useQuery('ports:suggestRange', undefined)
-  const existing = useQuery('projects:inspect', { path: dir }, [dir])
+  const existing = useQuery('projects:inspect', { path: dir })
   const [name, setName] = useState(() => baseName(dir))
   const [base, setBase] = useState<number | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy, error } = useAction()
 
   useEffect(() => {
     if (base === null && suggested.data !== null) setBase(suggested.data)
@@ -107,27 +107,15 @@ export function NewProjectModal({
   const ready = projectId !== '' && base !== null && !occupied && !existing.loading
 
   const submit = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
-      onDone(await call('projects:create', { path: dir, name: name.trim(), portBase: base ?? undefined }))
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+    const project = await run(() =>
+      call('projects:create', { path: dir, name: name.trim(), portBase: base ?? undefined })
+    )
+    if (project) onDone(project)
   }
 
   const addExisting = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
-      onDone(await call('projects:add', { path: dir }))
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+    const project = await run(() => call('projects:add', { path: dir }))
+    if (project) onDone(project)
   }
 
   return (
@@ -144,7 +132,12 @@ export function NewProjectModal({
               {t('newProject.addExisting')}
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => void submit()} loading={busy} disabled={!ready}>
+            <Button
+              variant="primary"
+              onClick={() => void submit()}
+              loading={busy}
+              disabled={!ready}
+            >
               {t('newProject.build')}
             </Button>
           )}
@@ -168,7 +161,11 @@ export function NewProjectModal({
             )
           }
         >
-          <Input value={name} onChange={(e) => setName(e.target.value)} disabled={busy || occupied} />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={busy || occupied}
+          />
         </Row>
         <Row
           label={t('newProject.portBase.label')}

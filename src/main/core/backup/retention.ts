@@ -5,7 +5,7 @@
  * pure (records in, records out), so it can be tested without a database, a
  * bucket or a clock.
  */
-import type { BackupRecord } from '@shared/types.js'
+import type { BackupRecord } from '@shared/types/index.js'
 
 export interface RetentionRule {
   /** Older than this many days goes. 0 = no age limit. */

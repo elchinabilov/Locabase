@@ -6,8 +6,8 @@
  * written at the end of its table, and a new table at the end of the file.
  */
 import { parse as parseToml } from 'smol-toml'
+import type { ConfigPatch, ConfigValue } from '@shared/types/index.js'
 import { scanToml, type TomlScan } from './scan.js'
-import type { ConfigPatch, ConfigValue } from '@shared/types.js'
 
 export type PatchValue = ConfigValue | { env: string } | undefined
 
@@ -106,7 +106,7 @@ export function applyPatches(source: string, patches: ConfigPatch[]): PatchResul
     const existing = scan.byPath.get(patch.path)
 
     if (patch.value === undefined) {
-      if (!existing) continue // onsuz da yoxdur
+      if (!existing) continue // already absent
       // delete the line entirely (together with its newline)
       let end = existing.lineEnd
       if (source[end] === '\r' && source[end + 1] === '\n') end += 2
@@ -115,7 +115,7 @@ export function applyPatches(source: string, patches: ConfigPatch[]): PatchResul
       continue
     }
 
-    const rendered = serializeValue(patch.value as PatchValue)
+    const rendered = serializeValue(patch.value)
 
     if (existing) {
       if (source.slice(existing.valueStart, existing.valueEnd) === rendered) continue
@@ -208,7 +208,7 @@ export function validate(text: string, patches: ConfigPatch[]): void {
       if (actual !== undefined) throw new TomlPatchError(`${patch.path} was not deleted`)
       continue
     }
-    const want = expectedValue(patch.value as PatchValue)
+    const want = expectedValue(patch.value)
     if (!sameValue(actual, want)) {
       throw new TomlPatchError(
         `${patch.path}: expected ${JSON.stringify(want)}, got ${JSON.stringify(actual)}`

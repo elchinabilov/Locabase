@@ -119,6 +119,9 @@ export function Menu({
         <div
           ref={list}
           role="menu"
+          // The container owns the arrow-key roving, so it has to be able to
+          // receive the keydown in the first place.
+          tabIndex={-1}
           onKeyDown={onListKey}
           style={{ top: at.top, right: at.right, minWidth: MIN_W }}
           className="fixed z-50 flex flex-col rounded-md border border-line bg-panel py-1 shadow-lg"

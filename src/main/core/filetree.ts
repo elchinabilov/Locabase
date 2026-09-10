@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import type { RemoteFile, RemoteFileChecksum } from '@shared/types.js'
+import type { RemoteFile, RemoteFileChecksum } from '@shared/types/index.js'
 
 /** Files larger than this are not shown — diffing a bundle or asset is pointless. */
 export const MAX_FILE_BYTES = 512 * 1024
@@ -35,6 +35,8 @@ export function readTree(dir: string): RemoteFile[] {
 export function checksums(dir: string): RemoteFileChecksum[] {
   return walk(dir).map((path) => ({
     path,
-    md5: createHash('md5').update(readFileSync(join(dir, path))).digest('hex')
+    md5: createHash('md5')
+      .update(readFileSync(join(dir, path)))
+      .digest('hex')
   }))
 }

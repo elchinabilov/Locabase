@@ -31,11 +31,13 @@ export function diffLines(before: string, after: string, context = 2): DiffLine[
     let matched = false
     for (let k = 1; k <= ahead && !matched; k++) {
       if (bv !== undefined && a[i + k] !== undefined && a[i + k] === bv) {
-        for (let d = 0; d < k; d++) raw.push({ kind: 'del', text: a[i + d]!, a: i + d + 1, b: null })
+        for (let d = 0; d < k; d++)
+          raw.push({ kind: 'del', text: a[i + d]!, a: i + d + 1, b: null })
         i += k
         matched = true
       } else if (av !== undefined && b[j + k] !== undefined && b[j + k] === av) {
-        for (let d = 0; d < k; d++) raw.push({ kind: 'add', text: b[j + d]!, a: null, b: j + d + 1 })
+        for (let d = 0; d < k; d++)
+          raw.push({ kind: 'add', text: b[j + d]!, a: null, b: j + d + 1 })
         j += k
         matched = true
       }

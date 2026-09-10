@@ -4,10 +4,6 @@
  */
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { parse as parseToml } from 'smol-toml'
-import { applyPatches } from './toml/patch.js'
-import { scanToml } from './toml/scan.js'
-import { mask, readMap } from './envfile.js'
-import { get as getProject, paths } from './projects.js'
 import { CONFIG_FIELDS, FIELD_BY_PATH, needsRestart } from '@shared/config-schema.js'
 import { AUTH_PROVIDERS } from '@shared/providers.js'
 import type {
@@ -16,7 +12,11 @@ import type {
   ConfigValue,
   FieldValue,
   PatchPreview
-} from '@shared/types.js'
+} from '@shared/types/index.js'
+import { applyPatches } from './toml/patch.js'
+import { scanToml } from './toml/scan.js'
+import { mask, readMap } from './envfile.js'
+import { get as getProject, paths } from './projects.js'
 
 const ENV_REF = /^env\(([A-Za-z_][A-Za-z0-9_]*)\)$/
 
@@ -43,11 +43,7 @@ export function knownPaths(configText: string): string[] {
   return [...out]
 }
 
-function toFieldValue(
-  raw: unknown,
-  env: Map<string, string>,
-  secret: boolean
-): FieldValue {
+function toFieldValue(raw: unknown, env: Map<string, string>, secret: boolean): FieldValue {
   if (raw === undefined) return { kind: 'literal', value: '', present: false }
   if (typeof raw === 'string') {
     const m = ENV_REF.exec(raw)
@@ -92,12 +88,28 @@ export function preview(projectId: string, patches: ConfigPatch[]): PatchPreview
   const project = getProject(projectId)
   const path = paths.configToml(project)
   const before = readFileSync(path, 'utf8')
+  assertKnownPaths(before, patches)
   const result = applyPatches(before, patches)
   return {
     before,
     after: result.text,
     changedLines: result.changedLines,
     restartRequired: needsRestart(patches.map((p) => p.path))
+  }
+}
+
+/**
+ * The form can only reach the keys it renders, so anything else arriving here
+ * came from somewhere other than the UI. Without this, `config:write` could set
+ * any dotted path — `project_id` included, which is the suffix of every
+ * container name and the prefix of the remote backup filenames.
+ */
+function assertKnownPaths(configText: string, patches: ConfigPatch[]): void {
+  const allowed = new Set(knownPaths(configText))
+  for (const patch of patches) {
+    if (!allowed.has(patch.path)) {
+      throw new Error(`Not a configurable key: ${patch.path}`)
+    }
   }
 }
 
@@ -113,15 +125,6 @@ export function write(projectId: string, patches: ConfigPatch[]): PatchPreview {
   if (existsSync(path)) copyFileSync(path, `${path}.bak`)
   writeFileSync(path, result.after, 'utf8')
   return result
-}
-
-/** The project's local API address — callback URLs are derived from it. */
-export function localApiUrl(projectId: string): string {
-  const project = getProject(projectId)
-  const parsed = parseToml(readFileSync(paths.configToml(project), 'utf8'))
-  const port = pick(parsed, 'api.port')
-  const tls = pick(parsed, 'api.tls.enabled') === true
-  return `${tls ? 'https' : 'http'}://127.0.0.1:${typeof port === 'number' ? port : 54321}`
 }
 
 export type { ConfigValue }

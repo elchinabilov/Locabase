@@ -50,11 +50,7 @@ describe('stamps', () => {
 describe('canonicalRequest', () => {
   it('lays out the six lines S3 expects', () => {
     const { text, signedHeaders } = canonicalRequest(base, '20260131T090501Z')
-    expect(text.split('\n').slice(0, 3)).toEqual([
-      'PUT',
-      '/backups/locabase/app-prod.dump',
-      ''
-    ])
+    expect(text.split('\n').slice(0, 3)).toEqual(['PUT', '/backups/locabase/app-prod.dump', ''])
     expect(signedHeaders).toBe('content-type;host;x-amz-content-sha256;x-amz-date')
     expect(text.endsWith('UNSIGNED-PAYLOAD')).toBe(true)
   })

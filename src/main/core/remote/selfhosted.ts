@@ -6,9 +6,7 @@
  * second configuration to keep in sync.
  */
 import { basename } from 'node:path'
-import { run, runFromFile, runToFile } from '../cli.js'
-import { paths } from '../projects.js'
-import { MAX_FILE_BYTES } from '../filetree.js'
+import { randomUUID } from 'node:crypto'
 import { parseBytes } from '@shared/services.js'
 import type {
   BackupFormat,
@@ -23,115 +21,24 @@ import type {
   SelfHostedEnv,
   SqlRun,
   VerifyReport
-} from '@shared/types.js'
+} from '@shared/types/index.js'
+import { run, runFromFile, runToFile } from '../cli.js'
+import { paths } from '../projects.js'
 import type { MigrationFile } from '../migrations.js'
 import { readMigration } from '../migrations.js'
-import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 import { parsePsqlCsv, parsePsqlError } from '../sql/csv.js'
-import { randomUUID } from 'node:crypto'
-
-/** A string that is safe to paste into a remote shell. */
-function sq(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
-
-/** `supabase-edge-functions-abc123` + `abc123` → `edge-functions` */
-function serviceKeyOf(container: string, suffix: string): string {
-  let key = container
-  if (key.endsWith(`-${suffix}`)) key = key.slice(0, -(suffix.length + 1))
-  return key.replace(/^supabase[-_]/, '') || container
-}
-
-/** `Up 2 hours (healthy)` → `healthy` */
-function parseHealth(status: string): string | null {
-  const m = /\((healthy|unhealthy|health: starting|starting)\)/i.exec(status)
-  return m ? m[1]!.toLowerCase().replace('health: ', '') : null
-}
-
-/**
- * A bash script that merges the remote `.env` with `KEY=value` lines coming from
- * stdin: a key that already exists is replaced, everything else stays as it is,
- * and the result is moved into place atomically with 0600 permissions.
- *
- * Lines are joined with `\n` — joining with `;` would make `while … do;` a syntax error.
- */
-export function envMergeScript(file: string): string {
-  return [
-    'set -e',
-    'T="$(mktemp)"',
-    'trap \'rm -f "$T" "$T.old"\' EXIT',
-    'cat > "$T"',
-    `TARGET=${sq(file)}`,
-    'touch "$TARGET"',
-    'cp "$TARGET" "$T.old"',
-    'while IFS= read -r line; do',
-    '  [ -z "$line" ] && continue',
-    '  K="${line%%=*}"',
-    '  grep -v "^${K}=" "$T.old" > "$T.new" || true',
-    '  mv "$T.new" "$T.old"',
-    'done < "$T"',
-    'cat "$T" >> "$T.old"',
-    'chmod 600 "$T.old"',
-    'mv "$T.old" "$TARGET"',
-    'echo updated'
-  ].join('\n')
-}
-
-/**
- * A bash script that streams every file in a folder as a `<token><path>` header
- * plus base64 content. For a large file a `<token>!` marker is sent instead of the
- * content — so the file stays in the listing and isn't reported as "local only".
- */
-export function dumpScript(dir: string, token: string): string {
-  return [
-    `cd ${sq(dir)}`,
-    // dot-prefixed files are skipped — the local tree ignores them too
-    `find . -type f -not -path '*/.*' | sort | while IFS= read -r f; do`,
-    `  printf '%s%s\\n' ${sq(token)} "\${f#./}"`,
-    `  if [ "$(wc -c < "$f")" -le ${MAX_FILE_BYTES} ]; then`,
-    '    base64 < "$f"',
-    '  else',
-    `    printf '%s!\\n' ${sq(token)}`,
-    '  fi',
-    'done'
-  ].join('\n')
-}
-
-/** `<token><path>` headers + base64 lines (or a `<token>!` marker) → files. */
-export function decodeDump(out: string, token: string): RemoteFile[] {
-  const files: RemoteFile[] = []
-  let path: string | null = null
-  let b64: string[] = []
-  let skipped = false
-  const flush = (): void => {
-    if (path === null) return
-    if (skipped) {
-      files.push({ path, content: null, binary: true })
-    } else {
-      const buf = Buffer.from(b64.join(''), 'base64')
-      const binary = buf.includes(0)
-      files.push({ path, content: binary ? null : buf.toString('utf8'), binary })
-    }
-    path = null
-    b64 = []
-    skipped = false
-  }
-  for (const line of out.split('\n')) {
-    if (line.startsWith(token)) {
-      const rest = line.slice(token.length).trim()
-      if (rest === '!') {
-        skipped = true
-        continue
-      }
-      flush()
-      path = rest
-      continue
-    }
-    if (path !== null) b64.push(line.trim())
-  }
-  flush()
-  return files.sort((a, b) => a.path.localeCompare(b.path))
-}
+import { quoteLiteral } from '../sql/ident.js'
+import {
+  decodeDump,
+  dumpScript,
+  envMergeScript,
+  parseHealth,
+  retentionDays,
+  serviceKeyOf,
+  sq
+} from './remote-scripts.js'
+import { checkEndpoints } from './index.js'
+import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 
 const LEDGER_QUERY =
   "select version || '\\t' || coalesce(name, '') from supabase_migrations.schema_migrations order by version"
@@ -148,10 +55,16 @@ export class SelfHostedAdapter implements RemoteAdapter {
     return `remote:${this.env.name}`
   }
 
+  /**
+   * `--` closes option parsing, so the host that follows can never be read as a
+   * flag. The host is already validated when the environment is saved
+   * (`projects.upsertEnv`); this is the second layer, at the point of use.
+   */
   private sshArgs(): string[] {
     const args = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=12']
     if (this.env.sshPort && this.env.sshPort !== 22) args.push('-p', String(this.env.sshPort))
     if (this.env.sshKeyPath) args.push('-i', this.env.sshKeyPath)
+    args.push('--')
     return args
   }
 
@@ -202,7 +115,11 @@ export class SelfHostedAdapter implements RemoteAdapter {
     }
     try {
       const out = await this.psql('select version();', ['-At'])
-      details.push({ label: 'Postgres', ok: true, info: out.trim().split('\n')[0]?.slice(0, 60) ?? '' })
+      details.push({
+        label: 'Postgres',
+        ok: true,
+        info: out.trim().split('\n')[0]?.slice(0, 60) ?? ''
+      })
     } catch (err) {
       details.push({ label: 'Postgres', ok: false, info: (err as Error).message })
     }
@@ -245,7 +162,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
         readMigration(file.file),
         ';',
         `insert into supabase_migrations.schema_migrations (version, name)`,
-        `values ('${file.version.replace(/'/g, "''")}', '${file.name.replace(/'/g, "''")}')`,
+        `values (${quoteLiteral(file.version)}, ${quoteLiteral(file.name)})`,
         'on conflict (version) do nothing;',
         'commit;'
       ].join('\n')
@@ -259,10 +176,10 @@ export class SelfHostedAdapter implements RemoteAdapter {
     const script = [
       'set -e',
       `mkdir -p ${sq(dir)}`,
-      `F=${sq(dir)}/${prefix}-$(date +%F-%H%M%S).dump`,
+      `F="$(printf '%s/%s-%s.dump' ${sq(dir)} ${sq(prefix)} "$(date +%F-%H%M%S)")"`,
       `docker exec -i ${sq(this.env.dbContainer)} pg_dump -U postgres -Fc postgres > "$F"`,
       'ls -lh "$F"',
-      `find ${sq(dir)} -name ${sq(`${prefix}-*.dump`)} -mtime +${this.env.backupRetentionDays || 14} -delete`
+      `find ${sq(dir)} -name ${sq(`${prefix}-*.dump`)} -mtime +${retentionDays(this.env.backupRetentionDays)} -delete`
     ].join('\n')
     log('Taking a backup…')
     const out = await this.ssh(`bash -s`, { input: script, timeoutMs: 30 * 60 * 1000 })
@@ -286,8 +203,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
     log: LogFn
   ): Promise<{ bytes: number; format: BackupFormat }> {
     const only = scope === 'schema' ? ' --schema-only' : scope === 'data' ? ' --data-only' : ''
-    const cmd =
-      `docker exec -i ${sq(this.env.dbContainer)} pg_dump -U postgres -d postgres -Fc${only}`
+    const cmd = `docker exec -i ${sq(this.env.dbContainer)} pg_dump -U postgres -d postgres -Fc${only}`
     log(`${this.env.name}: pg_dump over ssh → ${basename(file)}`)
     const res = await runToFile('ssh', [...this.sshArgs(), this.env.sshHost, cmd], file, {
       stream: this.stream,
@@ -368,10 +284,9 @@ export class SelfHostedAdapter implements RemoteAdapter {
   async listFunctions(): Promise<RemoteFunctionInfo[]> {
     if (!this.env.functionsContainer) return []
     const dir = `${this.env.remoteDir}/volumes/functions`
-    const out = await this.ssh(
-      `ls -1 ${sq(dir)} 2>/dev/null | grep -v '^_' || true`,
-      { quiet: true }
-    )
+    const out = await this.ssh(`ls -1 ${sq(dir)} 2>/dev/null | grep -v '^_' || true`, {
+      quiet: true
+    })
     const names = out
       .split('\n')
       .map((l) => l.trim())
@@ -467,7 +382,14 @@ export class SelfHostedAdapter implements RemoteAdapter {
       log('rsync: _shared')
       await run(
         'rsync',
-        ['-az', '--delete', '-e', sshCmd, `${sharedLocal}/`, `${this.env.sshHost}:${remoteDir}/_shared/`],
+        [
+          '-az',
+          '--delete',
+          '-e',
+          sshCmd,
+          `${sharedLocal}/`,
+          `${this.env.sshHost}:${remoteDir}/_shared/`
+        ],
         { stream: this.stream, timeoutMs: 5 * 60 * 1000 }
       )
     }
@@ -481,11 +403,11 @@ export class SelfHostedAdapter implements RemoteAdapter {
    * are in the database), `reverted` removes it. The SQL itself applies nothing.
    */
   async repairLedger(version: string, status: 'applied' | 'reverted', log: LogFn): Promise<void> {
-    const v = version.replace(/'/g, "''")
+    const v = quoteLiteral(version)
     const sql =
       status === 'applied'
-        ? `insert into supabase_migrations.schema_migrations (version) values ('${v}') on conflict (version) do nothing;`
-        : `delete from supabase_migrations.schema_migrations where version = '${v}';`
+        ? `insert into supabase_migrations.schema_migrations (version) values (${v}) on conflict (version) do nothing;`
+        : `delete from supabase_migrations.schema_migrations where version = ${v};`
     log(`ledger repair: ${version} → ${status}`)
     await this.psql(sql)
   }
@@ -560,22 +482,13 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   async verify(): Promise<VerifyReport> {
-    const checks: VerifyReport['checks'] = []
+    const base = this.env.apiUrl.replace(/\/+$/, '')
     const targets: Array<[string, string]> = [
-      ['REST', `${this.env.apiUrl.replace(/\/+$/, '')}/rest/v1/`],
-      ['Auth', `${this.env.apiUrl.replace(/\/+$/, '')}/auth/v1/health`]
+      ['REST', `${base}/rest/v1/`],
+      ['Auth', `${base}/auth/v1/health`]
     ]
     if (this.env.siteUrl) targets.push(['App', this.env.siteUrl])
-
-    for (const [label, url] of targets) {
-      try {
-        const res = await fetch(url, { method: 'GET' })
-        checks.push({ label, ok: res.status < 500, info: `HTTP ${res.status}` })
-      } catch (err) {
-        checks.push({ label, ok: false, info: (err as Error).message })
-      }
-    }
-    return { ok: checks.every((c) => c.ok), checks }
+    return checkEndpoints(targets)
   }
 
   /* ------------------------------------------------------------ SQL */

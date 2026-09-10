@@ -7,12 +7,17 @@
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type {
+  MigrationReport,
+  MigrationRow,
+  MigrationState,
+  TaskResult
+} from '@shared/types/index.js'
 import { supabase } from './cli.js'
 import { logBus } from './log.js'
 import { readLedger } from './localdb.js'
 import { get as getProject, getEnv, paths } from './projects.js'
 import { adapterFor } from './remote/index.js'
-import type { MigrationReport, MigrationRow, MigrationState, TaskResult } from '@shared/types.js'
 
 export interface MigrationFile {
   version: string
@@ -180,9 +185,7 @@ export async function repair(
   const env = getEnv(id, envId)
   const adapter = adapterFor(project, env)
   try {
-    await adapter.repairLedger(version, status, (t) =>
-      logBus.push(`remote:${env.name}`, 'warn', t)
-    )
+    await adapter.repairLedger(version, status, (t) => logBus.push(`remote:${env.name}`, 'warn', t))
     return { ok: true, code: 0, output: `${version} → ${status}`, error: null }
   } catch (err) {
     return { ok: false, code: null, output: '', error: (err as Error).message }

@@ -15,6 +15,7 @@ import type {
   StorageConnection
 } from '@shared/types'
 import { call } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { useT, type TranslationKey } from '../i18n'
 import { Button, ErrorNote, Input, Modal, Row, Select, Toggle } from './ui'
 
@@ -87,8 +88,7 @@ export function JobFormModal({
   const [keepLocal, setKeepLocal] = useState(job?.keepLocal ?? true)
   const [retentionDays, setRetentionDays] = useState(String(job?.retentionDays ?? 14))
   const [retentionCount, setRetentionCount] = useState(String(job?.retentionCount ?? 10))
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy: saving, error } = useAction()
 
   const schedule = (): ScheduleSpec => {
     switch (kind) {
@@ -104,9 +104,7 @@ export function JobFormModal({
   }
 
   const save = async (): Promise<void> => {
-    setSaving(true)
-    setError(null)
-    try {
+    const ok = await run(async () => {
       await call('jobs:upsert', {
         job: {
           id: job?.id,
@@ -123,12 +121,9 @@ export function JobFormModal({
           retentionCount: Number(retentionCount) || 0
         }
       })
-      onSaved()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
+      return true
+    })
+    if (ok) onSaved()
   }
 
   return (

@@ -2,9 +2,13 @@
  * The IPC router. Every channel is one handler typed by `IpcContract`; an
  * exception thrown here shows up on the renderer side as `{ ok: false, error }`.
  */
+import { readFileSync } from 'node:fs'
 import { dialog, ipcMain, nativeTheme, shell, BrowserWindow } from 'electron'
 import { IPC_CHANNELS, type IpcChannel, type IpcContract } from '@shared/ipc.js'
-import { logBus } from '../core/log.js'
+import { ZodError } from 'zod'
+import { describeIpcError, parseIpcRequest } from '@shared/ipc-schemas.js'
+import type { EnvEntry } from '@shared/types/index.js'
+import { logBus, redact } from '../core/log.js'
 import * as projects from '../core/projects.js'
 import * as scaffold from '../core/scaffold.js'
 import * as stack from '../core/stack.js'
@@ -19,17 +23,16 @@ import * as secrets from '../core/secrets.js'
 import * as sql from '../core/sql/index.js'
 import * as queries from '../core/queries.js'
 import { adapterFor } from '../core/remote/index.js'
-import { logBus as bus } from '../core/log.js'
-import type { EnvEntry } from '@shared/types.js'
 import { scanToml } from '../core/toml/scan.js'
 import * as prefs from '../core/prefs.js'
 import * as storage from '../core/storage/index.js'
 import * as backups from '../core/backup/index.js'
 import * as scheduler from '../core/scheduler/index.js'
 import * as authUsers from '../core/sql/authusers.js'
-import { readFileSync } from 'node:fs'
 
-type Handlers = { [C in IpcChannel]: (req: IpcContract[C]['req']) => Promise<IpcContract[C]['res']> }
+type Handlers = {
+  [C in IpcChannel]: (req: IpcContract[C]['req']) => Promise<IpcContract[C]['res']>
+}
 
 /** Which keys in `config.toml` reference this env variable. */
 function envReferences(projectPath: string): Map<string, string[]> {
@@ -56,6 +59,11 @@ const handlers: Handlers = {
     // the jobs, which have nothing left to back up.
     scheduler.forgetProject(id)
     backups.forgetProject(id)
+    // The pooled connections and the cached column metadata point at a project
+    // that is about to stop existing — every other destructive handler releases
+    // them, and so must this one.
+    sql.invalidate(id)
+    sql.introspect.forgetColumns(id)
     return projects.remove(id)
   },
   'projects:update': async ({ id, patch }) => projects.update(id, patch),
@@ -101,10 +109,17 @@ const handlers: Handlers = {
   },
   'stack:tailLogs': async ({ id, container, on }) => {
     const project = projects.get(id)
+    // Without this the renderer could stream logs from any container on the
+    // host. The stack's own containers are `supabase_<service>_<projectId>` —
+    // the same shape `docker.servicesFor` matches on.
+    const suffix = `_${project.projectId}`
+    if (!container.startsWith('supabase_') || !container.endsWith(suffix)) {
+      throw new Error(`Not a container of this project: ${container}`)
+    }
     await docker.tailLogs(container, stack.streamFor(project.projectId), on)
   },
 
-  /* --- portlar --- */
+  /* --- ports --- */
   'ports:conflicts': async () => ports.conflicts(),
   'ports:suggestRange': async () => ports.suggestRange(),
 
@@ -155,7 +170,7 @@ const handlers: Handlers = {
   'envs:ping': async ({ id, envId }) =>
     adapterFor(projects.get(id), projects.getEnv(id, envId)).ping(),
 
-  /* --- miqrasiyalar --- */
+  /* --- migrations --- */
   'migrations:report': async ({ id, envId }) => migrations.report(id, envId),
   'migrations:new': async ({ id, name }) => migrations.create(id, name),
   'migrations:up': async ({ id }) => migrations.up(id),
@@ -163,7 +178,7 @@ const handlers: Handlers = {
   'migrations:repair': async ({ id, envId, version, status }) =>
     migrations.repair(id, envId, version, status),
 
-  /* --- funksiyalar --- */
+  /* --- functions --- */
   'functions:list': async ({ id, envId }) => functions.list(id, envId),
   'functions:diff': async ({ id, envId, name }) => functions.diff(id, envId, name),
   'functions:create': async ({ id, name }) => functions.create(id, name),
@@ -177,7 +192,7 @@ const handlers: Handlers = {
   'remote:backup': async ({ id, envId }) => {
     const env = projects.getEnv(id, envId)
     const adapter = adapterFor(projects.get(id), env)
-    return adapter.backup((t) => bus.push(`remote:${env.name}`, 'info', t))
+    return adapter.backup((t) => logBus.push(`remote:${env.name}`, 'info', t))
   },
   'remote:verify': async ({ id, envId }) =>
     adapterFor(projects.get(id), projects.getEnv(id, envId)).verify(),
@@ -188,7 +203,7 @@ const handlers: Handlers = {
     const adapter = adapterFor(projects.get(id), env)
     try {
       await adapter.setServiceState(container, on, (t) =>
-        bus.push(`remote:${env.name}`, 'info', t)
+        logBus.push(`remote:${env.name}`, 'info', t)
       )
       return { ok: true, code: 0, output: `${container} → ${on ? 'start' : 'stop'}`, error: null }
     } catch (err) {
@@ -196,7 +211,7 @@ const handlers: Handlers = {
     }
   },
 
-  /* --- SQL redaktoru --- */
+  /* --- SQL editor --- */
   'sql:execute': async ({ id, envId, sql: text, readOnly, maxRows, timeoutMs, token }) => {
     const run = await sql.execute(id, text, { envId, readOnly, maxRows, timeoutMs, token })
     // DDL may have changed the schema — the column cache is stale
@@ -271,7 +286,7 @@ const handlers: Handlers = {
   'jobs:setEnabled': async ({ jobId, enabled }) => scheduler.setEnabled(jobId, enabled),
   'jobs:runNow': async ({ jobId }) => scheduler.runJob(jobId),
 
-  /* --- sistem --- */
+  /* --- system --- */
   'system:doctor': async () => stack.doctor(),
   'system:setTheme': async ({ theme }) => {
     nativeTheme.themeSource = theme
@@ -287,12 +302,22 @@ export function registerIpc(): void {
   for (const channel of IPC_CHANNELS) {
     ipcMain.handle(channel, async (_event, req: unknown) => {
       try {
+        // The contract types are erased at build time, so this is the only point
+        // where the shape of a renderer payload is actually established. These
+        // values go on to reach spawn argv, filesystem paths and SQL quoting.
+        const parsed = parseIpcRequest(channel, req)
         const handler = handlers[channel] as (r: unknown) => Promise<unknown>
-        return { ok: true, data: await handler(req) }
+        return { ok: true, data: await handler(parsed) }
       } catch (err) {
-        const message = (err as Error).message ?? String(err)
+        const message =
+          err instanceof ZodError
+            ? `invalid request — ${describeIpcError(err)}`
+            : ((err as Error).message ?? String(err))
         logBus.push('app', 'error', `${channel}: ${message}`)
-        return { ok: false, error: message }
+        // `redact` is wired into the log bus, not into the value returned here —
+        // and `ssh`/the Management API both throw raw remote output, which can
+        // carry a connection string. Redact on the way out too.
+        return { ok: false, error: redact(message) }
       }
     })
   }

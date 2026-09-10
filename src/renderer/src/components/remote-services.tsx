@@ -1,7 +1,8 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, type ReactNode } from 'react'
 import type { Project, RemoteEnv } from '@shared/types'
 import { formatBytes } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { useT } from '../i18n'
 import { Badge, Button, Card, Dot, ErrorNote, Skeleton, Toggle } from '../components/ui'
 
@@ -9,43 +10,31 @@ import { Badge, Button, Card, Dot, ErrorNote, Skeleton, Toggle } from '../compon
  * Containers on the remote server. A managed project has no such control —
  * the card says so plainly and shows nothing.
  */
-export function RemoteServices({
-  project,
-  env
-}: {
-  project: Project
-  env: RemoteEnv
-}): ReactNode {
+export function RemoteServices({ project, env }: { project: Project; env: RemoteEnv }): ReactNode {
   const t = useT()
   const services = useQuery(
     'remote:services',
     { id: project.id, envId: env.id },
-    [env.id],
     { enabled: env.kind === 'self-hosted' }
   )
-  const [pending, setPending] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { run, runningLabel: pending, error } = useAction()
 
   const toggle = useCallback(
     async (container: string, on: boolean) => {
-      setPending(container)
-      setError(null)
-      try {
+      await run(async () => {
         const res = await call('remote:setService', {
           id: project.id,
           envId: env.id,
           container,
           on
         })
-        if (!res.ok) setError(res.error ?? t('dashboard.reset.genericError'))
-      } catch (err) {
-        setError((err as Error).message)
-      } finally {
-        setPending(null)
-        services.refresh()
-      }
+        // The handler reports a refusal in the result rather than throwing.
+        if (!res.ok) throw new Error(res.error ?? t('dashboard.reset.genericError'))
+        return res
+      }, container)
+      services.refresh()
     },
-    [project.id, env.id, services, t]
+    [project.id, env.id, services, t, run]
   )
 
   if (env.kind === 'managed') {
@@ -78,7 +67,11 @@ export function RemoteServices({
       }
     >
       {services.loading && items.length === 0 && (
-        <ul className="divide-y divide-line-soft" role="status" aria-label={t('remoteServices.checkingServer')}>
+        <ul
+          className="divide-y divide-line-soft"
+          role="status"
+          aria-label={t('remoteServices.checkingServer')}
+        >
           {[0, 1, 2, 3].map((i) => (
             <li key={i} className="flex items-center gap-2.5 px-3.5 py-2">
               <Skeleton w={32} h={18} delay={i * 90} className="shrink-0 rounded-full" />

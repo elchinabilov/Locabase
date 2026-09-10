@@ -5,8 +5,9 @@
  * file, otherwise the ledger and the database drift apart.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { DbCells, DbColumn, DbFilter, DbOp, DbRow, DbTable, Project } from '@shared/types'
+import type { DbFilter, DbRow, DbTable, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { cx } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
 import {
@@ -16,15 +17,17 @@ import {
   Empty,
   ErrorNote,
   Input,
-  Modal,
   Pager,
   Select,
   SkeletonRows,
-  SkeletonTable,
   Toggle,
   formatCount
 } from '../components/ui'
 import { DataGrid, type GridSort } from '../components/data-grid'
+import { FilterBar } from '../components/tables/filter-bar'
+import { StructurePane } from '../components/tables/structure-pane'
+import { changedOnly, DeleteModal, RowModal } from '../components/tables/row-editor'
+import { pkCells, shortType } from '../components/tables/cells'
 import { EnvPicker, RemoteNote, envOf, useDbGate } from '../components/env-picker'
 import { Splitter, useStoredSize } from '../components/splitter'
 
@@ -33,32 +36,6 @@ const PAGE_SIZES = [25, 50, 100, 500]
 /* The table list is resizable; in pixels, so it keeps its width when the window
    grows — schema names are what decides how wide it wants to be, not the window. */
 const SIDEBAR = { default: 248, min: 180, max: 460 }
-
-const OP_SYMBOLS: Record<DbOp, string> = {
-  eq: '=',
-  neq: '≠',
-  gt: '>',
-  gte: '≥',
-  lt: '<',
-  lte: '≤',
-  like: 'like',
-  ilike: 'ilike',
-  isnull: '',
-  notnull: ''
-}
-
-const OP_LABEL_KEY: Record<DbOp, TranslationKey | null> = {
-  eq: null,
-  neq: null,
-  gt: null,
-  gte: null,
-  lt: null,
-  lte: null,
-  like: null,
-  ilike: null,
-  isnull: 'tables.op.isnull',
-  notnull: 'tables.op.notnull'
-}
 
 const KIND_LABEL_KEY: Record<string, TranslationKey> = {
   r: 'tables.kind.table',
@@ -76,7 +53,13 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
   const env = envOf(project, envId)
   const [includeSystem, setIncludeSystem] = useState(false)
   const [schema, setSchema] = useState('public')
-  const [table, setTable] = useState<string | null>(null)
+  /**
+   * The selection carries the schema it belongs to. Keeping them apart meant a
+   * cross-schema jump from a foreign key (`setSchema` then `setTable`) tripped
+   * the "schema changed, clear the table" effect and landed on nothing.
+   */
+  const [selection, setSelection] = useState<{ schema: string; table: string } | null>(null)
+  const table = selection && selection.schema === schema ? selection.table : null
   const [tab, setTab] = useState<'rows' | 'structure'>('rows')
   const [filter, setFilter] = useState('')
   const [sidebarWidth, setSidebarWidth] = useStoredSize(
@@ -87,33 +70,31 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
   const schemas = useQuery(
     'db:schemas',
     { id: project.id, envId, includeSystem },
-    [project.id, envId, includeSystem],
     { enabled: ready }
   )
   const tables = useQuery(
     'db:tables',
     { id: project.id, envId, schema },
-    [project.id, envId, schema],
     { enabled: ready && schema.length > 0 }
   )
 
   const list = useMemo(() => {
     const all = tables.data ?? []
     const q = filter.trim().toLowerCase()
-    return q ? all.filter((t) => t.name.toLowerCase().includes(q)) : all
+    return q ? all.filter((tbl) => tbl.name.toLowerCase().includes(q)) : all
   }, [tables.data, filter])
 
-  // The selection resets when the schema or the environment changes
-  useEffect(() => setTable(null), [schema, envId])
+  // A different environment is a different database — nothing carries over.
+  useEffect(() => setSelection(null), [envId])
 
   const active = useMemo(
-    () => (tables.data ?? []).find((t) => t.name === table) ?? null,
+    () => (tables.data ?? []).find((tbl) => tbl.name === table) ?? null,
     [tables.data, table]
   )
 
-  const goTo = useCallback((s: string, t: string) => {
-    setSchema(s)
-    setTable(t)
+  const goTo = useCallback((nextSchema: string, nextTable: string) => {
+    setSchema(nextSchema)
+    setSelection({ schema: nextSchema, table: nextTable })
     setTab('rows')
   }, [])
 
@@ -150,7 +131,7 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
               key={tb.name}
               table={tb}
               active={tb.name === table}
-              onClick={() => setTable(tb.name)}
+              onClick={() => setSelection({ schema, table: tb.name })}
             />
           ))}
         </div>
@@ -186,7 +167,9 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
               </h1>
               <Badge tone="muted">{t(KIND_LABEL_KEY[active.kind] ?? 'tables.kind.table')}</Badge>
               {active.rls && <Badge tone="info">RLS</Badge>}
-              {!active.editable && <Badge tone="warn">{active.editableReason}</Badge>}
+              {!active.editable && active.editableReason && (
+                <Badge tone="warn">{t(`tables.editableReason.${active.editableReason}`)}</Badge>
+              )}
               <div className="flex-1" />
               <div className="flex rounded-md border border-line p-0.5">
                 {(['rows', 'structure'] as const).map((tabId) => (
@@ -264,35 +247,57 @@ function RowsPane({
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState<GridSort | null>(null)
   const [filters, setFilters] = useState<DbFilter[]>([])
-  const [selected, setSelected] = useState<Set<number>>(new Set())
+  /**
+   * Selection and the open editor are keyed by PRIMARY KEY, not by row index.
+   * An index is only meaningful for the page that produced it, so paging with
+   * rows checked used to carry the ticks onto whichever rows happened to land
+   * in those positions next. A table without a primary key is not editable, so
+   * wherever a key is needed one exists.
+   */
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [adding, setAdding] = useState(false)
-  const [editing, setEditing] = useState<number | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, error } = useAction()
 
-  const rows = useQuery(
-    'db:rows',
-    {
-      id: project.id,
-      envId,
-      schema: table.schema,
-      table: table.name,
-      limit: pageSize,
-      offset: page * pageSize,
-      orderBy: sort,
-      filters
-    },
-    [project.id, envId, table.schema, table.name, pageSize, page, sort, filters]
-  )
+  const rows = useQuery('db:rows', {
+    id: project.id,
+    envId,
+    schema: table.schema,
+    table: table.name,
+    limit: pageSize,
+    offset: page * pageSize,
+    orderBy: sort,
+    filters
+  })
 
-  // Go back to the first page when the filter/sort changes
-  useEffect(() => {
-    setPage(0)
-    setSelected(new Set())
-  }, [filters, sort, pageSize])
+  // Go back to the first page when the filter/sort changes.
+  useEffect(() => setPage(0), [filters, sort, pageSize])
+
+  // The selection applies to the rows on screen, so leaving the page clears it.
+  // Keying by primary key on top of that means a refresh or a re-sort keeps the
+  // right rows ticked rather than the same positions.
+  useEffect(() => setSelected(new Set()), [filters, sort, pageSize, page])
 
   const cols = rows.data?.columns ?? []
   const data = rows.data?.rows ?? []
+  const keyOf = useCallback((row: DbRow) => JSON.stringify(pkCells(cols, row)), [cols])
+  /** The rows on this page that are selected, by their position in the grid. */
+  const selectedIndexes = useMemo(() => {
+    const out = new Set<number>()
+    data.forEach((row, i) => {
+      if (selected.has(keyOf(row))) out.add(i)
+    })
+    return out
+  }, [data, selected, keyOf])
+  const editingRow = useMemo(
+    () => data.find((row) => keyOf(row) === editing) ?? null,
+    [data, editing, keyOf]
+  )
+  const selectedRows = useMemo(
+    () => data.filter((row) => selected.has(keyOf(row))),
+    [data, selected, keyOf]
+  )
   const editable = rows.data?.editable ?? false
   const total = rows.data?.total ?? null
 
@@ -301,19 +306,13 @@ function RowsPane({
     rows.refresh()
   }, [rows])
 
-  const run = useCallback(
+  const submit = useCallback(
     async (fn: () => Promise<unknown>) => {
-      setError(null)
-      try {
-        await fn()
-        refresh()
-        return true
-      } catch (err) {
-        setError((err as Error).message)
-        return false
-      }
+      const ok = (await run(fn)) !== undefined
+      if (ok) refresh()
+      return ok
     },
-    [refresh]
+    [refresh, run]
   )
 
   return (
@@ -324,9 +323,9 @@ function RowsPane({
             {t('tables.addRow')}
           </Button>
         )}
-        {editable && selected.size > 0 && (
+        {editable && selectedRows.length > 0 && (
           <Button variant="danger" onClick={() => setDeleting(true)}>
-            {t('tables.deleteRows', { count: selected.size })}
+            {t('tables.deleteRows', { count: selectedRows.length })}
           </Button>
         )}
         <FilterBar columns={cols} filters={filters} onChange={setFilters} />
@@ -335,7 +334,10 @@ function RowsPane({
           <Select
             value={String(pageSize)}
             onChange={(v) => setPageSize(Number(v))}
-            options={PAGE_SIZES.map((n) => ({ value: String(n), label: t('sql.rowCount', { count: n }) }))}
+            options={PAGE_SIZES.map((n) => ({
+              value: String(n),
+              label: t('sql.rowCount', { count: n })
+            }))}
           />
         </div>
         <Pager page={page} pageSize={pageSize} count={data.length} total={total} onPage={setPage} />
@@ -356,7 +358,11 @@ function RowsPane({
       )}
       {!editable && rows.data && (
         <p className="border-b border-line-soft bg-warn-bg px-3 py-1.5 text-small text-warn">
-          {t('tables.notEditable', { reason: rows.data.editableReason ?? '' })}
+          {t('tables.notEditable', {
+            reason: rows.data.editableReason
+              ? t(`tables.editableReason.${rows.data.editableReason}`)
+              : ''
+          })}
         </p>
       )}
 
@@ -367,13 +373,27 @@ function RowsPane({
           rows={data}
           sort={sort}
           onSort={setSort}
-          selected={editable ? selected : undefined}
-          onSelectedChange={editable ? setSelected : undefined}
+          selected={editable ? selectedIndexes : undefined}
+          onSelectedChange={
+            editable
+              ? (next) => {
+                  // The grid speaks in positions; store what they identify.
+                  const keys = [...next]
+                    .map((i) => data[i])
+                    .filter(Boolean)
+                    .map((r) => keyOf(r!))
+                  setSelected(new Set(keys))
+                }
+              : undefined
+          }
           rowActions={
             editable
               ? (i) => (
                   <button
-                    onClick={() => setEditing(i)}
+                    onClick={() => {
+                      const row = data[i]
+                      if (row) setEditing(keyOf(row))
+                    }}
                     className="text-meta text-muted hover:text-accent"
                   >
                     {t('tables.edit')}
@@ -391,7 +411,7 @@ function RowsPane({
           row={null}
           onClose={() => setAdding(false)}
           onSubmit={async (values) => {
-            const ok = await run(() =>
+            const ok = await submit(() =>
               call('db:insertRow', {
                 id: project.id,
                 envId,
@@ -405,21 +425,20 @@ function RowsPane({
         />
       )}
 
-      {editing !== null && data[editing] && (
+      {editingRow && (
         <RowModal
           title={t('tables.editRowTitle', { schema: table.schema, table: table.name })}
           columns={cols}
-          row={data[editing] ?? null}
+          row={editingRow}
           onClose={() => setEditing(null)}
           onSubmit={async (values) => {
-            const current = data[editing]
-            if (!current) return
+            const current = editingRow
             const patch = changedOnly(cols, current, values)
             if (Object.keys(patch).length === 0) {
               setEditing(null)
               return
             }
-            const ok = await run(() =>
+            const ok = await submit(() =>
               call('db:updateRow', {
                 id: project.id,
                 envId,
@@ -437,14 +456,11 @@ function RowsPane({
       {deleting && (
         <DeleteModal
           columns={cols}
-          rows={[...selected].map((i) => data[i]).filter((r): r is DbRow => Boolean(r))}
+          rows={selectedRows}
           onClose={() => setDeleting(false)}
           onConfirm={async () => {
-            const pks = [...selected]
-              .map((i) => data[i])
-              .filter((r): r is DbRow => Boolean(r))
-              .map((r) => pkCells(cols, r))
-            const ok = await run(() =>
+            const pks = selectedRows.map((r) => pkCells(cols, r))
+            const ok = await submit(() =>
               call('db:deleteRows', {
                 id: project.id,
                 envId,
@@ -459,389 +475,4 @@ function RowsPane({
       )}
     </div>
   )
-}
-
-
-function FilterBar({
-  columns,
-  filters,
-  onChange
-}: {
-  columns: DbColumn[]
-  filters: DbFilter[]
-  onChange: (f: DbFilter[]) => void
-}): ReactNode {
-  const t = useT()
-  const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState<DbFilter>({ column: '', op: 'eq', value: '' })
-  const needsValue = draft.op !== 'isnull' && draft.op !== 'notnull'
-  const opLabel = (op: DbOp): string => {
-    const key = OP_LABEL_KEY[op]
-    return key ? t(key) : OP_SYMBOLS[op]
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {filters.map((f, i) => (
-        <button
-          key={`${f.column}-${f.op}-${i}`}
-          onClick={() => onChange(filters.filter((_, j) => j !== i))}
-          title={t('tables.removeFilter')}
-          className="rounded border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-badge text-muted hover:text-danger"
-        >
-          {f.column} {opLabel(f.op)} {f.value ?? ''} ✕
-        </button>
-      ))}
-      <Button onClick={() => setOpen(true)} disabled={columns.length === 0}>
-        {t('tables.addFilter')}
-      </Button>
-
-      {open && (
-        <Modal
-          title={t('tables.addFilterTitle')}
-          onClose={() => setOpen(false)}
-          footer={
-            <>
-              <Button onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
-              <Button
-                variant="primary"
-                disabled={!draft.column}
-                onClick={() => {
-                  onChange([...filters, { ...draft, value: needsValue ? draft.value : null }])
-                  setDraft({ column: '', op: 'eq', value: '' })
-                  setOpen(false)
-                }}
-              >
-                {t('common.add')}
-              </Button>
-            </>
-          }
-        >
-          <div className="flex flex-col gap-2">
-            <Select
-              value={draft.column}
-              onChange={(v) => setDraft((d) => ({ ...d, column: v }))}
-              options={[
-                { value: '', label: t('tables.selectColumn') },
-                ...columns.map((c) => ({ value: c.name, label: `${c.name} · ${c.dataType}` }))
-              ]}
-            />
-            <Select
-              value={draft.op}
-              onChange={(v) => setDraft((d) => ({ ...d, op: v as DbOp }))}
-              options={(Object.keys(OP_SYMBOLS) as DbOp[]).map((op) => ({ value: op, label: opLabel(op) }))}
-            />
-            <Input
-              value={draft.value ?? ''}
-              disabled={!needsValue}
-              onChange={(e) => setDraft((d) => ({ ...d, value: e.target.value }))}
-              placeholder={needsValue ? t('tables.value') : t('tables.valueNotNeeded')}
-              className="font-mono"
-            />
-          </div>
-        </Modal>
-      )}
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ struktur */
-
-function StructurePane({
-  project,
-  envId,
-  table,
-  onNavigate
-}: {
-  project: Project
-  envId: string | null
-  table: DbTable
-  onNavigate: (schema: string, table: string) => void
-}): ReactNode {
-  const t = useT()
-  const cols = useQuery(
-    'db:columns',
-    { id: project.id, envId, schema: table.schema, table: table.name },
-    [project.id, envId, table.schema, table.name]
-  )
-
-  return (
-    <div className="min-h-0 flex-1 overflow-auto p-4">
-      <div className="mx-auto max-w-4xl">
-        {cols.error && <ErrorNote>{cols.error}</ErrorNote>}
-        <table className="w-full text-note">
-          <thead>
-            <tr className="border-b border-line text-badge tracking-wide text-muted uppercase">
-              <th className="px-2 py-1.5 text-left font-medium">{t('tables.col.column')}</th>
-              <th className="px-2 py-1.5 text-left font-medium">{t('tables.col.type')}</th>
-              <th className="px-2 py-1.5 text-left font-medium">{t('tables.col.default')}</th>
-              <th className="px-2 py-1.5 text-right font-medium">{t('tables.col.attributes')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cols.loading && cols.data === null && (
-              <tr>
-                <td colSpan={4} className="p-0">
-                  <SkeletonTable rows={8} cols={4} widths={['30%', '22%', '26%', '14%']} />
-                </td>
-              </tr>
-            )}
-            {(cols.data ?? []).map((c) => (
-              <tr key={c.name} className="border-b border-line-soft last:border-0">
-                <td className="px-2 py-1.5 font-mono text-small text-text">{c.name}</td>
-                <td className="px-2 py-1.5 text-muted">{c.dataType}</td>
-                <td className="max-w-[220px] truncate px-2 py-1.5 font-mono text-meta text-muted">
-                  {c.defaultExpr ?? '—'}
-                </td>
-                <td className="px-2 py-1.5 text-right">
-                  <span className="inline-flex flex-wrap justify-end gap-1">
-                    {c.pkOrd !== null && <Badge tone="ok">PK</Badge>}
-                    {!c.nullable && <Badge tone="muted">not null</Badge>}
-                    {c.isIdentity && <Badge tone="info">identity</Badge>}
-                    {c.isGenerated && <Badge tone="info">generated</Badge>}
-                    {c.refTable && (
-                      <button
-                        onClick={() => onNavigate(c.refSchema ?? 'public', c.refTable ?? '')}
-                        className="text-badge text-info hover:underline"
-                      >
-                        → {c.refSchema}.{c.refTable}.{c.refColumn}
-                      </button>
-                    )}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="mt-4 text-small leading-relaxed text-muted">{t('tables.ddlHint')}</p>
-      </div>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ modallar */
-
-type FieldMode = 'value' | 'null' | 'default'
-interface Field {
-  mode: FieldMode
-  text: string
-}
-
-function RowModal({
-  title,
-  columns,
-  row,
-  onClose,
-  onSubmit
-}: {
-  title: string
-  columns: DbColumn[]
-  /** null = a new row */
-  row: DbRow | null
-  onClose: () => void
-  onSubmit: (values: DbCells) => Promise<void>
-}): ReactNode {
-  const t = useT()
-  const editable = useMemo(() => columns.filter((c) => !c.isGenerated), [columns])
-  const [fields, setFields] = useState<Record<string, Field>>(() => initFields(columns, row))
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const set = (name: string, patch: Partial<Field>): void =>
-    setFields((f) => ({ ...f, [name]: { ...(f[name] ?? { mode: 'value', text: '' }), ...patch } }))
-
-  return (
-    <Modal
-      wide
-      title={title}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            loading={busy}
-            onClick={() => {
-              setBusy(true)
-              setError(null)
-              void onSubmit(collect(editable, fields))
-                .catch((e: Error) => setError(e.message))
-                .finally(() => setBusy(false))
-            }}
-          >
-            {t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      {error && (
-        <div className="mb-3">
-          <ErrorNote>{error}</ErrorNote>
-        </div>
-      )}
-      <div className="flex flex-col gap-2.5">
-        {editable.map((c) => {
-          const f = fields[c.name] ?? { mode: 'value' as FieldMode, text: '' }
-          const canDefault = row === null && (c.defaultExpr !== null || c.isIdentity)
-          const multiline = /json|text|xml/.test(c.dataType)
-          return (
-            <div
-              key={c.name}
-              className="grid grid-cols-[minmax(160px,220px)_1fr] items-start gap-3"
-            >
-              <div className="pt-1.5">
-                <div className="font-mono text-note text-text">{c.name}</div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-1 text-meta text-muted">
-                  <span>{c.dataType}</span>
-                  {c.pkOrd !== null && <Badge tone="ok">PK</Badge>}
-                  {!c.nullable && <Badge tone="muted">not null</Badge>}
-                </div>
-              </div>
-              <div className="min-w-0">
-                {multiline ? (
-                  <textarea
-                    value={f.text}
-                    disabled={f.mode !== 'value'}
-                    onChange={(e) => set(c.name, { text: e.target.value })}
-                    rows={3}
-                    className="w-full rounded-md border border-line bg-sunken px-2 py-1.5 font-mono text-note text-text focus:border-accent-dim focus:outline-none disabled:opacity-40"
-                  />
-                ) : (
-                  <Input
-                    value={f.text}
-                    disabled={f.mode !== 'value'}
-                    onChange={(e) => set(c.name, { text: e.target.value })}
-                    className="font-mono"
-                  />
-                )}
-                <div className="mt-1 flex items-center gap-3 text-meta text-muted">
-                  <label className="flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={f.mode === 'null'}
-                      onChange={(e) => set(c.name, { mode: e.target.checked ? 'null' : 'value' })}
-                      className="accent-accent"
-                    />
-                    NULL
-                  </label>
-                  {canDefault && (
-                    <label className="flex items-center gap-1.5">
-                      <input
-                        type="checkbox"
-                        checked={f.mode === 'default'}
-                        onChange={(e) =>
-                          set(c.name, { mode: e.target.checked ? 'default' : 'value' })
-                        }
-                        className="accent-accent"
-                      />
-                      {t('tables.default')} {c.defaultExpr ? `(${c.defaultExpr})` : ''}
-                    </label>
-                  )}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </Modal>
-  )
-}
-
-function DeleteModal({
-  columns,
-  rows,
-  onClose,
-  onConfirm
-}: {
-  columns: DbColumn[]
-  rows: DbRow[]
-  onClose: () => void
-  onConfirm: () => Promise<void>
-}): ReactNode {
-  const t = useT()
-  const [busy, setBusy] = useState(false)
-  return (
-    <Modal
-      title={t('tables.deleteConfirmTitle', { count: rows.length })}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="danger"
-            loading={busy}
-            onClick={() => {
-              setBusy(true)
-              void onConfirm().finally(() => setBusy(false))
-            }}
-          >
-            {t('common.delete')}
-          </Button>
-        </>
-      }
-    >
-      <p className="mb-3 text-ui text-muted">{t('tables.irreversible')}</p>
-      <ul className="max-h-64 overflow-auto rounded-md border border-line bg-sunken p-2 font-mono text-small">
-        {rows.map((r, i) => (
-          <li key={i} className="truncate py-0.5 text-muted">
-            {JSON.stringify(pkCells(columns, r))}
-          </li>
-        ))}
-      </ul>
-    </Modal>
-  )
-}
-
-/* ------------------------------------------------------------------- helpers */
-
-function initFields(columns: DbColumn[], row: DbRow | null): Record<string, Field> {
-  const out: Record<string, Field> = {}
-  columns.forEach((c, i) => {
-    if (c.isGenerated) return
-    if (row === null) {
-      out[c.name] =
-        c.defaultExpr !== null || c.isIdentity
-          ? { mode: 'default', text: '' }
-          : { mode: 'value', text: '' }
-      return
-    }
-    const v = row[i] ?? null
-    out[c.name] = v === null ? { mode: 'null', text: '' } : { mode: 'value', text: v }
-  })
-  return out
-}
-
-/** The "default" mode omits the key ENTIRELY — Postgres applies its own default. */
-function collect(columns: DbColumn[], fields: Record<string, Field>): DbCells {
-  const out: DbCells = {}
-  for (const c of columns) {
-    const f = fields[c.name]
-    if (!f || f.mode === 'default') continue
-    out[c.name] = f.mode === 'null' ? null : f.text
-  }
-  return out
-}
-
-function changedOnly(columns: DbColumn[], row: DbRow, values: DbCells): DbCells {
-  const out: DbCells = {}
-  columns.forEach((c, i) => {
-    if (!(c.name in values)) return
-    const before = row[i] ?? null
-    const after = values[c.name] ?? null
-    if (before !== after) out[c.name] = after
-  })
-  return out
-}
-
-export function pkCells(columns: DbColumn[], row: DbRow): DbCells {
-  const out: DbCells = {}
-  columns.forEach((c, i) => {
-    if (c.pkOrd !== null) out[c.name] = row[i] ?? null
-  })
-  return out
-}
-
-function shortType(c: DbColumn): string {
-  const pk = c.pkOrd !== null ? '🔑' : ''
-  return `${pk}${c.dataType}`
 }

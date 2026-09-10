@@ -6,11 +6,29 @@
  * way the cursor stays put and the text doesn't jump.
  */
 import { useEffect, useRef, type ReactNode } from 'react'
-import { Compartment, EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
-import { Decoration, EditorView, highlightSpecialChars, keymap, lineNumbers, type DecorationSet } from '@codemirror/view'
+import {
+  Compartment,
+  EditorState,
+  StateEffect,
+  StateField,
+  type Extension
+} from '@codemirror/state'
+import {
+  Decoration,
+  EditorView,
+  highlightSpecialChars,
+  keymap,
+  lineNumbers,
+  type DecorationSet
+} from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { bracketMatching, HighlightStyle, syntaxHighlighting } from '@codemirror/language'
-import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap
+} from '@codemirror/autocomplete'
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { PostgreSQL, sql } from '@codemirror/lang-sql'
 import { tags as t } from '@lezer/highlight'
@@ -25,42 +43,48 @@ import { useTheme } from '../theme'
  * itself — has to be handed over, hence the argument and the compartment below.
  */
 function editorTheme(dark: boolean): Extension {
-  return EditorView.theme({
-    '&': {
-      backgroundColor: 'var(--color-bg)',
-      color: 'var(--color-text)',
-      fontSize: 'var(--lb-editor-size)',
-      height: '100%'
+  return EditorView.theme(
+    {
+      '&': {
+        backgroundColor: 'var(--color-bg)',
+        color: 'var(--color-text)',
+        fontSize: 'var(--lb-editor-size)',
+        height: '100%'
+      },
+      '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6' },
+      '.cm-content': { padding: '10px 0' },
+      '.cm-gutters': {
+        backgroundColor: 'var(--color-panel)',
+        color: 'var(--color-dim)',
+        border: 'none',
+        borderRight: '1px solid var(--color-line)'
+      },
+      '.cm-activeLine': { backgroundColor: 'var(--color-panel-2)' },
+      '.cm-activeLineGutter': {
+        backgroundColor: 'var(--color-panel-2)',
+        color: 'var(--color-muted)'
+      },
+      '.cm-cursor': { borderLeftColor: 'var(--color-accent)' },
+      '&.cm-focused': { outline: 'none' },
+      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
+        backgroundColor: 'var(--lb-selection)'
+      },
+      '.cm-tooltip': {
+        backgroundColor: 'var(--color-panel-2)',
+        border: '1px solid var(--color-line)',
+        borderRadius: '6px'
+      },
+      '.cm-tooltip-autocomplete ul li[aria-selected]': {
+        backgroundColor: 'var(--color-accent-dim)',
+        color: 'var(--color-text)'
+      },
+      '.lb-sql-error': {
+        textDecoration: 'underline wavy var(--color-danger)',
+        textUnderlineOffset: '3px'
+      }
     },
-    '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6' },
-    '.cm-content': { padding: '10px 0' },
-    '.cm-gutters': {
-      backgroundColor: 'var(--color-panel)',
-      color: 'var(--color-dim)',
-      border: 'none',
-      borderRight: '1px solid var(--color-line)'
-    },
-    '.cm-activeLine': { backgroundColor: 'var(--color-panel-2)' },
-    '.cm-activeLineGutter': { backgroundColor: 'var(--color-panel-2)', color: 'var(--color-muted)' },
-    '.cm-cursor': { borderLeftColor: 'var(--color-accent)' },
-    '&.cm-focused': { outline: 'none' },
-    '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
-      backgroundColor: 'var(--lb-selection)'
-    },
-    '.cm-tooltip': {
-      backgroundColor: 'var(--color-panel-2)',
-      border: '1px solid var(--color-line)',
-      borderRadius: '6px'
-    },
-    '.cm-tooltip-autocomplete ul li[aria-selected]': {
-      backgroundColor: 'var(--color-accent-dim)',
-      color: 'var(--color-text)'
-    },
-    '.lb-sql-error': {
-      textDecoration: 'underline wavy var(--color-danger)',
-      textUnderlineOffset: '3px'
-    }
-  }, { dark })
+    { dark }
+  )
 }
 
 const highlight = syntaxHighlighting(
@@ -199,15 +223,13 @@ export function SqlEditor({
   useEffect(() => {
     if (!view.current || !completion) return
     const schema: Record<string, string[]> = {}
-    for (const t of completion.tables) {
-      schema[`${t.schema}.${t.table}`] = t.columns
+    for (const tbl of completion.tables) {
+      schema[`${tbl.schema}.${tbl.table}`] = tbl.columns
       // complete the short name for `public` too
-      if (t.schema === 'public') schema[t.table] = t.columns
+      if (tbl.schema === 'public') schema[tbl.table] = tbl.columns
     }
     view.current.dispatch({
-      effects: schemaComp.reconfigure(
-        sql({ dialect: PostgreSQL, schema, defaultSchema: 'public' })
-      )
+      effects: schemaComp.reconfigure(sql({ dialect: PostgreSQL, schema, defaultSchema: 'public' }))
     })
   }, [completion, schemaComp])
 

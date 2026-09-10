@@ -1,0 +1,8 @@
+dist
+out
+node_modules
+resources
+docs/screenshots
+package-lock.json
+*.tsbuildinfo
+coverage
