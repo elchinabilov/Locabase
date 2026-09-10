@@ -24,6 +24,7 @@ import {
   SkeletonList,
   Toggle
 } from '../components/ui'
+import { envOptions } from '../components/env-picker'
 import { describeSchedule, JobFormModal, scopeOptions } from '../components/job-form'
 
 export function BackupsRoute({
@@ -93,13 +94,7 @@ export function BackupsRoute({
           <Select
             value={envId}
             onChange={setEnvId}
-            options={[
-              { value: '', label: `⌂ ${t('backups.localTarget')}` },
-              ...project.environments.map((e) => ({
-                value: e.id,
-                label: `${e.kind === 'managed' ? '☁' : '⛁'} ${e.name}`
-              }))
-            ]}
+            options={envOptions(project, t('backups.localTarget'))}
           />
         </div>
         <div className="w-44">
@@ -581,13 +576,7 @@ function RestoreModal({
                 setEnvId(v)
                 setConfirm('')
               }}
-              options={[
-                { value: '', label: `⌂ ${t('backups.localTarget')}` },
-                ...project.environments.map((e) => ({
-                  value: e.id,
-                  label: `${e.kind === 'managed' ? '☁' : '⛁'} ${e.name}`
-                }))
-              ]}
+              options={envOptions(project, t('backups.localTarget'))}
             />
           </Row>
 

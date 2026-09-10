@@ -14,9 +14,7 @@ import {
   Dot,
   Empty,
   ErrorNote,
-  Input,
-  Modal,
-  Row,
+  ConfirmModal,
   Skeleton,
   Toggle
 } from '../components/ui'
@@ -538,46 +536,32 @@ function ResetModal({
   onDone: () => void
 }): ReactNode {
   const t = useT()
-  const [text, setText] = useState('')
   const { run, busy, error } = useAction()
 
   const go = useCallback(async () => {
     const res = await run(async () => {
-      const r = await call('stack:reset', { id: project.id, confirm: text })
+      const r = await call('stack:reset', { id: project.id, confirm: project.name })
       // A refused reset reports itself in the result rather than throwing.
       if (!r.ok) throw new Error(r.error ?? t('dashboard.reset.genericError'))
       return r
     })
     if (res) onClose()
     onDone()
-  }, [project.id, text, onClose, onDone, t, run])
+  }, [project.id, project.name, onClose, onDone, t, run])
 
   return (
-    <Modal
+    <ConfirmModal
       title={t('dashboard.reset.title')}
+      expected={project.name}
+      confirmLabel={t('dashboard.reset.confirmButton')}
+      hint={t('dashboard.reset.confirmLabel', { name: project.name })}
+      busy={busy}
+      error={error}
       onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="danger"
-            onClick={() => void go()}
-            loading={busy}
-            disabled={text !== project.name}
-          >
-            {t('dashboard.reset.confirmButton')}
-          </Button>
-        </>
-      }
+      onConfirm={() => void go()}
     >
-      <p className="mb-3 text-ui leading-relaxed">
-        {t('dashboard.reset.body')}{' '}
-        <span className="text-danger">{t('dashboard.reset.dataLoss')}</span>
-      </p>
-      <Row label={t('dashboard.reset.confirmLabel', { name: project.name })}>
-        <Input value={text} onChange={(e) => setText(e.target.value)} autoFocus />
-      </Row>
-      {error && <ErrorNote>{error}</ErrorNote>}
-    </Modal>
+      {t('dashboard.reset.body')}{' '}
+      <span className="text-danger">{t('dashboard.reset.dataLoss')}</span>
+    </ConfirmModal>
   )
 }

@@ -4,7 +4,7 @@ import type {
   ButtonHTMLAttributes,
   KeyboardEvent as ReactKeyboardEvent
 } from 'react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cx } from '../lib/format'
 import { useI18n, useT } from '../i18n'
 
@@ -324,6 +324,63 @@ export function Modal({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * A dialog that will not act until the exact name is typed back.
+ *
+ * Three of these existed — reset the local database, deploy to an environment,
+ * restore over one — each with its own copy of the typed-name check, the busy
+ * button and the error note. The guard is the point of the dialog, so it lives
+ * in one place rather than three.
+ */
+export function ConfirmModal({
+  title,
+  expected,
+  confirmLabel,
+  busy,
+  error,
+  onClose,
+  onConfirm,
+  children,
+  hint
+}: {
+  title: string
+  /** What the user has to type — usually the project or environment name. */
+  expected: string
+  confirmLabel: string
+  busy?: boolean
+  error?: string | null
+  onClose: () => void
+  onConfirm: () => void
+  /** The explanation of what is about to happen. */
+  children: ReactNode
+  /** Label for the input, naming what has to be typed. */
+  hint: string
+}): ReactNode {
+  const t = useT()
+  const [text, setText] = useState('')
+
+  return (
+    <Modal
+      title={title}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={onConfirm} loading={busy} disabled={text !== expected}>
+            {confirmLabel}
+          </Button>
+        </>
+      }
+    >
+      <div className="mb-3 text-ui leading-relaxed">{children}</div>
+      <Row label={hint}>
+        <Input value={text} onChange={(e) => setText(e.target.value)} autoFocus />
+      </Row>
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </Modal>
   )
 }
 

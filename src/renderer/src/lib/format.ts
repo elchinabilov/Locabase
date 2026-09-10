@@ -34,13 +34,25 @@ export function bytes(n: number): string {
   return `${value >= 10 || i === 0 ? Math.round(value) : value.toFixed(1)} ${units[i]}`
 }
 
-/** Date + time in the interface language, no seconds. */
-export function stamp(iso: string, locale = 'en'): string {
-  return new Date(iso).toLocaleString(locale === 'az' ? 'az-AZ' : 'en-GB', {
+/**
+ * Date + time in the interface language, no seconds.
+ *
+ * Absolute, not relative: "3 days ago" is useless when comparing two sign-ups.
+ * `hour12` is pinned off so the shape does not change with the locale — a table
+ * of timestamps has to line up.
+ */
+export function stamp(iso: string | null, locale = 'en'): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  // A timestamp the database gave us in a shape `Date` cannot read is still
+  // worth showing raw; blanking it would hide that something is wrong.
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleString(locale === 'az' ? 'az-AZ' : 'en-GB', {
     year: 'numeric',
     month: 'short',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    hour12: false
   })
 }

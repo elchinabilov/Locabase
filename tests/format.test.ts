@@ -108,4 +108,16 @@ describe('clock and stamp', () => {
   it('uses the Azerbaijani locale when asked', () => {
     expect(stamp('2026-01-02T15:04:05Z', 'az')).not.toBe(stamp('2026-01-02T15:04:05Z', 'en'))
   })
+
+  it('renders a missing timestamp as a dash', () => {
+    expect(stamp(null)).toBe('—')
+  })
+
+  it('shows an unparseable timestamp raw rather than blanking it', () => {
+    expect(stamp('not-a-date')).toBe('not-a-date')
+  })
+
+  it('stays on a 24-hour clock', () => {
+    expect(stamp('2026-01-02T15:04:00Z')).not.toMatch(/[ap]m/i)
+  })
 })

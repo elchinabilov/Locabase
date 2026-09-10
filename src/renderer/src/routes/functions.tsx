@@ -15,6 +15,7 @@ import {
   SkeletonList,
   Toggle
 } from '../components/ui'
+import { envOptions } from '../components/env-picker'
 import { DRIFT, FunctionDiffModal } from '../components/function-diff'
 
 export function FunctionsRoute({ project }: { project: Project }): ReactNode {
@@ -61,10 +62,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
           <Select
             value={envId}
             onChange={setEnvId}
-            options={[
-              { value: '', label: t('functions.localOnly') },
-              ...project.environments.map((e) => ({ value: e.id, label: `↔ ${e.name}` }))
-            ]}
+            options={envOptions(project, t('functions.localOnly'))}
           />
         </div>
         <div className="flex-1" />

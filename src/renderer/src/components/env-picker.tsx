@@ -12,6 +12,26 @@ import { useStackStatus } from '../lib/stack-status'
 import { useT } from '../i18n'
 import { Empty, Select, Spinner } from './ui'
 
+/**
+ * The environment list as `<Select>` options, with the local stack first.
+ *
+ * Five screens built this inline, and they had drifted into three different icon
+ * conventions for the same three things — `⌂/☁/⛁` here, a bare `↔` on
+ * Migrations and Functions. One list, one set of icons.
+ */
+export function envOptions(
+  project: Project,
+  localLabel: string
+): Array<{ value: string; label: string }> {
+  return [
+    { value: '', label: `⌂ ${localLabel}` },
+    ...project.environments.map((e) => ({
+      value: e.id,
+      label: `${e.kind === 'managed' ? '☁' : '⛁'} ${e.name}`
+    }))
+  ]
+}
+
 export function EnvPicker({
   project,
   envId,
@@ -29,13 +49,7 @@ export function EnvPicker({
       <Select
         value={envId ?? ''}
         onChange={(v) => onChange(v || null)}
-        options={[
-          { value: '', label: `⌂ ${t('envPicker.local')}` },
-          ...project.environments.map((e) => ({
-            value: e.id,
-            label: `${e.kind === 'managed' ? '☁' : '⛁'} ${e.name}`
-          }))
-        ]}
+        options={envOptions(project, t('envPicker.local'))}
       />
     </div>
   )

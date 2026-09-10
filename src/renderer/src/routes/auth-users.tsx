@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AuthUser, AuthUserSort, AuthUserStatus, Project, RemoteEnv } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { useCopy } from '../lib/use-copy'
-import { cx } from '../lib/format'
+import { cx, stamp } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
 import {
   Badge,
@@ -559,46 +559,36 @@ function isBanned(user: AuthUser): boolean {
   return user.bannedUntil !== null && new Date(user.bannedUntil) > new Date()
 }
 
-/** `linkedin_oidc` → `LinkedIn OIDC`; anything unknown is title-cased as-is. */
-function providerLabel(id: string): string {
-  const known: Record<string, string> = {
-    email: 'Email',
-    phone: 'Phone',
-    anonymous: 'Anonymous',
-    linkedin_oidc: 'LinkedIn OIDC',
-    github: 'GitHub',
-    gitlab: 'GitLab',
-    google: 'Google',
-    apple: 'Apple',
-    azure: 'Azure',
-    bitbucket: 'Bitbucket',
-    discord: 'Discord',
-    facebook: 'Facebook',
-    figma: 'Figma',
-    kakao: 'Kakao',
-    keycloak: 'Keycloak',
-    notion: 'Notion',
-    slack: 'Slack',
-    spotify: 'Spotify',
-    twitch: 'Twitch',
-    twitter: 'Twitter',
-    workos: 'WorkOS',
-    zoom: 'Zoom'
-  }
-  return known[id] ?? id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+/**
+ * Module scope: this was rebuilt for every provider badge on every row, so a
+ * page of 50 users allocated it a few hundred times per render.
+ */
+const PROVIDER_LABELS: Record<string, string> = {
+  email: 'Email',
+  phone: 'Phone',
+  anonymous: 'Anonymous',
+  linkedin_oidc: 'LinkedIn OIDC',
+  github: 'GitHub',
+  gitlab: 'GitLab',
+  google: 'Google',
+  apple: 'Apple',
+  azure: 'Azure',
+  bitbucket: 'Bitbucket',
+  discord: 'Discord',
+  facebook: 'Facebook',
+  figma: 'Figma',
+  kakao: 'Kakao',
+  keycloak: 'Keycloak',
+  notion: 'Notion',
+  slack: 'Slack',
+  spotify: 'Spotify',
+  twitch: 'Twitch',
+  twitter: 'Twitter',
+  workos: 'WorkOS',
+  zoom: 'Zoom'
 }
 
-/** Absolute, not relative: "3 days ago" is useless when comparing two sign-ups. */
-function stamp(iso: string | null, locale: 'az' | 'en'): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleString(locale === 'az' ? 'az-AZ' : 'en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  })
+/** `linkedin_oidc` → `LinkedIn OIDC`; anything unknown is title-cased as-is. */
+function providerLabel(id: string): string {
+  return PROVIDER_LABELS[id] ?? id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
