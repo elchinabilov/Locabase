@@ -18,7 +18,7 @@ import type {
   SqlColumn,
   SqlErrorInfo,
   SqlResult
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import { quoteIdent, qualify } from './ident.js'
 
 /* ------------------------------------------------------------ normalizasiya */

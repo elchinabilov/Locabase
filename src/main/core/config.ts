@@ -12,7 +12,7 @@ import type {
   ConfigValue,
   FieldValue,
   PatchPreview
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import { applyPatches } from './toml/patch.js'
 import { scanToml } from './toml/scan.js'
 import { mask, readMap } from './envfile.js'

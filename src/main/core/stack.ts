@@ -13,7 +13,7 @@ import { write as writeConfig } from './config.js'
 const SERVICE_PATHS = new Set(
   SERVICE_GROUPS.map((g) => g.configPath).filter((p): p is string => p !== null)
 )
-import type { StackStatus, TaskResult } from '@shared/types.js'
+import type { StackStatus, TaskResult } from '@shared/types/index.js'
 
 const START_TIMEOUT = 10 * 60 * 1000
 const STOP_TIMEOUT = 3 * 60 * 1000

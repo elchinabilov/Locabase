@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { basename, join, resolve } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { sanitizeProjectId } from '@shared/naming.js'
-import type { ConfigPatch, Project } from '@shared/types.js'
+import type { ConfigPatch, Project } from '@shared/types/index.js'
 import { supabase } from './cli.js'
 import { logBus } from './log.js'
 import { add as addProject, update as updateProject, ProjectError } from './projects.js'

@@ -8,7 +8,7 @@
  */
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { createReadStream, createWriteStream, rmSync, statSync } from 'node:fs'
-import type { TaskResult } from '@shared/types.js'
+import type { TaskResult } from '@shared/types/index.js'
 import { logBus } from './log.js'
 import { resolvedPath, whichBin } from './env-path.js'
 

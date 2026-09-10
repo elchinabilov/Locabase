@@ -21,7 +21,7 @@ import type {
   SelfHostedEnv,
   SqlRun,
   VerifyReport
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import { run, runFromFile, runToFile } from '../cli.js'
 import { paths } from '../projects.js'
 import { MAX_FILE_BYTES } from '../filetree.js'

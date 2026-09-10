@@ -10,7 +10,7 @@ import {
   renameFor,
   writeFor
 } from '../src/main/core/queries.js'
-import type { Project } from '../src/shared/types.js'
+import type { Project } from '../src/shared/types/index.js'
 
 let root: string
 let project: Project

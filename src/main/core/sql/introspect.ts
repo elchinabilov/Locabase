@@ -5,7 +5,7 @@
  * doesn't report `attidentity`/`attgenerated` cleanly, has no row estimate, and
  * is noticeably slower.
  */
-import type { DbColumn, DbCompletion, DbRelKind, DbSchema, DbTable } from '@shared/types.js'
+import type { DbColumn, DbCompletion, DbRelKind, DbSchema, DbTable } from '@shared/types/index.js'
 import { rowsOf, targetFor } from './target.js'
 import { qualify } from './ident.js'
 

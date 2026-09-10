@@ -16,7 +16,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import type { Project, SavedQuery } from '@shared/types.js'
+import type { Project, SavedQuery } from '@shared/types/index.js'
 import { get as getProject, paths } from './projects.js'
 
 /**

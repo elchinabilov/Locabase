@@ -31,7 +31,7 @@ import type {
   SqlResult,
   SqlRun,
   VerifyReport
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import { supabase, supabaseJson } from '../cli.js'
 import { get as getSecret, keys } from '../secrets.js'
 import { readTree } from '../filetree.js'

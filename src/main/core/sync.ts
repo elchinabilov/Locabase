@@ -14,7 +14,7 @@ import type {
   SyncAxis,
   SyncReport,
   TaskResult
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import { readMap } from './envfile.js'
 import { logBus } from './log.js'
 import { listFiles, report as migrationReport } from './migrations.js'

@@ -26,7 +26,7 @@ import type {
   RemoteEnv,
   RestoreOptions,
   RestoreResult
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import { runFromFile, runToFile } from '../cli.js'
 import { servicesFor } from '../docker.js'
 import { logBus } from '../log.js'

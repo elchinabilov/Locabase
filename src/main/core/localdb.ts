@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs'
 import { Client } from 'pg'
 import { parse as parseToml } from 'smol-toml'
-import type { Project } from '@shared/types.js'
+import type { Project } from '@shared/types/index.js'
 import { paths } from './projects.js'
 
 export interface LedgerRow {

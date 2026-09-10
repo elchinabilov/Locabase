@@ -12,7 +12,7 @@
  * file — which the main process also imports — never depends on the UI's
  * translation layer.
  */
-import type { ConfigField } from './types.js'
+import type { ConfigField } from './types/index.js'
 
 const R = true // needs a restart
 

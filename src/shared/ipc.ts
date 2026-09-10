@@ -46,7 +46,7 @@ import type {
   SyncReport,
   TaskResult,
   VerifyReport
-} from './types.js'
+} from './types/index.js'
 
 export interface IpcContract {
   /* --- projects --- */

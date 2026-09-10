@@ -14,7 +14,7 @@ import type {
   DbRowsPage,
   SqlResult,
   SqlRun
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import { oidNames, poolFor } from './pool.js'
 import {
   buildCount,

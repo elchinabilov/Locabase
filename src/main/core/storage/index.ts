@@ -13,7 +13,7 @@ import type {
   StorageConnectionInput,
   StorageObject,
   StorageTestReport
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import * as secrets from '../secrets.js'
 import { logBus } from '../log.js'
 import {

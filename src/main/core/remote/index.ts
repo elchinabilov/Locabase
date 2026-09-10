@@ -14,7 +14,7 @@ import type {
   RemoteService,
   SqlRun,
   VerifyReport
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import type { MigrationFile } from '../migrations.js'
 import { ManagedAdapter } from './managed.js'
 import { SelfHostedAdapter } from './selfhosted.js'

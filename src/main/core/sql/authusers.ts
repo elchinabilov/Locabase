@@ -17,7 +17,7 @@
  * `banned_until` in the future, a delete is a row removal that the auth schema's
  * own foreign keys cascade. See `setBanned()` and `remove()`.
  */
-import type { AuthUser, AuthUserDetail, AuthUsersPage, AuthUsersQuery } from '@shared/types.js'
+import type { AuthUser, AuthUserDetail, AuthUsersPage, AuthUsersQuery } from '@shared/types/index.js'
 import { rowsOf, targetFor, type Target } from './target.js'
 import { poolFor } from './pool.js'
 import { inlineParams } from './ident.js'

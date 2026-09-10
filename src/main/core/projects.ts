@@ -9,7 +9,7 @@ import { basename, isAbsolute, join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import Store from 'electron-store'
 import { parse as parseToml } from 'smol-toml'
-import type { Project, RemoteEnv } from '@shared/types.js'
+import type { Project, RemoteEnv } from '@shared/types/index.js'
 import { containedPath } from './safe-path.js'
 
 interface RegistryShape {

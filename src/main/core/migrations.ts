@@ -7,7 +7,7 @@
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { MigrationReport, MigrationRow, MigrationState, TaskResult } from '@shared/types.js'
+import type { MigrationReport, MigrationRow, MigrationState, TaskResult } from '@shared/types/index.js'
 import { supabase } from './cli.js'
 import { logBus } from './log.js'
 import { readLedger } from './localdb.js'

@@ -14,7 +14,7 @@ import type {
   FunctionInfo,
   RemoteFile,
   RemoteFileChecksum
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import { checksums, readTree } from './filetree.js'
 import { get as getProject, getEnv, paths } from './projects.js'
 import { adapterFor } from './remote/index.js'

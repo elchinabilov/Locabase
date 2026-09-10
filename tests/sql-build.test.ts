@@ -10,7 +10,7 @@ import {
   pkColumns,
   requireColumn
 } from '../src/main/core/sql/build.js'
-import type { DbColumn, DbFilter, DbOp } from '../src/shared/types.js'
+import type { DbColumn, DbFilter, DbOp } from '../src/shared/types/index.js'
 
 function col(name: string, over: Partial<DbColumn> = {}): DbColumn {
   return {

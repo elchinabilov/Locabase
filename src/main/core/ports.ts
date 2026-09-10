@@ -5,7 +5,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { parse as parseToml } from 'smol-toml'
-import type { ConfigPatch, PortConflict, PortUsage, Project } from '@shared/types.js'
+import type { ConfigPatch, PortConflict, PortUsage, Project } from '@shared/types/index.js'
 import { list as listProjects, paths } from './projects.js'
 
 /** Supabase's default port base: 543xx. */

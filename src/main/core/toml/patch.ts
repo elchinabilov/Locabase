@@ -6,7 +6,7 @@
  * written at the end of its table, and a new table at the end of the file.
  */
 import { parse as parseToml } from 'smol-toml'
-import type { ConfigPatch, ConfigValue } from '@shared/types.js'
+import type { ConfigPatch, ConfigValue } from '@shared/types/index.js'
 import { scanToml, type TomlScan } from './scan.js'
 
 export type PatchValue = ConfigValue | { env: string } | undefined

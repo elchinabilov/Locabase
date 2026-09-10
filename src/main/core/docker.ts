@@ -4,7 +4,7 @@
  */
 import type { Duplex } from 'node:stream'
 import Docker from 'dockerode'
-import type { ServiceStatus } from '@shared/types.js'
+import type { ServiceStatus } from '@shared/types/index.js'
 import { logBus } from './log.js'
 
 let docker: Docker | null = null
