@@ -388,9 +388,7 @@ function RemoveBackupModal({
   const { run, busy, error } = useAction()
 
   const remove = async (): Promise<void> => {
-    const ok = await run(() =>
-      call('backups:remove', { id: record.projectId, backupId: record.id, deleteFile })
-    )
+    const ok = await run(() => call('backups:remove', { backupId: record.id, deleteFile }))
     if (ok !== undefined) onDone()
   }
 

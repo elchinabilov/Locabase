@@ -158,7 +158,10 @@ export async function users(id: string, req: AuthUsersQuery): Promise<AuthUsersP
   const anon = has.has('is_anonymous') ? 'u.is_anonymous' : 'false'
   const confirmed = confirmedExpr(has)
   const pageSize = clampInt(req.pageSize ?? 50, 10, 500)
-  const page = Math.max(0, req.page ?? 0)
+  // Through `clampInt` like `pageSize`: `Math.max(0, NaN)` is NaN, which reached
+  // the query as `offset NaN` and came back as a syntax error rather than a
+  // clean rejection.
+  const page = clampInt(req.page ?? 0, 0, 1_000_000)
 
   const where: string[] = []
   const params: Array<string | null | boolean> = []

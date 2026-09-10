@@ -8,7 +8,7 @@
  */
 import type { ReactNode } from 'react'
 import type { Project, RemoteEnv } from '@shared/types'
-import { useQuery } from '../lib/ipc'
+import { useStackStatus } from '../lib/stack-status'
 import { useT } from '../i18n'
 import { Empty, Select, Spinner } from './ui'
 
@@ -69,14 +69,9 @@ export function useDbGate(
   envId: string | null
 ): { ready: boolean; blocked: ReactNode | null } {
   const t = useT()
-  const status = useQuery(
-    'stack:status',
-    { id: projectId },
-    {
-      pollMs: 10_000,
-      enabled: envId === null
-    }
-  )
+  // Subscribing unconditionally keeps the hook order fixed; the shared poller
+  // already collapses this into the one request the screen behind it makes.
+  const status = useStackStatus(projectId)
   if (envId !== null) return { ready: true, blocked: null }
 
   const dbUp = status.data?.services.some((s) => s.key === 'db' && s.state === 'running') ?? false

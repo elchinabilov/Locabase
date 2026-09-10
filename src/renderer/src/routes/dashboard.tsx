@@ -2,6 +2,7 @@ import { useCallback, useState, type ReactNode } from 'react'
 import type { FieldValue, Project, ServiceStatus, StackStatus } from '@shared/types'
 import { formatBytes, SERVICE_GROUPS } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
+import { useStackStatus } from '../lib/stack-status'
 import { useAction } from '../lib/use-action'
 import { useCopy } from '../lib/use-copy'
 import { cx, timeAgo } from '../lib/format'
@@ -29,13 +30,11 @@ const SERVICE_NOTE_KEY: Record<string, TranslationKey | undefined> = {
 
 export function Dashboard({
   project,
-  onChanged,
   onOpen,
   onNew,
   onRoute
 }: {
   project: Project | null
-  onChanged: () => void
   onOpen: () => void
   onNew: () => void
   onRoute: (r: RouteId) => void
@@ -63,27 +62,19 @@ export function Dashboard({
       />
     )
   }
-  return <ProjectView key={project.id} project={project} onChanged={onChanged} onRoute={onRoute} />
+  return <ProjectView key={project.id} project={project} onRoute={onRoute} />
 }
 
 function ProjectView({
   project,
-  onChanged,
   onRoute
 }: {
   project: Project
-  onChanged: () => void
   onRoute: (r: RouteId) => void
 }): ReactNode {
   const t = useT()
   const { locale } = useI18n()
-  const status = useQuery(
-    'stack:status',
-    { id: project.id, withStats: true },
-    {
-      pollMs: 8000
-    }
-  )
+  const status = useStackStatus(project.id, { withStats: true })
   const config = useQuery('config:read', { id: project.id })
   const conflicts = useQuery('ports:conflicts', undefined, { pollMs: 30000 })
   const { run, runningLabel: busy, error: actionError } = useAction()
@@ -183,7 +174,7 @@ function ProjectView({
             running={running}
             loading={status.loading && status.data === null}
           />
-          <Environments project={project} onRoute={onRoute} onChanged={onChanged} />
+          <Environments project={project} onRoute={onRoute} />
         </div>
       </div>
 
@@ -499,7 +490,6 @@ function Environments({
 }: {
   project: Project
   onRoute: (r: RouteId) => void
-  onChanged: () => void
 }): ReactNode {
   const t = useT()
   return (

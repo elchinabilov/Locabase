@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Project } from '@shared/types'
 import { call, useQuery } from './lib/ipc'
+import { useStackStatus } from './lib/stack-status'
 import { cx, shortPath } from './lib/format'
 import { useT, type TranslationKey } from './i18n'
 import { Badge, Button, Dot, Empty, ErrorNote, SkeletonRows } from './components/ui'
@@ -162,15 +163,7 @@ function Content({
     return <SettingsRoute section={settingsSection} onSection={onSettingsSection} />
   }
   if (route === 'dashboard') {
-    return (
-      <Dashboard
-        project={project}
-        onChanged={onProjectsChanged}
-        onOpen={onOpen}
-        onNew={onNew}
-        onRoute={onRoute}
-      />
-    )
+    return <Dashboard project={project} onOpen={onOpen} onNew={onNew} onRoute={onRoute} />
   }
   if (!project) {
     return <Empty title={t('app.selectProject.title')} hint={t('app.selectProject.hint')} />
@@ -315,7 +308,7 @@ function ProjectItem({
   active: boolean
   onClick: () => void
 }): ReactNode {
-  const status = useQuery('stack:status', { id: project.id }, { pollMs: 8000 })
+  const status = useStackStatus(project.id)
   const running = status.data?.running ?? false
   const unhealthy =
     status.data?.services.some((s) => s.state === 'running' && s.health === 'unhealthy') ?? false

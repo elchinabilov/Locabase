@@ -247,7 +247,7 @@ export interface IpcContract {
   'backups:list': { req: { id: string }; res: BackupRecord[] }
   /** Take one now — the same engine the scheduler uses. */
   'backups:run': { req: { id: string } & BackupOptions; res: BackupRecord }
-  'backups:remove': { req: { id: string; backupId: string; deleteFile: boolean }; res: void }
+  'backups:remove': { req: { backupId: string; deleteFile: boolean }; res: void }
   /** Show the dump in Finder / Explorer. */
   'backups:reveal': { req: { backupId: string }; res: void }
   /** Re-upload a kept local dump to a storage connection. */

@@ -82,25 +82,33 @@ export function Card({
 
 /* ------------------------------------------------------------------- Badge */
 
+export type Tone = 'muted' | 'ok' | 'warn' | 'danger' | 'info'
+
+/**
+ * Module scope, and typed by the union rather than by `string`: rebuilding the
+ * map on every render bought nothing, and `Record<string, string>` meant a tone
+ * added to the union without a class here would compile.
+ */
+const BADGE_TONES: Record<Tone, string> = {
+  muted: 'bg-chip text-muted border-line',
+  ok: 'bg-accent-bg text-accent border-accent-border',
+  warn: 'bg-warn-chip text-warn border-warn-border',
+  danger: 'bg-danger-bg text-danger border-danger-border',
+  info: 'bg-info-bg text-info border-info-border'
+}
+
 export function Badge({
   tone = 'muted',
   children
 }: {
-  tone?: 'muted' | 'ok' | 'warn' | 'danger' | 'info'
+  tone?: Tone
   children: ReactNode
 }): ReactNode {
-  const tones: Record<string, string> = {
-    muted: 'bg-chip text-muted border-line',
-    ok: 'bg-accent-bg text-accent border-accent-border',
-    warn: 'bg-warn-chip text-warn border-warn-border',
-    danger: 'bg-danger-bg text-danger border-danger-border',
-    info: 'bg-info-bg text-info border-info-border'
-  }
   return (
     <span
       className={cx(
         'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-badge font-medium tracking-wide whitespace-nowrap',
-        tones[tone]
+        BADGE_TONES[tone]
       )}
     >
       {children}
@@ -108,14 +116,15 @@ export function Badge({
   )
 }
 
-export function Dot({ tone }: { tone: 'ok' | 'warn' | 'danger' | 'muted' }): ReactNode {
-  const c: Record<string, string> = {
-    ok: 'bg-accent',
-    warn: 'bg-warn',
-    danger: 'bg-danger',
-    muted: 'bg-dimmer'
-  }
-  return <span className={cx('inline-block size-1.5 shrink-0 rounded-full', c[tone])} />
+const DOT_TONES: Record<Exclude<Tone, 'info'>, string> = {
+  ok: 'bg-accent',
+  warn: 'bg-warn',
+  danger: 'bg-danger',
+  muted: 'bg-dimmer'
+}
+
+export function Dot({ tone }: { tone: Exclude<Tone, 'info'> }): ReactNode {
+  return <span className={cx('inline-block size-1.5 shrink-0 rounded-full', DOT_TONES[tone])} />
 }
 
 /* ------------------------------------------------------------------ Inputs */
