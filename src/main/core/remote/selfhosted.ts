@@ -28,11 +28,23 @@ import type { MigrationFile } from '../migrations.js'
 import { readMigration } from '../migrations.js'
 import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 import { parsePsqlCsv, parsePsqlError } from '../sql/csv.js'
+import { quoteLiteral } from '../sql/ident.js'
 import { randomUUID } from 'node:crypto'
 
 /** A string that is safe to paste into a remote shell. */
 function sq(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+/**
+ * `-mtime +N` is a bare shell token, so it cannot be quoted like a value — the
+ * only safe form is to guarantee it really is a number before it is pasted.
+ * The field is typed `number`, but it arrives from the renderer through the
+ * project registry, and a type is not a runtime check.
+ */
+function retentionDays(value: number): number {
+  const n = Math.trunc(Number(value))
+  return Number.isFinite(n) && n > 0 ? n : 14
 }
 
 /** `supabase-edge-functions-abc123` + `abc123` → `edge-functions` */
@@ -148,10 +160,16 @@ export class SelfHostedAdapter implements RemoteAdapter {
     return `remote:${this.env.name}`
   }
 
+  /**
+   * `--` closes option parsing, so the host that follows can never be read as a
+   * flag. The host is already validated when the environment is saved
+   * (`projects.upsertEnv`); this is the second layer, at the point of use.
+   */
   private sshArgs(): string[] {
     const args = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=12']
     if (this.env.sshPort && this.env.sshPort !== 22) args.push('-p', String(this.env.sshPort))
     if (this.env.sshKeyPath) args.push('-i', this.env.sshKeyPath)
+    args.push('--')
     return args
   }
 
@@ -245,7 +263,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
         readMigration(file.file),
         ';',
         `insert into supabase_migrations.schema_migrations (version, name)`,
-        `values ('${file.version.replace(/'/g, "''")}', '${file.name.replace(/'/g, "''")}')`,
+        `values (${quoteLiteral(file.version)}, ${quoteLiteral(file.name)})`,
         'on conflict (version) do nothing;',
         'commit;'
       ].join('\n')
@@ -259,10 +277,10 @@ export class SelfHostedAdapter implements RemoteAdapter {
     const script = [
       'set -e',
       `mkdir -p ${sq(dir)}`,
-      `F=${sq(dir)}/${prefix}-$(date +%F-%H%M%S).dump`,
+      `F="$(printf '%s/%s-%s.dump' ${sq(dir)} ${sq(prefix)} "$(date +%F-%H%M%S)")"`,
       `docker exec -i ${sq(this.env.dbContainer)} pg_dump -U postgres -Fc postgres > "$F"`,
       'ls -lh "$F"',
-      `find ${sq(dir)} -name ${sq(`${prefix}-*.dump`)} -mtime +${this.env.backupRetentionDays || 14} -delete`
+      `find ${sq(dir)} -name ${sq(`${prefix}-*.dump`)} -mtime +${retentionDays(this.env.backupRetentionDays)} -delete`
     ].join('\n')
     log('Taking a backup…')
     const out = await this.ssh(`bash -s`, { input: script, timeoutMs: 30 * 60 * 1000 })
@@ -481,11 +499,11 @@ export class SelfHostedAdapter implements RemoteAdapter {
    * are in the database), `reverted` removes it. The SQL itself applies nothing.
    */
   async repairLedger(version: string, status: 'applied' | 'reverted', log: LogFn): Promise<void> {
-    const v = version.replace(/'/g, "''")
+    const v = quoteLiteral(version)
     const sql =
       status === 'applied'
-        ? `insert into supabase_migrations.schema_migrations (version) values ('${v}') on conflict (version) do nothing;`
-        : `delete from supabase_migrations.schema_migrations where version = '${v}';`
+        ? `insert into supabase_migrations.schema_migrations (version) values (${v}) on conflict (version) do nothing;`
+        : `delete from supabase_migrations.schema_migrations where version = ${v};`
     log(`ledger repair: ${version} → ${status}`)
     await this.psql(sql)
   }

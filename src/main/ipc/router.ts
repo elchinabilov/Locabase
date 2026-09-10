@@ -19,7 +19,6 @@ import * as secrets from '../core/secrets.js'
 import * as sql from '../core/sql/index.js'
 import * as queries from '../core/queries.js'
 import { adapterFor } from '../core/remote/index.js'
-import { logBus as bus } from '../core/log.js'
 import type { EnvEntry } from '@shared/types.js'
 import { scanToml } from '../core/toml/scan.js'
 import * as prefs from '../core/prefs.js'
@@ -56,6 +55,11 @@ const handlers: Handlers = {
     // the jobs, which have nothing left to back up.
     scheduler.forgetProject(id)
     backups.forgetProject(id)
+    // The pooled connections and the cached column metadata point at a project
+    // that is about to stop existing — every other destructive handler releases
+    // them, and so must this one.
+    sql.invalidate(id)
+    sql.introspect.forgetColumns(id)
     return projects.remove(id)
   },
   'projects:update': async ({ id, patch }) => projects.update(id, patch),
@@ -101,6 +105,13 @@ const handlers: Handlers = {
   },
   'stack:tailLogs': async ({ id, container, on }) => {
     const project = projects.get(id)
+    // Without this the renderer could stream logs from any container on the
+    // host. The stack's own containers are `supabase_<service>_<projectId>` —
+    // the same shape `docker.servicesFor` matches on.
+    const suffix = `_${project.projectId}`
+    if (!container.startsWith('supabase_') || !container.endsWith(suffix)) {
+      throw new Error(`Not a container of this project: ${container}`)
+    }
     await docker.tailLogs(container, stack.streamFor(project.projectId), on)
   },
 
@@ -177,7 +188,7 @@ const handlers: Handlers = {
   'remote:backup': async ({ id, envId }) => {
     const env = projects.getEnv(id, envId)
     const adapter = adapterFor(projects.get(id), env)
-    return adapter.backup((t) => bus.push(`remote:${env.name}`, 'info', t))
+    return adapter.backup((t) => logBus.push(`remote:${env.name}`, 'info', t))
   },
   'remote:verify': async ({ id, envId }) =>
     adapterFor(projects.get(id), projects.getEnv(id, envId)).verify(),
@@ -188,7 +199,7 @@ const handlers: Handlers = {
     const adapter = adapterFor(projects.get(id), env)
     try {
       await adapter.setServiceState(container, on, (t) =>
-        bus.push(`remote:${env.name}`, 'info', t)
+        logBus.push(`remote:${env.name}`, 'info', t)
       )
       return { ok: true, code: 0, output: `${container} → ${on ? 'start' : 'stop'}`, error: null }
     } catch (err) {
