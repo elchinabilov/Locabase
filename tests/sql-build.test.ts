@@ -72,9 +72,9 @@ describe('buildWhere', () => {
   })
 
   it('rejects an unknown operator', () => {
-    expect(() =>
-      buildWhere(COLS, [{ column: 'a', op: 'drop' as DbOp, value: null }])
-    ).toThrow(/Unknown operator/)
+    expect(() => buildWhere(COLS, [{ column: 'a', op: 'drop' as DbOp, value: null }])).toThrow(
+      /Unknown operator/
+    )
   })
 
   it('an injection inside a value only ever appears as a parameter', () => {
@@ -92,9 +92,9 @@ describe('buildOrder', () => {
   })
 
   it('rejects any other direction', () => {
-    expect(() =>
-      buildOrder(COLS, { column: 'a', dir: 'desc; drop table t' as 'asc' })
-    ).toThrow(/Unknown sort direction/)
+    expect(() => buildOrder(COLS, { column: 'a', dir: 'desc; drop table t' as 'asc' })).toThrow(
+      /Unknown sort direction/
+    )
   })
 })
 
@@ -150,9 +150,7 @@ describe('buildInsert', () => {
 describe('buildUpdate', () => {
   it('the where clause covers every PK column', () => {
     const f = buildUpdate('public', 't', COLS, { a: '1', b: '2' }, { c: 'yeni' })
-    expect(f.text).toBe(
-      'update "public"."t" set "c" = $1 where "a" = $2 and "b" = $3 returning *'
-    )
+    expect(f.text).toBe('update "public"."t" set "c" = $1 where "a" = $2 and "b" = $3 returning *')
     expect(f.params).toEqual(['yeni', '1', '2'])
   })
 

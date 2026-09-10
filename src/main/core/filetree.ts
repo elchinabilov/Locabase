@@ -35,6 +35,8 @@ export function readTree(dir: string): RemoteFile[] {
 export function checksums(dir: string): RemoteFileChecksum[] {
   return walk(dir).map((path) => ({
     path,
-    md5: createHash('md5').update(readFileSync(join(dir, path))).digest('hex')
+    md5: createHash('md5')
+      .update(readFileSync(join(dir, path)))
+      .digest('hex')
   }))
 }

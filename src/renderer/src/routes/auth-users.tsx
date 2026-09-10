@@ -8,13 +8,7 @@
  * password hashing and identity rows, which is the admin API's job.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import type {
-  AuthUser,
-  AuthUserSort,
-  AuthUserStatus,
-  Project,
-  RemoteEnv
-} from '@shared/types'
+import type { AuthUser, AuthUserSort, AuthUserStatus, Project, RemoteEnv } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
 import { useI18n, useT, type TranslationKey } from '../i18n'
@@ -101,9 +95,7 @@ export function AuthUsers({ project }: { project: Project }): ReactNode {
       <header className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
         <h1 className="text-h3 font-medium">{t('authUsers.title')}</h1>
         {users.data && (
-          <span className="text-small text-muted">
-            {formatCount(users.data.total, locale)}
-          </span>
+          <span className="text-small text-muted">{formatCount(users.data.total, locale)}</span>
         )}
         <EnvPicker project={project} envId={envId} onChange={setEnvId} />
         <div className="flex-1" />
@@ -281,7 +273,11 @@ function UserRow({
         {stamp(user.createdAt, locale)}
       </td>
       <td className="px-3 py-2 text-meta whitespace-nowrap text-muted">
-        {user.lastSignInAt ? stamp(user.lastSignInAt, locale) : <span className="text-faint">—</span>}
+        {user.lastSignInAt ? (
+          stamp(user.lastSignInAt, locale)
+        ) : (
+          <span className="text-faint">—</span>
+        )}
       </td>
       <td className="px-3 py-2 font-mono text-meta text-faint">{user.id}</td>
       {/* Stops the click from also opening the detail modal behind the menu. */}
@@ -402,9 +398,14 @@ function UserDetail({
                 </thead>
                 <tbody>
                   {u.identities.map((i) => (
-                    <tr key={`${i.provider}-${i.providerId}`} className="border-b border-line-soft last:border-0">
+                    <tr
+                      key={`${i.provider}-${i.providerId}`}
+                      className="border-b border-line-soft last:border-0"
+                    >
                       <td className="px-3 py-1.5">
-                        <Badge tone={i.provider === 'email' || i.provider === 'phone' ? 'muted' : 'info'}>
+                        <Badge
+                          tone={i.provider === 'email' || i.provider === 'phone' ? 'muted' : 'info'}
+                        >
                           {providerLabel(i.provider)}
                         </Badge>
                       </td>
@@ -527,11 +528,7 @@ function ConfirmAction({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant={kind === 'delete' ? 'danger' : 'primary'}
-            loading={busy}
-            onClick={run}
-          >
+          <Button variant={kind === 'delete' ? 'danger' : 'primary'} loading={busy} onClick={run}>
             {kind === 'delete'
               ? t('common.delete')
               : kind === 'ban'

@@ -131,7 +131,8 @@ const en = {
     empty: {
       title: 'No project added',
       hintBefore: 'Set up a new project from scratch in an empty folder, or open a repo with',
-      hintAfter: 'in it. For an existing project the tool copies nothing — every file stays where it is.',
+      hintAfter:
+        'in it. For an existing project the tool copies nothing — every file stays where it is.',
       newProject: 'New project',
       openProject: 'Open existing project'
     },
@@ -145,9 +146,11 @@ const en = {
       start: 'Start',
       dbReset: 'db reset'
     },
-    portConflict: 'Port conflict: {ports} — the same port is used by more than one project. Move the ports to a different 100-block from the Configuration screen.',
+    portConflict:
+      'Port conflict: {ports} — the same port is used by more than one project. Move the ports to a different 100-block from the Configuration screen.',
     needsRestart: {
-      message: 'The service toggle was written to `config.toml`. Containers only change after a restart.',
+      message:
+        'The service toggle was written to `config.toml`. Containers only change after a restart.',
       now: 'Restart now',
       later: 'later'
     },
@@ -160,10 +163,12 @@ const en = {
       subtitle: '{running} / {total} running',
       ramSuffix: ' · {size} RAM',
       logButton: 'log',
-      noContainers: 'No containers — the toggles reflect `config.toml`; status shows up once the stack is up.',
+      noContainers:
+        'No containers — the toggles reflect `config.toml`; status shows up once the stack is up.',
       note: {
         imgproxy: 'Image transformation. Doesn’t start anyway if Storage is disabled.',
-        analytics: 'The heaviest and most crash-prone service locally. Keep it off if you don’t need it.'
+        analytics:
+          'The heaviest and most crash-prone service locally. Keep it off if you don’t need it.'
       }
     },
     quickLinks: {
@@ -176,7 +181,8 @@ const en = {
       title: 'Remote environments',
       add: 'Add',
       sync: 'Sync',
-      empty: 'No environment yet. Add a managed (supabase.com) or self-hosted (SSH) environment to see the diff against local.',
+      empty:
+        'No environment yet. Add a managed (supabase.com) or self-hosted (SSH) environment to see the diff against local.',
       managed: 'managed',
       selfHosted: 'self-hosted'
     },
@@ -269,7 +275,8 @@ const en = {
     defaultName: 'default name',
     diffTitle: 'Auth changes',
     writeFile: 'Write file',
-    diffChangedLines: '{count} line(s) change. If a provider key is bound to `env()`, set its value from the Secrets screen.',
+    diffChangedLines:
+      '{count} line(s) change. If a provider key is bound to `env()`, set its value from the Secrets screen.',
     restartRequired: 'Restart required.',
     fieldLabel: {
       clientId: 'Client ID',
@@ -280,13 +287,16 @@ const en = {
       emailOptional: 'Email not required'
     },
     providerHint: {
-      apple: 'The `client_id` is the Services ID, and `secret` is a signed JWT (renews every 6 months). `skip_nonce_check` may be needed for native iOS sign-in.',
+      apple:
+        'The `client_id` is the Services ID, and `secret` is a signed JWT (renews every 6 months). `skip_nonce_check` may be needed for native iOS sign-in.',
       azure: '`url` is the tenant endpoint: https://login.microsoftonline.com/<tenant>/v2.0',
       github: 'GitHub Developer Settings → OAuth Apps → Authorization callback URL.',
       gitlab: 'For self-hosted GitLab, `url` is the instance address.',
-      google: 'Google Cloud Console → Credentials → OAuth 2.0 Client (Web) → Authorized redirect URI.',
+      google:
+        'Google Cloud Console → Credentials → OAuth 2.0 Client (Web) → Authorized redirect URI.',
       keycloak: '`url` is the realm address: https://<host>/realms/<realm>',
-      linkedinOidc: 'The provider name is `linkedin_oidc`, not the old `linkedin` — the app must send this name too.'
+      linkedinOidc:
+        'The provider name is `linkedin_oidc`, not the old `linkedin` — the app must send this name too.'
     }
   },
   fieldEditor: {
@@ -315,178 +325,208 @@ const en = {
     previewBackupSuffix: 'copy is taken before writing.',
     previewRestartRequired: 'This change requires a restart.',
     fields: {
-  project_id: { label: 'Project ID', help: 'The key that ties together container and volume names. Changing it orphans the old database.' },
-  api: {
-    enabled: { label: 'API enabled' },
-    port: { label: 'Port' },
-    schemas: { label: 'Exposed schemas', help: 'Schemas the Data API serves.' },
-    extra_search_path: { label: 'Extra search_path' },
-    max_rows: { label: 'Max. rows' },
-    tls: {
-      enabled: { label: 'TLS (https)' },
-    },
-  },
-  db: {
-    port: { label: 'Postgres port' },
-    shadow_port: { label: 'Shadow port', help: 'Temporary database used for `db diff`.' },
-    major_version: { label: 'Postgres version', help: 'Should match production — a mismatch causes migrations to pass locally and fail in production.' },
-    health_timeout: { label: 'Health check timeout' },
-    migrations: {
-      enabled: { label: 'Migrations enabled' },
-      schema_paths: { label: 'Declarative schema paths' },
-    },
-    seed: {
-      enabled: { label: 'Seed enabled' },
-      sql_paths: { label: 'Seed files' },
-    },
-    pooler: {
-      enabled: { label: 'Pooler (Supavisor)' },
-      port: { label: 'Pooler port' },
-      pool_mode: { label: 'Pool mode' },
-      default_pool_size: { label: 'Pool size' },
-      max_client_conn: { label: 'Max. client connections' },
-    },
-    network_restrictions: {
-      enabled: { label: 'Network restrictions' },
-      allowed_cidrs: { label: 'Allowed CIDR (v4)' },
-      allowed_cidrs_v6: { label: 'Allowed CIDR (v6)' },
-    },
-  },
-  studio: {
-    enabled: { label: 'Studio enabled' },
-    port: { label: 'Studio port' },
-    api_url: { label: 'API URL' },
-    openai_api_key: { label: 'OpenAI key', help: 'For Studio\'s SQL assistant.' },
-  },
-  local_smtp: {
-    enabled: { label: 'Mailpit enabled', help: 'Emails sent locally don\'t actually go out — they land in this panel.' },
-    port: { label: 'Mailpit port' },
-  },
-  auth: {
-    enabled: { label: 'Auth enabled' },
-    site_url: { label: 'Site URL', help: 'Browser origin. You\'re redirected here after login.' },
-    additional_redirect_urls: { label: 'Extra redirect URLs', help: 'Wildcards supported: http://localhost:3000/**' },
-    external_url: { label: 'External auth URL', help: 'The auth service\'s externally visible address (behind a reverse proxy).' },
-    jwt_expiry: { label: 'JWT lifetime (s)' },
-    enable_refresh_token_rotation: { label: 'Refresh token rotation' },
-    refresh_token_reuse_interval: { label: 'Refresh reuse window (s)' },
-    enable_signup: { label: 'Signup enabled' },
-    enable_anonymous_sign_ins: { label: 'Anonymous sign-in' },
-    enable_manual_linking: { label: 'Manual account linking' },
-    minimum_password_length: { label: 'Min. password length' },
-    password_requirements: { label: 'Password requirements' },
-    web3: {
-      solana: {
-        enabled: { label: 'Solana Web3 sign-in' },
+      project_id: {
+        label: 'Project ID',
+        help: 'The key that ties together container and volume names. Changing it orphans the old database.'
       },
-    },
-    oauth_server: {
-      enabled: { label: 'OAuth server' },
-      authorization_url_path: { label: 'OAuth consent path' },
-      allow_dynamic_registration: { label: 'Dynamic registration' },
-    },
-    email: {
-      enable_signup: { label: 'Email signup' },
-      double_confirm_changes: { label: 'Double-confirm email change' },
-      enable_confirmations: { label: 'Require confirmation email' },
-      secure_password_change: { label: 'Require old password on change' },
-      max_frequency: { label: 'Max. frequency' },
-      otp_length: { label: 'OTP length' },
-      otp_expiry: { label: 'OTP lifetime (s)' },
-      smtp: {
-        enabled: { label: 'External SMTP' },
-        host: { label: 'SMTP host' },
-        port: { label: 'SMTP port' },
-        user: { label: 'SMTP user' },
-        pass: { label: 'SMTP password' },
-        admin_email: { label: 'Sender email' },
-        sender_name: { label: 'Sender name' },
+      api: {
+        enabled: { label: 'API enabled' },
+        port: { label: 'Port' },
+        schemas: { label: 'Exposed schemas', help: 'Schemas the Data API serves.' },
+        extra_search_path: { label: 'Extra search_path' },
+        max_rows: { label: 'Max. rows' },
+        tls: {
+          enabled: { label: 'TLS (https)' }
+        }
       },
-    },
-    sms: {
-      enable_signup: { label: 'SMS signup' },
-      enable_confirmations: { label: 'SMS confirmation' },
-      template: { label: 'Template' },
-      max_frequency: { label: 'Max. frequency' },
-      twilio: {
-        enabled: { label: 'Twilio' },
-        account_sid: { label: 'Account SID' },
-        message_service_sid: { label: 'Message Service SID' },
-        auth_token: { label: 'Auth token' },
+      db: {
+        port: { label: 'Postgres port' },
+        shadow_port: { label: 'Shadow port', help: 'Temporary database used for `db diff`.' },
+        major_version: {
+          label: 'Postgres version',
+          help: 'Should match production — a mismatch causes migrations to pass locally and fail in production.'
+        },
+        health_timeout: { label: 'Health check timeout' },
+        migrations: {
+          enabled: { label: 'Migrations enabled' },
+          schema_paths: { label: 'Declarative schema paths' }
+        },
+        seed: {
+          enabled: { label: 'Seed enabled' },
+          sql_paths: { label: 'Seed files' }
+        },
+        pooler: {
+          enabled: { label: 'Pooler (Supavisor)' },
+          port: { label: 'Pooler port' },
+          pool_mode: { label: 'Pool mode' },
+          default_pool_size: { label: 'Pool size' },
+          max_client_conn: { label: 'Max. client connections' }
+        },
+        network_restrictions: {
+          enabled: { label: 'Network restrictions' },
+          allowed_cidrs: { label: 'Allowed CIDR (v4)' },
+          allowed_cidrs_v6: { label: 'Allowed CIDR (v6)' }
+        }
       },
-    },
-    mfa: {
-      max_enrolled_factors: { label: 'Max. enrolled factors' },
-      totp: {
-        enroll_enabled: { label: 'TOTP enrollment' },
-        verify_enabled: { label: 'TOTP verification' },
+      studio: {
+        enabled: { label: 'Studio enabled' },
+        port: { label: 'Studio port' },
+        api_url: { label: 'API URL' },
+        openai_api_key: { label: 'OpenAI key', help: "For Studio's SQL assistant." }
       },
-      phone: {
-        enroll_enabled: { label: 'Phone enrollment' },
-        verify_enabled: { label: 'Phone verification' },
-        otp_length: { label: 'OTP length' },
-        template: { label: 'SMS template' },
-        max_frequency: { label: 'Max. frequency' },
+      local_smtp: {
+        enabled: {
+          label: 'Mailpit enabled',
+          help: "Emails sent locally don't actually go out — they land in this panel."
+        },
+        port: { label: 'Mailpit port' }
       },
-    },
-    rate_limit: {
-      email_sent: { label: 'Emails / hour' },
-      sms_sent: { label: 'SMS / hour' },
-      anonymous_users: { label: 'Anonymous users / hour' },
-      token_refresh: { label: 'Token refresh / 5 min' },
-      sign_in_sign_ups: { label: 'Sign-in/signup / 5 min' },
-      token_verifications: { label: 'Token verification / 5 min' },
-      web3: { label: 'Web3 / 5 min' },
-    },
-  },
-  storage: {
-    enabled: { label: 'Storage enabled' },
-    file_size_limit: { label: 'File size limit' },
-    s3_protocol: {
-      enabled: { label: 'S3 protocol' },
-    },
-    image_transformation: {
-      enabled: { label: 'Image transformation (imgproxy)', help: 'Starts a separate container. Keep it off if you don\'t need image resize/format conversion.' },
-    },
-    analytics: {
-      enabled: { label: 'Analytics buckets (Iceberg)' },
-      max_catalogs: { label: 'Max. catalogs' },
-      max_namespaces: { label: 'Max. namespaces' },
-      max_tables: { label: 'Max. tables' },
-    },
-    vector: {
-      enabled: { label: 'Vector buckets' },
-      max_buckets: { label: 'Max. buckets' },
-      max_indexes: { label: 'Max. indexes' },
-    },
-  },
-  realtime: {
-    enabled: { label: 'Realtime enabled' },
-    ip_version: { label: 'IP version' },
-    max_header_length: { label: 'Max. header length' },
-  },
-  edge_runtime: {
-    enabled: { label: 'Edge runtime enabled' },
-    policy: { label: 'Request policy', help: '`per_worker` gives hot reload; switch to `oneshot` for repos with lots of symlinks.' },
-    inspector_port: { label: 'Inspector port' },
-    deno_version: { label: 'Deno version' },
-  },
-  analytics: {
-    enabled: { label: 'Analytics (Logflare)', help: 'The most crash-prone part locally; keep it off if you don\'t need it.' },
-    port: { label: 'Port' },
-    backend: { label: 'Backend' },
-  },
-  experimental: {
-    orioledb_version: { label: 'OrioleDB version' },
-    s3_host: { label: 'S3 host' },
-    s3_region: { label: 'S3 region' },
-    s3_access_key: { label: 'S3 access key' },
-    s3_secret_key: { label: 'S3 secret key' },
-    pgdelta: {
-      enabled: { label: 'pg-delta diff engine', help: 'Disabling it falls back to the old `migra` engine.' },
-    },
-  },
-}
+      auth: {
+        enabled: { label: 'Auth enabled' },
+        site_url: {
+          label: 'Site URL',
+          help: "Browser origin. You're redirected here after login."
+        },
+        additional_redirect_urls: {
+          label: 'Extra redirect URLs',
+          help: 'Wildcards supported: http://localhost:3000/**'
+        },
+        external_url: {
+          label: 'External auth URL',
+          help: "The auth service's externally visible address (behind a reverse proxy)."
+        },
+        jwt_expiry: { label: 'JWT lifetime (s)' },
+        enable_refresh_token_rotation: { label: 'Refresh token rotation' },
+        refresh_token_reuse_interval: { label: 'Refresh reuse window (s)' },
+        enable_signup: { label: 'Signup enabled' },
+        enable_anonymous_sign_ins: { label: 'Anonymous sign-in' },
+        enable_manual_linking: { label: 'Manual account linking' },
+        minimum_password_length: { label: 'Min. password length' },
+        password_requirements: { label: 'Password requirements' },
+        web3: {
+          solana: {
+            enabled: { label: 'Solana Web3 sign-in' }
+          }
+        },
+        oauth_server: {
+          enabled: { label: 'OAuth server' },
+          authorization_url_path: { label: 'OAuth consent path' },
+          allow_dynamic_registration: { label: 'Dynamic registration' }
+        },
+        email: {
+          enable_signup: { label: 'Email signup' },
+          double_confirm_changes: { label: 'Double-confirm email change' },
+          enable_confirmations: { label: 'Require confirmation email' },
+          secure_password_change: { label: 'Require old password on change' },
+          max_frequency: { label: 'Max. frequency' },
+          otp_length: { label: 'OTP length' },
+          otp_expiry: { label: 'OTP lifetime (s)' },
+          smtp: {
+            enabled: { label: 'External SMTP' },
+            host: { label: 'SMTP host' },
+            port: { label: 'SMTP port' },
+            user: { label: 'SMTP user' },
+            pass: { label: 'SMTP password' },
+            admin_email: { label: 'Sender email' },
+            sender_name: { label: 'Sender name' }
+          }
+        },
+        sms: {
+          enable_signup: { label: 'SMS signup' },
+          enable_confirmations: { label: 'SMS confirmation' },
+          template: { label: 'Template' },
+          max_frequency: { label: 'Max. frequency' },
+          twilio: {
+            enabled: { label: 'Twilio' },
+            account_sid: { label: 'Account SID' },
+            message_service_sid: { label: 'Message Service SID' },
+            auth_token: { label: 'Auth token' }
+          }
+        },
+        mfa: {
+          max_enrolled_factors: { label: 'Max. enrolled factors' },
+          totp: {
+            enroll_enabled: { label: 'TOTP enrollment' },
+            verify_enabled: { label: 'TOTP verification' }
+          },
+          phone: {
+            enroll_enabled: { label: 'Phone enrollment' },
+            verify_enabled: { label: 'Phone verification' },
+            otp_length: { label: 'OTP length' },
+            template: { label: 'SMS template' },
+            max_frequency: { label: 'Max. frequency' }
+          }
+        },
+        rate_limit: {
+          email_sent: { label: 'Emails / hour' },
+          sms_sent: { label: 'SMS / hour' },
+          anonymous_users: { label: 'Anonymous users / hour' },
+          token_refresh: { label: 'Token refresh / 5 min' },
+          sign_in_sign_ups: { label: 'Sign-in/signup / 5 min' },
+          token_verifications: { label: 'Token verification / 5 min' },
+          web3: { label: 'Web3 / 5 min' }
+        }
+      },
+      storage: {
+        enabled: { label: 'Storage enabled' },
+        file_size_limit: { label: 'File size limit' },
+        s3_protocol: {
+          enabled: { label: 'S3 protocol' }
+        },
+        image_transformation: {
+          enabled: {
+            label: 'Image transformation (imgproxy)',
+            help: "Starts a separate container. Keep it off if you don't need image resize/format conversion."
+          }
+        },
+        analytics: {
+          enabled: { label: 'Analytics buckets (Iceberg)' },
+          max_catalogs: { label: 'Max. catalogs' },
+          max_namespaces: { label: 'Max. namespaces' },
+          max_tables: { label: 'Max. tables' }
+        },
+        vector: {
+          enabled: { label: 'Vector buckets' },
+          max_buckets: { label: 'Max. buckets' },
+          max_indexes: { label: 'Max. indexes' }
+        }
+      },
+      realtime: {
+        enabled: { label: 'Realtime enabled' },
+        ip_version: { label: 'IP version' },
+        max_header_length: { label: 'Max. header length' }
+      },
+      edge_runtime: {
+        enabled: { label: 'Edge runtime enabled' },
+        policy: {
+          label: 'Request policy',
+          help: '`per_worker` gives hot reload; switch to `oneshot` for repos with lots of symlinks.'
+        },
+        inspector_port: { label: 'Inspector port' },
+        deno_version: { label: 'Deno version' }
+      },
+      analytics: {
+        enabled: {
+          label: 'Analytics (Logflare)',
+          help: "The most crash-prone part locally; keep it off if you don't need it."
+        },
+        port: { label: 'Port' },
+        backend: { label: 'Backend' }
+      },
+      experimental: {
+        orioledb_version: { label: 'OrioleDB version' },
+        s3_host: { label: 'S3 host' },
+        s3_region: { label: 'S3 region' },
+        s3_access_key: { label: 'S3 access key' },
+        s3_secret_key: { label: 'S3 secret key' },
+        pgdelta: {
+          enabled: {
+            label: 'pg-delta diff engine',
+            help: 'Disabling it falls back to the old `migra` engine.'
+          }
+        }
+      }
+    }
   },
   diffView: {
     noDiff: 'No difference.'
@@ -512,7 +552,8 @@ const en = {
     localBadge: 'local',
     managedLine1: 'Runs over the Management API: no column types, same-named columns merge.',
     managedLine2: '"Read only" is enforced by Supabase’s API.',
-    selfHostedLine1: 'Runs over SSH + psql: a single result block is shown, error position isn’t marked.',
+    selfHostedLine1:
+      'Runs over SSH + psql: a single result block is shown, error position isn’t marked.',
     selfHostedLine2: '"Read only" is enforced on the server with `begin read only`.',
     cancelHint: 'Canceling a query is only possible locally.',
     checkingDb: 'checking database…',
@@ -587,7 +628,8 @@ const en = {
     remoteOnly: 'remote only',
     fileCount: '{count} file(s)',
     remoteStatus: 'remote: {status}',
-    verifyJwtTitle: 'JWT check should be disabled for functions called from the database via pg_net',
+    verifyJwtTitle:
+      'JWT check should be disabled for functions called from the database via pg_net',
     diff: 'diff',
     deploy: 'deploy',
     verifyJwtHint:
@@ -612,7 +654,8 @@ const en = {
     computeDiff: 'Compute diff',
     computedAt: 'computed: {time}',
     dryRun: 'Dry run',
-    beforeReport: '"Compute diff" reads five axes: migrations, schema, functions, secret names, auth.',
+    beforeReport:
+      '"Compute diff" reads five axes: migrations, schema, functions, secret names, auth.',
     schema: 'Schema (db diff)',
     schemaClean: 'Local schema matches the migrations.',
     viewDiff: 'view diff',
@@ -639,7 +682,8 @@ const en = {
     showValues: 'show values',
     addVar: '+ variable',
     write: 'Write',
-    missingHeading: '{count} reference(s) are empty — `config.toml` expects these variables, they’re missing from `.env`:',
+    missingHeading:
+      '{count} reference(s) are empty — `config.toml` expects these variables, they’re missing from `.env`:',
     cardTitle: 'Local backend variables',
     cardSubtitle: 'The Supabase CLI reads every env() reference in `config.toml` from here',
     fileEmpty: '{file} is empty or missing.',
@@ -679,7 +723,8 @@ const en = {
       'Don’t apply SQL from Studio: no ledger row is written, and the next deploy either re-runs the file or skips work that never happened. One change = one version number.',
     diffTitle: 'db diff — changes not captured in the local schema',
     newTitle: 'New migration',
-    nameHint: 'Lowercase letters, digits and underscore only. The file is created as `supabase/migrations/<version>_{name}.sql`.',
+    nameHint:
+      'Lowercase letters, digits and underscore only. The file is created as `supabase/migrations/<version>_{name}.sql`.',
     repairTitle: 'Ledger repair — {version}',
     repairBodyBefore: 'Fixing the ledger for the «{env}» environment.',
     repairBodyBold: 'No SQL runs',
@@ -721,7 +766,8 @@ const en = {
     rowsAffected: '{command} — {count} row(s) affected.',
     notInLedger: 'SQL run here isn’t written to the migration ledger.',
     saveQueryTitle: 'Save query',
-    saveQueryHint: 'Letters, digits, spaces, `_` and `-`. The file is created as `supabase/.locabase/queries/<name>.sql`.',
+    saveQueryHint:
+      'Letters, digits, spaces, `_` and `-`. The file is created as `supabase/.locabase/queries/<name>.sql`.',
     renameQueryTitle: 'Rename «{name}»',
     deleteConfirmTitle: 'Delete «{name}»?',
     fileDeletedFromDisk: 'The file is deleted from disk.',

@@ -182,7 +182,9 @@ export interface AuthProviderMeta {
   id: string
   label: string
   /** which fields to show */
-  fields: Array<'client_id' | 'secret' | 'url' | 'redirect_uri' | 'skip_nonce_check' | 'email_optional'>
+  fields: Array<
+    'client_id' | 'secret' | 'url' | 'redirect_uri' | 'skip_nonce_check' | 'email_optional'
+  >
   /** explains where the callback URL goes in the provider's console */
   hint?: string
   docs?: string
@@ -208,11 +210,7 @@ export interface EnvEntry {
 /* ---------------------------------------------------------------- migrations */
 
 export type MigrationState =
-  | 'synced'
-  | 'pending-local'
-  | 'pending-remote'
-  | 'remote-only'
-  | 'local-only'
+  'synced' | 'pending-local' | 'pending-remote' | 'remote-only' | 'local-only'
 
 export interface MigrationRow {
   version: string
@@ -468,16 +466,7 @@ export interface DbColumn {
 }
 
 export type DbOp =
-  | 'eq'
-  | 'neq'
-  | 'gt'
-  | 'gte'
-  | 'lt'
-  | 'lte'
-  | 'like'
-  | 'ilike'
-  | 'isnull'
-  | 'notnull'
+  'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'ilike' | 'isnull' | 'notnull'
 
 export interface DbFilter {
   column: string
@@ -522,11 +511,7 @@ export interface AuthUser {
 export type AuthUserStatus = 'all' | 'confirmed' | 'unconfirmed' | 'anonymous' | 'banned'
 
 export type AuthUserSort =
-  | 'created_desc'
-  | 'created_asc'
-  | 'signin_desc'
-  | 'signin_asc'
-  | 'email_asc'
+  'created_desc' | 'created_asc' | 'signin_desc' | 'signin_asc' | 'email_asc'
 
 export interface AuthUsersQuery {
   envId: string | null

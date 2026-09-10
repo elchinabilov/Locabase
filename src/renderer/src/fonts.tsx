@@ -25,7 +25,7 @@ import {
 
 /** The tail every sans choice falls back to — never leaves the app font-less. */
 const SANS_TAIL = "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
-const MONO_TAIL = "Menlo, Consolas, monospace"
+const MONO_TAIL = 'Menlo, Consolas, monospace'
 
 export interface FontOption {
   id: string

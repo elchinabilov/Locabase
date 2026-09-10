@@ -110,7 +110,9 @@ export function NewProjectModal({
     setBusy(true)
     setError(null)
     try {
-      onDone(await call('projects:create', { path: dir, name: name.trim(), portBase: base ?? undefined }))
+      onDone(
+        await call('projects:create', { path: dir, name: name.trim(), portBase: base ?? undefined })
+      )
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -144,7 +146,12 @@ export function NewProjectModal({
               {t('newProject.addExisting')}
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => void submit()} loading={busy} disabled={!ready}>
+            <Button
+              variant="primary"
+              onClick={() => void submit()}
+              loading={busy}
+              disabled={!ready}
+            >
               {t('newProject.build')}
             </Button>
           )}
@@ -168,7 +175,11 @@ export function NewProjectModal({
             )
           }
         >
-          <Input value={name} onChange={(e) => setName(e.target.value)} disabled={busy || occupied} />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={busy || occupied}
+          />
         </Row>
         <Row
           label={t('newProject.portBase.label')}

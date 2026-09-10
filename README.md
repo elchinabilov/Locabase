@@ -34,17 +34,17 @@ remote environments — managed (supabase.com) or self-hosted over SSH.
 
 ## What each screen does
 
-| Screen | What it gives you |
-| --- | --- |
-| **Overview** | Service toggles (on/off) with **per-container RAM**, start/stop/restart/`db reset`, links to Studio · Mailpit · API · DB, and port-collision warnings |
-| **Configuration** | 108 `config.toml` fields as a form in 14 groups, with a diff preview before writing and a restart banner when one is needed |
-| **Auth** | 19 OAuth providers, the callback URL computed for you, `env()` wiring to your `.env` |
-| **Secrets** | A root `.env` editor with masking, plus the list of references `config.toml` expects but `.env` doesn't have |
-| **Tables** | Schema/table browser, row viewing (filter, sort, paginate), row create/edit/delete, and structure (type, PK, FK, default) |
-| **SQL** | CodeMirror with schema autocompletion and ⌘↵, read-only enforced server-side, multi-statement results, queries saved into the repo, "save as migration" |
-| **Migrations** | Files · local ledger · remote ledger side by side, with new/up/diff/repair |
-| **Functions** | List, create from a template, serve locally, `verify_jwt`, deploy one or all |
-| **Sync / Deploy** | The diff across five axes, **file-by-file content diffs for functions**, selective deploy, dry run, and on/off plus RAM for remote containers |
+| Screen            | What it gives you                                                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview**      | Service toggles (on/off) with **per-container RAM**, start/stop/restart/`db reset`, links to Studio · Mailpit · API · DB, and port-collision warnings   |
+| **Configuration** | 108 `config.toml` fields as a form in 14 groups, with a diff preview before writing and a restart banner when one is needed                             |
+| **Auth**          | 19 OAuth providers, the callback URL computed for you, `env()` wiring to your `.env`                                                                    |
+| **Secrets**       | A root `.env` editor with masking, plus the list of references `config.toml` expects but `.env` doesn't have                                            |
+| **Tables**        | Schema/table browser, row viewing (filter, sort, paginate), row create/edit/delete, and structure (type, PK, FK, default)                               |
+| **SQL**           | CodeMirror with schema autocompletion and ⌘↵, read-only enforced server-side, multi-statement results, queries saved into the repo, "save as migration" |
+| **Migrations**    | Files · local ledger · remote ledger side by side, with new/up/diff/repair                                                                              |
+| **Functions**     | List, create from a template, serve locally, `verify_jwt`, deploy one or all                                                                            |
+| **Sync / Deploy** | The diff across five axes, **file-by-file content diffs for functions**, selective deploy, dry run, and on/off plus RAM for remote containers           |
 
 ### Configuration — the file as a form
 
@@ -150,7 +150,7 @@ offers to add it as-is instead.
 Three design decisions are worth knowing before you read the code.
 
 **The `config.toml` patcher never re-serializes.** The file is scanned once to
-find where each key's *value* starts and ends; a change replaces only that byte
+find where each key's _value_ starts and ends; a change replaces only that byte
 range. Before writing, the result is re-parsed and every patch verified against
 its expected value — on a mismatch, nothing is written. Every write leaves a
 `.bak`.

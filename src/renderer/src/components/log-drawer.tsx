@@ -14,13 +14,7 @@ const LEVEL_CLASS: Record<string, string> = {
   stdout: 'text-text-soft'
 }
 
-export function LogDrawer({
-  open,
-  onToggle
-}: {
-  open: boolean
-  onToggle: () => void
-}): ReactNode {
+export function LogDrawer({ open, onToggle }: { open: boolean; onToggle: () => void }): ReactNode {
   const [lines, setLines] = useState<LogLine[]>([])
   const [filter, setFilter] = useState('')
   const [unseen, setUnseen] = useState(0)
@@ -31,7 +25,8 @@ export function LogDrawer({
 
   useEvent('log:line', (line) => {
     setLines((prev) => {
-      const next = prev.length >= MAX ? [...prev.slice(prev.length - MAX + 1), line] : [...prev, line]
+      const next =
+        prev.length >= MAX ? [...prev.slice(prev.length - MAX + 1), line] : [...prev, line]
       return next
     })
     if (!open) setUnseen((n) => n + 1)
@@ -62,9 +57,7 @@ export function LogDrawer({
           {t('logDrawer.title')}
         </button>
         {!open && unseen > 0 && (
-          <span className="rounded bg-chip px-1.5 py-0.5 text-micro text-accent">
-            {unseen}
-          </span>
+          <span className="rounded bg-chip px-1.5 py-0.5 text-micro text-accent">{unseen}</span>
         )}
         <div className="flex-1" />
         {open && (
@@ -75,10 +68,7 @@ export function LogDrawer({
               placeholder={t('logDrawer.filterPlaceholder')}
               className="w-40 rounded border border-line bg-sunken px-2 py-1 text-small outline-none focus:border-accent-dim"
             />
-            <button
-              onClick={() => setLines([])}
-              className="text-small text-muted hover:text-text"
-            >
+            <button onClick={() => setLines([])} className="text-small text-muted hover:text-text">
               {t('logDrawer.clear')}
             </button>
           </>

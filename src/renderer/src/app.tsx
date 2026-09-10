@@ -57,10 +57,7 @@ export function App(): ReactNode {
   const [newProjectDir, setNewProjectDir] = useState<string | null>(null)
 
   const list = projects.data ?? []
-  const selected = useMemo(
-    () => list.find((p) => p.id === selectedId) ?? null,
-    [list, selectedId]
-  )
+  const selected = useMemo(() => list.find((p) => p.id === selectedId) ?? null, [list, selectedId])
 
   useEffect(() => {
     if (!selectedId && list.length > 0) setSelectedId(list[0]!.id)
@@ -336,9 +333,7 @@ function ProjectItem({
         <span className="block truncate text-ui text-text">{project.name}</span>
         <span className="block truncate text-badge text-muted">{shortPath(project.path, 1)}</span>
       </span>
-      {project.environments.length > 0 && (
-        <Badge tone="muted">{project.environments.length}</Badge>
-      )}
+      {project.environments.length > 0 && <Badge tone="muted">{project.environments.length}</Badge>}
     </button>
   )
 }

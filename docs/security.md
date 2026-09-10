@@ -9,12 +9,12 @@ one of them, please report it privately — see [SECURITY.md](../SECURITY.md).
 Anything on a process's argument list is visible to every user on the machine
 through `ps`. So secret values travel another way:
 
-| Path | How the value travels |
-| --- | --- |
-| Managed secrets | `supabase secrets set --env-file <tmp>` — a temporary file with 0600 permissions, deleted afterwards |
-| Self-hosted secrets | piped to the remote script over **stdin** |
-| Access tokens | the `SUPABASE_ACCESS_TOKEN` environment variable |
-| SSH | the user's own ssh-agent / key files |
+| Path                | How the value travels                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| Managed secrets     | `supabase secrets set --env-file <tmp>` — a temporary file with 0600 permissions, deleted afterwards |
+| Self-hosted secrets | piped to the remote script over **stdin**                                                            |
+| Access tokens       | the `SUPABASE_ACCESS_TOKEN` environment variable                                                     |
+| SSH                 | the user's own ssh-agent / key files                                                                 |
 
 `run()` in [`src/main/core/cli.ts`](../src/main/core/cli.ts) is the single place
 external commands are spawned, and it takes `input` for exactly this reason.
@@ -69,7 +69,7 @@ Two rules, both mechanical:
 1. **Values are always `$n` parameters** on the local path. There is no code path
    in [`sql/build.ts`](../src/main/core/sql/build.ts) that pastes a value into
    SQL text.
-2. **Identifiers always go through `quoteIdent()`** *and* must first appear in
+2. **Identifiers always go through `quoteIdent()`** _and_ must first appear in
    the column list returned by introspection (`requireColumn`).
 
 The remote transports cannot bind parameters, so values in queries Locabase

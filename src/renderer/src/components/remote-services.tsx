@@ -9,13 +9,7 @@ import { Badge, Button, Card, Dot, ErrorNote, Skeleton, Toggle } from '../compon
  * Containers on the remote server. A managed project has no such control —
  * the card says so plainly and shows nothing.
  */
-export function RemoteServices({
-  project,
-  env
-}: {
-  project: Project
-  env: RemoteEnv
-}): ReactNode {
+export function RemoteServices({ project, env }: { project: Project; env: RemoteEnv }): ReactNode {
   const t = useT()
   const services = useQuery(
     'remote:services',
@@ -77,7 +71,11 @@ export function RemoteServices({
       }
     >
       {services.loading && items.length === 0 && (
-        <ul className="divide-y divide-line-soft" role="status" aria-label={t('remoteServices.checkingServer')}>
+        <ul
+          className="divide-y divide-line-soft"
+          role="status"
+          aria-label={t('remoteServices.checkingServer')}
+        >
           {[0, 1, 2, 3].map((i) => (
             <li key={i} className="flex items-center gap-2.5 px-3.5 py-2">
               <Skeleton w={32} h={18} delay={i * 90} className="shrink-0 rounded-full" />

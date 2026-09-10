@@ -84,7 +84,9 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
 
           {missing.length > 0 && (
             <div className="rounded-md border border-warn-border bg-warn-bg px-3.5 py-2.5 text-note text-warn">
-              <p className="mb-1.5 font-medium">{t('secrets.missingHeading', { count: missing.length })}</p>
+              <p className="mb-1.5 font-medium">
+                {t('secrets.missingHeading', { count: missing.length })}
+              </p>
               <ul className="space-y-0.5 font-mono text-meta">
                 {missing.slice(0, 8).map((m) => (
                   <li key={m.path}>
@@ -109,7 +111,10 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
                 return (
                   <li
                     key={e.key}
-                    className={cx('grid grid-cols-[minmax(220px,300px)_1fr_auto] items-start gap-3 px-3.5 py-2', changed && 'bg-accent-tint')}
+                    className={cx(
+                      'grid grid-cols-[minmax(220px,300px)_1fr_auto] items-start gap-3 px-3.5 py-2',
+                      changed && 'bg-accent-tint'
+                    )}
                   >
                     <div className="pt-1.5">
                       <code className="font-mono text-note text-text">{e.key}</code>
@@ -205,7 +210,12 @@ function AddVar({
       <div className="flex flex-col gap-3">
         <div>
           <label className="mb-1 block text-note text-muted">{t('newProject.name.label')}</label>
-          <Input value={key} onChange={(e) => setKey(e.target.value)} className="font-mono" autoFocus />
+          <Input
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            className="font-mono"
+            autoFocus
+          />
         </div>
         <div>
           <label className="mb-1 block text-note text-muted">{t('secrets.value')}</label>

@@ -107,6 +107,11 @@ export function parsePsqlError(output: string): {
   // the `LINE n: …` and caret lines are useful context
   const lineIdx = lines.findIndex((l) => /^LINE \d+:/.test(l.trim()))
   const context =
-    lineIdx >= 0 ? lines.slice(lineIdx, lineIdx + 2).join('\n').trimEnd() : null
+    lineIdx >= 0
+      ? lines
+          .slice(lineIdx, lineIdx + 2)
+          .join('\n')
+          .trimEnd()
+      : null
   return { message, detail: pick('DETAIL') ?? context, hint: pick('HINT') }
 }

@@ -8,12 +8,12 @@ deliberate shape, so this document is short and specific.
 Locabase drives the `supabase` CLI and Docker, so both have to work on your
 machine before the app is useful:
 
-| Requirement | Why |
-| --- | --- |
-| Node.js 22 (`.nvmrc`) | build and dev server |
+| Requirement                                                          | Why                                                 |
+| -------------------------------------------------------------------- | --------------------------------------------------- |
+| Node.js 22 (`.nvmrc`)                                                | build and dev server                                |
 | [`supabase` CLI](https://supabase.com/docs/guides/local-development) | every stack, migration, function and deploy command |
-| Docker Desktop or OrbStack | the local Supabase stack |
-| `ssh` + `rsync` | only for self-hosted remote environments |
+| Docker Desktop or OrbStack                                           | the local Supabase stack                            |
+| `ssh` + `rsync`                                                      | only for self-hosted remote environments            |
 
 The app checks all of these itself under **Settings → Environment check**.
 

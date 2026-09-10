@@ -38,7 +38,7 @@ Two conventions matter:
 
 - **Errors cross as data, not exceptions.** A thrown error becomes
   `{ ok: false, error }` on the renderer side. But SQL execution deliberately
-  does *not* throw: a failing query returns `SqlRun.error`, because the router
+  does _not_ throw: a failing query returns `SqlRun.error`, because the router
   can only carry a `string` and `position`/`hint`/`detail` would be lost.
 - **Every cell that crosses IPC is text.** Row values are `string | null`
   (`TEXT_TYPES` in `src/main/core/sql/build.ts`) — structured clone would mangle
@@ -69,15 +69,15 @@ line.
 talking to. [`remote/index.ts`](../src/main/core/remote/index.ts) defines the
 interface; two implementations satisfy it.
 
-| | Managed (supabase.com) | Self-hosted (SSH) |
-| --- | --- | --- |
-| Migrations | `supabase db push` (all pending, no selection) | one transaction per migration, ledger row included |
-| Functions | `supabase functions deploy` / `download` | `rsync` + restart the edge runtime container |
-| Secrets | `secrets set --env-file` (0600, temporary) | merged into the remote `.env` over stdin |
-| Auth config | Management API | the server's own `.env` |
-| SQL | Management API `database/query` | `docker exec psql -q --csv` over ssh |
-| Containers | not controllable (the platform owns them) | `docker stop` / `docker start` |
-| Function diff | version number only (`unknown`) | per-file md5 in **one** ssh call |
+|               | Managed (supabase.com)                         | Self-hosted (SSH)                                  |
+| ------------- | ---------------------------------------------- | -------------------------------------------------- |
+| Migrations    | `supabase db push` (all pending, no selection) | one transaction per migration, ledger row included |
+| Functions     | `supabase functions deploy` / `download`       | `rsync` + restart the edge runtime container       |
+| Secrets       | `secrets set --env-file` (0600, temporary)     | merged into the remote `.env` over stdin           |
+| Auth config   | Management API                                 | the server's own `.env`                            |
+| SQL           | Management API `database/query`                | `docker exec psql -q --csv` over ssh               |
+| Containers    | not controllable (the platform owns them)      | `docker stop` / `docker start`                     |
+| Function diff | version number only (`unknown`)                | per-file md5 in **one** ssh call                   |
 
 The self-hosted adapter shells out to the system `ssh` binary rather than using
 the ssh2 library, so `~/.ssh/config` host aliases, ssh-agent and `known_hosts`
@@ -87,16 +87,16 @@ behave exactly as they do in the user's terminal.
 
 Query text is identical across environments; only the transport differs.
 
-| Environment | Transport | Consequences |
-| --- | --- | --- |
-| Local | the `pg` driver, `$n` parameters | full fidelity; cancellation works |
-| Managed | Management API `database/query` | no column types, same-named columns collapse, `read_only` enforced by the API |
-| Self-hosted | ssh + `docker exec psql -q --csv` | one result block, no error position |
+| Environment | Transport                         | Consequences                                                                  |
+| ----------- | --------------------------------- | ----------------------------------------------------------------------------- |
+| Local       | the `pg` driver, `$n` parameters  | full fidelity; cancellation works                                             |
+| Managed     | Management API `database/query`   | no column types, same-named columns collapse, `read_only` enforced by the API |
+| Self-hosted | ssh + `docker exec psql -q --csv` | one result block, no error position                                           |
 
 Because the remote transports cannot bind `$n`, values in queries **we build**
 are pasted with `quoteLiteral()` (see
 [`sql/ident.ts`](../src/main/core/sql/ident.ts)). User-written SQL never goes
-through that path. Identifiers are always quoted *and* checked against the
+through that path. Identifiers are always quoted _and_ checked against the
 introspected column list first (`requireColumn`).
 
 Read-only is enforced server-side — `begin read only` locally and on self-hosted,

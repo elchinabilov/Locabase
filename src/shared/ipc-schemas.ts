@@ -16,7 +16,10 @@ import type { IpcChannel } from './ipc.js'
 /* ------------------------------------------------------------- primitives */
 
 /** Channels take no payload; the renderer sends `undefined`. */
-const none = z.undefined().or(z.null()).transform(() => undefined)
+const none = z
+  .undefined()
+  .or(z.null())
+  .transform(() => undefined)
 
 const id = z.string().min(1).max(200)
 const envId = z.string().min(1).max(200)
@@ -67,7 +70,10 @@ const selfHostedEnv = z.object({
   kind: z.literal('self-hosted'),
   sshHost: z.string().regex(/^[A-Za-z0-9._-]+(?:@[A-Za-z0-9._-]+)?$/, 'Invalid SSH host'),
   sshPort: z.number().int().min(1).max(65535),
-  sshKeyPath: z.string().max(4096).refine((v) => !v.startsWith('-'), 'may not start with `-`'),
+  sshKeyPath: z
+    .string()
+    .max(4096)
+    .refine((v) => !v.startsWith('-'), 'may not start with `-`'),
   dbContainer: z.string().max(255),
   remoteDir: z.string().max(4096),
   functionsContainer: z.string().max(255),
@@ -82,7 +88,10 @@ const remoteEnv = z.discriminatedUnion('kind', [managedEnv, selfHostedEnv])
 const scheduleSpec = z.object({
   kind: z.enum(['interval', 'daily', 'weekly', 'cron']),
   everyMinutes: z.number().int().min(1).max(525600).optional(),
-  at: z.string().regex(/^\d{1,2}:\d{2}$/).optional(),
+  at: z
+    .string()
+    .regex(/^\d{1,2}:\d{2}$/)
+    .optional(),
   weekday: z.number().int().min(0).max(6).optional(),
   expr: z.string().max(200).optional()
 })
@@ -231,7 +240,11 @@ export const IPC_SCHEMAS = {
     sql: sqlText,
     readOnly: z.boolean(),
     maxRows: z.number().int().min(1).max(1_000_000),
-    timeoutMs: z.number().int().min(0).max(24 * 60 * 60 * 1000),
+    timeoutMs: z
+      .number()
+      .int()
+      .min(0)
+      .max(24 * 60 * 60 * 1000),
     token: z.string().max(200).optional()
   }),
   'sql:cancel': z.object({ id, token: z.string().min(1).max(200) }),

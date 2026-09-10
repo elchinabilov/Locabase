@@ -281,18 +281,16 @@ function RowsPane({
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const rows = useQuery(
-    'db:rows',
-    {
-      id: project.id,
-      envId,
-      schema: table.schema,
-      table: table.name,
-      limit: pageSize,
-      offset: page * pageSize,
-      orderBy: sort,
-      filters
-    })
+  const rows = useQuery('db:rows', {
+    id: project.id,
+    envId,
+    schema: table.schema,
+    table: table.name,
+    limit: pageSize,
+    offset: page * pageSize,
+    orderBy: sort,
+    filters
+  })
 
   // Go back to the first page when the filter/sort changes.
   useEffect(() => setPage(0), [filters, sort, pageSize])
@@ -363,7 +361,10 @@ function RowsPane({
           <Select
             value={String(pageSize)}
             onChange={(v) => setPageSize(Number(v))}
-            options={PAGE_SIZES.map((n) => ({ value: String(n), label: t('sql.rowCount', { count: n }) }))}
+            options={PAGE_SIZES.map((n) => ({
+              value: String(n),
+              label: t('sql.rowCount', { count: n })
+            }))}
           />
         </div>
         <Pager page={page} pageSize={pageSize} count={data.length} total={total} onPage={setPage} />
@@ -400,7 +401,10 @@ function RowsPane({
             editable
               ? (next) => {
                   // The grid speaks in positions; store what they identify.
-                  const keys = [...next].map((i) => data[i]).filter(Boolean).map((r) => keyOf(r!))
+                  const keys = [...next]
+                    .map((i) => data[i])
+                    .filter(Boolean)
+                    .map((r) => keyOf(r!))
                   setSelected(new Set(keys))
                 }
               : undefined
@@ -496,7 +500,6 @@ function RowsPane({
   )
 }
 
-
 function FilterBar({
   columns,
   filters,
@@ -564,7 +567,10 @@ function FilterBar({
             <Select
               value={draft.op}
               onChange={(v) => setDraft((d) => ({ ...d, op: v as DbOp }))}
-              options={(Object.keys(OP_SYMBOLS) as DbOp[]).map((op) => ({ value: op, label: opLabel(op) }))}
+              options={(Object.keys(OP_SYMBOLS) as DbOp[]).map((op) => ({
+                value: op,
+                label: opLabel(op)
+              }))}
             />
             <Input
               value={draft.value ?? ''}
@@ -594,9 +600,12 @@ function StructurePane({
   onNavigate: (schema: string, table: string) => void
 }): ReactNode {
   const t = useT()
-  const cols = useQuery(
-    'db:columns',
-    { id: project.id, envId, schema: table.schema, table: table.name })
+  const cols = useQuery('db:columns', {
+    id: project.id,
+    envId,
+    schema: table.schema,
+    table: table.name
+  })
 
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4">

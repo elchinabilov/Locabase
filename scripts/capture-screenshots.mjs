@@ -81,23 +81,19 @@ function capture(shot) {
   return new Promise((done, fail) => {
     const file = join(OUT, `${shot.name}.png`)
     rmSync(file, { force: true })
-    const child = spawn(
-      'npx',
-      ['electron-vite', 'dev', '--', `--user-data-dir=${UDATA}`],
-      {
-        cwd: ROOT,
-        stdio: 'ignore',
-        env: {
-          ...process.env,
-          LOCABASE_SHOT: file,
-          LOCABASE_SHOT_JS: shot.js ?? '',
-          LOCABASE_SHOT_DELAY: String(shot.delay ?? 7000),
-          LOCABASE_SHOT_WAIT: String(shot.wait ?? 2500),
-          // The window is 1360×900; capture is Retina-sized, so scale back down.
-          LOCABASE_SHOT_WIDTH: '1360'
-        }
+    const child = spawn('npx', ['electron-vite', 'dev', '--', `--user-data-dir=${UDATA}`], {
+      cwd: ROOT,
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        LOCABASE_SHOT: file,
+        LOCABASE_SHOT_JS: shot.js ?? '',
+        LOCABASE_SHOT_DELAY: String(shot.delay ?? 7000),
+        LOCABASE_SHOT_WAIT: String(shot.wait ?? 2500),
+        // The window is 1360×900; capture is Retina-sized, so scale back down.
+        LOCABASE_SHOT_WIDTH: '1360'
       }
-    )
+    })
     const deadline = Date.now() + 90_000
     const poll = setInterval(() => {
       if (existsSync(file)) {
@@ -117,9 +113,7 @@ function capture(shot) {
 }
 
 if (!existsSync(join(DEMO, 'supabase', 'config.toml'))) {
-  process.stderr.write(
-    `No demo project at ${DEMO}. Create one first — see docs/screenshots.md.\n`
-  )
+  process.stderr.write(`No demo project at ${DEMO}. Create one first — see docs/screenshots.md.\n`)
   process.exit(1)
 }
 

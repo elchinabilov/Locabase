@@ -35,7 +35,9 @@ describe('saved queries', () => {
 
   it('write → list → read → rename → remove cycle', () => {
     writeFor(project, 'active users', 'select * from auth.users;')
-    expect(existsSync(join(root, 'supabase', '.locabase', 'queries', 'active users.sql'))).toBe(true)
+    expect(existsSync(join(root, 'supabase', '.locabase', 'queries', 'active users.sql'))).toBe(
+      true
+    )
 
     const all = listFor(project)
     expect(all).toHaveLength(1)

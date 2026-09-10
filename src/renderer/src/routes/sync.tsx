@@ -1,15 +1,19 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import type {
-  DeployStep,
-  HealthReport,
-  Project,
-  RemoteEnv,
-  SyncReport
-} from '@shared/types'
+import type { DeployStep, HealthReport, Project, RemoteEnv, SyncReport } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx, timeAgo } from '../lib/format'
 import { useI18n, useT } from '../i18n'
-import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Skeleton } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  Dot,
+  Empty,
+  ErrorNote,
+  Input,
+  Modal,
+  Skeleton
+} from '../components/ui'
 import { EnvForm } from '../components/env-form'
 import { RemoteServices } from '../components/remote-services'
 import { DRIFT, FunctionDiffModal } from '../components/function-diff'
@@ -27,8 +31,7 @@ export function SyncRoute({
   // panel never appeared. `picked` is only what the user chose explicitly.
   const [picked, setPicked] = useState<string | null>(null)
   const [editing, setEditing] = useState<RemoteEnv | null | 'new'>(null)
-  const env =
-    project.environments.find((e) => e.id === picked) ?? project.environments[0] ?? null
+  const env = project.environments.find((e) => e.id === picked) ?? project.environments[0] ?? null
   const envId = env?.id ?? ''
 
   if (project.environments.length === 0) {
@@ -73,10 +76,7 @@ export function SyncRoute({
             )}
           >
             <span
-              className={cx(
-                'size-1.5 rounded-full',
-                e.kind === 'managed' ? 'bg-info' : 'bg-warn'
-              )}
+              className={cx('size-1.5 rounded-full', e.kind === 'managed' ? 'bg-info' : 'bg-warn')}
             />
             {e.name}
           </button>
@@ -128,7 +128,9 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
       const r = await call('sync:report', { id: project.id, envId: env.id })
       setReport(r)
       setPickedMigrations(
-        new Set(r.migrations.items.filter((m) => m.state === 'pending-remote').map((m) => m.version))
+        new Set(
+          r.migrations.items.filter((m) => m.state === 'pending-remote').map((m) => m.version)
+        )
       )
       setPickedFunctions(
         new Set(
@@ -167,7 +169,12 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4">
       <div className="mx-auto flex max-w-5xl flex-col gap-3">
-        <Health report={health.data ?? null} loading={health.loading} error={health.error} env={env} />
+        <Health
+          report={health.data ?? null}
+          loading={health.loading}
+          error={health.error}
+          env={env}
+        />
 
         <RemoteServices project={project} env={env} />
 
@@ -372,7 +379,9 @@ function Health({
   return (
     <Card
       title={env.name}
-      subtitle={env.kind === 'managed' ? `managed · ${env.projectRef}` : `self-hosted · ${env.sshHost}`}
+      subtitle={
+        env.kind === 'managed' ? `managed · ${env.projectRef}` : `self-hosted · ${env.sshHost}`
+      }
     >
       {loading && (
         <ul className="divide-y divide-line-soft" role="status" aria-label={t('common.checking')}>
@@ -435,9 +444,7 @@ function Axis({
         </>
       }
     >
-      {error && (
-        <p className="px-3.5 py-2 text-small leading-relaxed text-muted">{error}</p>
-      )}
+      {error && <p className="px-3.5 py-2 text-small leading-relaxed text-muted">{error}</p>}
       {children}
     </Card>
   )
@@ -549,7 +556,8 @@ function DeployModal({
             <span className="text-muted">•</span>
             <span>
               {s === 'backup' && t('sync.step.backup')}
-              {s === 'migrations' && t('sync.step.migrations', { list: plan.migrations.join(', ') })}
+              {s === 'migrations' &&
+                t('sync.step.migrations', { list: plan.migrations.join(', ') })}
               {s === 'functions' && t('sync.step.functions', { list: plan.functions.join(', ') })}
               {s === 'secrets' && t('sync.step.secrets', { list: plan.secrets.join(', ') })}
               {s === 'verify' && t('sync.step.verify')}

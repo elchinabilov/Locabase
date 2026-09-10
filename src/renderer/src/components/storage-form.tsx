@@ -29,7 +29,10 @@ export function StorageCard(): ReactNode {
     } catch (err) {
       setTests((prev) => ({
         ...prev,
-        [conn.id]: { ok: false, checks: [{ label: 'Error', ok: false, info: (err as Error).message }] }
+        [conn.id]: {
+          ok: false,
+          checks: [{ label: 'Error', ok: false, info: (err as Error).message }]
+        }
       }))
     }
   }

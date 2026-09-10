@@ -3,7 +3,17 @@ import type { Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
 import { useT } from '../i18n'
-import { Badge, Button, Card, ErrorNote, Input, Modal, Select, SkeletonList, Toggle } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorNote,
+  Input,
+  Modal,
+  Select,
+  SkeletonList,
+  Toggle
+} from '../components/ui'
 import { DRIFT, FunctionDiffModal } from '../components/function-diff'
 
 export function FunctionsRoute({ project }: { project: Project }): ReactNode {
@@ -78,7 +88,10 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
 
           {envId && stale.length > 0 && (
             <div className="rounded-md border border-info-border bg-info-bg px-3.5 py-2 text-note text-info">
-              {t('functions.staleWarning', { count: stale.length, names: stale.map((f) => f.name).join(', ') })}
+              {t('functions.staleWarning', {
+                count: stale.length,
+                names: stale.map((f) => f.name).join(', ')
+              })}
             </div>
           )}
 
@@ -126,7 +139,9 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
                       disabled={fn.path === ''}
                       onChange={(v) => void setVerify(fn.name, v)}
                     />
-                    {envId && <Button onClick={() => setDiffFn(fn.name)}>{t('functions.diff')}</Button>}
+                    {envId && (
+                      <Button onClick={() => setDiffFn(fn.name)}>{t('functions.diff')}</Button>
+                    )}
                     {envId && fn.path !== '' && (
                       <Button
                         loading={deploying === fn.name}
@@ -141,7 +156,9 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
             </ul>
           </Card>
 
-          <p className="px-1 text-small leading-relaxed text-muted">{t('functions.verifyJwtHint')}</p>
+          <p className="px-1 text-small leading-relaxed text-muted">
+            {t('functions.verifyJwtHint')}
+          </p>
         </div>
       </div>
 
@@ -155,11 +172,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
       )}
 
       {creating && (
-        <Modal
-          title={t('functions.newTitle')}
-          onClose={() => setCreating(false)}
-          footer={null}
-        >
+        <Modal title={t('functions.newTitle')} onClose={() => setCreating(false)} footer={null}>
           <NewFunction
             onCreate={async (name) => {
               await call('functions:create', { id: project.id, name })

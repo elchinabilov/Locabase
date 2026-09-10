@@ -58,7 +58,12 @@ function createWindow(): BrowserWindow {
       setTimeout(
         () => {
           void (js ? win.webContents.executeJavaScript(js) : Promise.resolve())
-            .then(() => new Promise((r) => setTimeout(r, js ? Number(process.env['LOCABASE_SHOT_WAIT'] ?? 2500) : 0)))
+            .then(
+              () =>
+                new Promise((r) =>
+                  setTimeout(r, js ? Number(process.env['LOCABASE_SHOT_WAIT'] ?? 2500) : 0)
+                )
+            )
             .then(() => win.webContents.capturePage())
             .then((img) => {
               const width = Number(process.env['LOCABASE_SHOT_WIDTH'] ?? 0)

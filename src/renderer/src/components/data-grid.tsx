@@ -109,7 +109,11 @@ export function DataGrid({
 
   return (
     <>
-      <div ref={scroller} className="h-full overflow-auto" onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
+      <div
+        ref={scroller}
+        className="h-full overflow-auto"
+        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+      >
         <table className="w-max min-w-full border-collapse text-note">
           <thead className="sticky top-0 z-10 bg-panel">
             <tr className="border-b border-line text-badge tracking-wide text-muted uppercase">
@@ -119,9 +123,7 @@ export function DataGrid({
                     type="checkbox"
                     checked={allSelected}
                     onChange={() =>
-                      onSelectedChange(
-                        allSelected ? new Set() : new Set(rows.map((_, i) => i))
-                      )
+                      onSelectedChange(allSelected ? new Set() : new Set(rows.map((_, i) => i)))
                     }
                     className="accent-accent"
                   />

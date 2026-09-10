@@ -179,7 +179,9 @@ export function BackupsRoute({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-ui text-text">{job.name}</span>
-                      <Badge tone="muted">{envLabel(project, job.envId, t('backups.localTarget'))}</Badge>
+                      <Badge tone="muted">
+                        {envLabel(project, job.envId, t('backups.localTarget'))}
+                      </Badge>
                       {job.running && <Badge tone="info">{t('jobs.running')}</Badge>}
                       {job.lastStatus && (
                         <Badge tone={job.lastStatus === 'ok' ? 'ok' : 'danger'}>
@@ -258,7 +260,9 @@ export function BackupsRoute({
                     <div className="mt-0.5 flex flex-wrap items-center gap-3 font-mono text-badge text-faint">
                       <span>{humanBytes(row.bytes)}</span>
                       {row.durationMs !== null && (
-                        <span>{t('backups.seconds', { count: Math.round(row.durationMs / 1000) })}</span>
+                        <span>
+                          {t('backups.seconds', { count: Math.round(row.durationMs / 1000) })}
+                        </span>
                       )}
                       <span className={cx(!row.path && 'text-warn')}>
                         {row.path ? shortFile(row.path) : t('backups.fileGone')}
@@ -271,7 +275,9 @@ export function BackupsRoute({
                         <span>{t('backups.localOnly')}</span>
                       )}
                     </div>
-                    {row.error && <div className="mt-1 text-meta text-danger-soft">{row.error}</div>}
+                    {row.error && (
+                      <div className="mt-1 text-meta text-danger-soft">{row.error}</div>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     {row.path && (
@@ -355,11 +361,7 @@ export function BackupsRoute({
       )}
 
       {restoring && (
-        <RestoreModal
-          project={project}
-          record={restoring}
-          onClose={() => setRestoring(null)}
-        />
+        <RestoreModal project={project} record={restoring} onClose={() => setRestoring(null)} />
       )}
 
       {uploading && (
@@ -465,7 +467,12 @@ function UploadModal({
       footer={
         <>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" loading={busy} disabled={!storageId} onClick={() => void upload()}>
+          <Button
+            variant="primary"
+            loading={busy}
+            disabled={!storageId}
+            onClick={() => void upload()}
+          >
             {t('backups.upload')}
           </Button>
         </>
@@ -629,14 +636,16 @@ function RestoreModal({
             </p>
           )}
 
-          <Row label={t('backups.restoreConfirm', { name: expected })} hint={t('backups.restoreWarning')}>
+          <Row
+            label={t('backups.restoreConfirm', { name: expected })}
+            hint={t('backups.restoreWarning')}
+          >
             <Input
               value={confirm}
               placeholder={expected}
               onChange={(e) => setConfirm(e.target.value)}
             />
           </Row>
-
         </div>
       )}
     </Modal>
@@ -650,14 +659,13 @@ function envLabel(project: Project, envId: string | null, localLabel: string): s
   return project.environments.find((e) => e.id === envId)?.name ?? envId
 }
 
-function storageName(
-  storages: Array<{ id: string; name: string }>,
-  storageId: string
-): string {
+function storageName(storages: Array<{ id: string; name: string }>, storageId: string): string {
   return storages.find((s) => s.id === storageId)?.name ?? storageId
 }
 
-function scopeKey(scope: BackupScope): 'backups.scope.full' | 'backups.scope.schema' | 'backups.scope.data' {
+function scopeKey(
+  scope: BackupScope
+): 'backups.scope.full' | 'backups.scope.schema' | 'backups.scope.data' {
   return scope === 'schema'
     ? 'backups.scope.schema'
     : scope === 'data'

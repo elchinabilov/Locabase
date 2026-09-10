@@ -91,10 +91,7 @@ export function ConfigRoute({ project }: { project: Project }): ReactNode {
     }
   }, [project.id])
 
-  const localized = useMemo(
-    () => CONFIG_FIELDS.map((f) => localize(f, tDynamic)),
-    [tDynamic]
-  )
+  const localized = useMemo(() => CONFIG_FIELDS.map((f) => localize(f, tDynamic)), [tDynamic])
 
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase()

@@ -3,7 +3,16 @@ import type { MigrationRow, MigrationState, Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
-import { Badge, Button, Card, ErrorNote, Input, Modal, Select, SkeletonTable } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorNote,
+  Input,
+  Modal,
+  Select,
+  SkeletonTable
+} from '../components/ui'
 
 const STATE_META: Record<
   MigrationState,
@@ -24,9 +33,7 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
   const [picked, setPicked] = useState<string>('')
   const envId = project.environments.some((e) => e.id === picked) ? picked : ''
   const setEnvId = setPicked
-  const report = useQuery(
-    'migrations:report',
-    { id: project.id, envId: envId || null })
+  const report = useQuery('migrations:report', { id: project.id, envId: envId || null })
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -103,13 +110,17 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
           <div className="flex flex-wrap items-center gap-2 text-small">
             <Badge tone={report.data?.localReachable ? 'ok' : 'muted'}>
               {t('migrations.localLedger', {
-                status: report.data?.localReachable ? t('migrations.read') : t('migrations.unreachable')
+                status: report.data?.localReachable
+                  ? t('migrations.read')
+                  : t('migrations.unreachable')
               })}
             </Badge>
             {envId && (
               <Badge tone={report.data?.remoteReachable ? 'ok' : 'danger'}>
                 {t('migrations.remoteLedger', {
-                  status: report.data?.remoteReachable ? t('migrations.read') : t('migrations.unreachable')
+                  status: report.data?.remoteReachable
+                    ? t('migrations.read')
+                    : t('migrations.unreachable')
                 })}
               </Badge>
             )}
@@ -128,18 +139,32 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
               <SkeletonTable rows={6} cols={5} widths={['26%', '30%', 42, 42, 42]} />
             )}
             {!report.loading && rows.length === 0 && (
-              <p className="px-3.5 py-6 text-center text-note text-muted">{t('migrations.empty')}</p>
+              <p className="px-3.5 py-6 text-center text-note text-muted">
+                {t('migrations.empty')}
+              </p>
             )}
             {rows.length > 0 && (
               <table className="w-full text-note">
                 <thead>
                   <tr className="border-b border-line-soft text-badge tracking-wide text-muted uppercase">
-                    <th className="px-3.5 py-1.5 text-left font-medium">{t('migrations.col.version')}</th>
-                    <th className="px-2 py-1.5 text-left font-medium">{t('migrations.col.name')}</th>
-                    <th className="px-2 py-1.5 text-center font-medium">{t('migrations.col.file')}</th>
-                    <th className="px-2 py-1.5 text-center font-medium">{t('migrations.col.local')}</th>
-                    <th className="px-2 py-1.5 text-center font-medium">{t('migrations.col.remote')}</th>
-                    <th className="px-3.5 py-1.5 text-right font-medium">{t('migrations.col.state')}</th>
+                    <th className="px-3.5 py-1.5 text-left font-medium">
+                      {t('migrations.col.version')}
+                    </th>
+                    <th className="px-2 py-1.5 text-left font-medium">
+                      {t('migrations.col.name')}
+                    </th>
+                    <th className="px-2 py-1.5 text-center font-medium">
+                      {t('migrations.col.file')}
+                    </th>
+                    <th className="px-2 py-1.5 text-center font-medium">
+                      {t('migrations.col.local')}
+                    </th>
+                    <th className="px-2 py-1.5 text-center font-medium">
+                      {t('migrations.col.remote')}
+                    </th>
+                    <th className="px-3.5 py-1.5 text-right font-medium">
+                      {t('migrations.col.state')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -152,13 +177,17 @@ export function MigrationsRoute({ project }: { project: Project }): ReactNode {
                       )}
                     >
                       <td className="px-3.5 py-1.5 font-mono text-small">{r.version}</td>
-                      <td className="max-w-[280px] truncate px-2 py-1.5 text-muted">{r.name || '—'}</td>
+                      <td className="max-w-[280px] truncate px-2 py-1.5 text-muted">
+                        {r.name || '—'}
+                      </td>
                       <Cell on={r.inFiles} />
                       <Cell on={r.appliedLocal} />
                       <Cell on={r.appliedRemote} />
                       <td className="px-3.5 py-1.5 text-right">
                         {r.state === 'synced' ? (
-                          <span className="text-meta text-muted">{t('migrations.state.synced')}</span>
+                          <span className="text-meta text-muted">
+                            {t('migrations.state.synced')}
+                          </span>
                         ) : (
                           <button
                             onClick={() => setRepairRow(r)}

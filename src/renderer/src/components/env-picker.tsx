@@ -69,10 +69,14 @@ export function useDbGate(
   envId: string | null
 ): { ready: boolean; blocked: ReactNode | null } {
   const t = useT()
-  const status = useQuery('stack:status', { id: projectId }, {
-    pollMs: 10_000,
-    enabled: envId === null
-  })
+  const status = useQuery(
+    'stack:status',
+    { id: projectId },
+    {
+      pollMs: 10_000,
+      enabled: envId === null
+    }
+  )
   if (envId !== null) return { ready: true, blocked: null }
 
   const dbUp = status.data?.services.some((s) => s.key === 'db' && s.state === 'running') ?? false
@@ -95,7 +99,8 @@ export function useDbGate(
         title={t('envPicker.dbDownTitle')}
         hint={
           <>
-            {t('envPicker.dbDownHintBefore')} «{t('app.nav.dashboard')}» {t('envPicker.dbDownHintAfter')}
+            {t('envPicker.dbDownHintBefore')} «{t('app.nav.dashboard')}»{' '}
+            {t('envPicker.dbDownHintAfter')}
           </>
         }
       />

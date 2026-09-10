@@ -38,7 +38,8 @@ export interface InspectResult {
 
 /** Does this folder contain a usable Supabase project? */
 export function inspect(dir: string): InspectResult {
-  if (!isAbsolute(dir)) return { valid: false, projectId: null, reason: 'The path must be absolute' }
+  if (!isAbsolute(dir))
+    return { valid: false, projectId: null, reason: 'The path must be absolute' }
   const configPath = join(dir, 'supabase', 'config.toml')
   if (!existsSync(configPath)) {
     return { valid: false, projectId: null, reason: 'supabase/config.toml not found' }
@@ -51,7 +52,11 @@ export function inspect(dir: string): InspectResult {
     }
     return { valid: true, projectId: id, reason: null }
   } catch (err) {
-    return { valid: false, projectId: null, reason: `Could not read config.toml: ${(err as Error).message}` }
+    return {
+      valid: false,
+      projectId: null,
+      reason: `Could not read config.toml: ${(err as Error).message}`
+    }
   }
 }
 

@@ -56,13 +56,17 @@ export function list(projectId: string): Job[] {
 }
 
 export function get(jobId: string): Job {
-  const found = store().get('jobs').find((j) => j.id === jobId)
+  const found = store()
+    .get('jobs')
+    .find((j) => j.id === jobId)
   if (!found) throw new Error(`Job not found: ${jobId}`)
   return decorate(found)
 }
 
 function put(job: Job): Job {
-  const rest = store().get('jobs').filter((j) => j.id !== job.id)
+  const rest = store()
+    .get('jobs')
+    .filter((j) => j.id !== job.id)
   store().set('jobs', [...rest, job])
   return decorate(job)
 }
@@ -83,7 +87,11 @@ export function upsert(input: JobInput): Job {
   projects.get(input.projectId)
   if (input.envId) projects.getEnv(input.projectId, input.envId)
 
-  const existing = input.id ? store().get('jobs').find((j) => j.id === input.id) : undefined
+  const existing = input.id
+    ? store()
+        .get('jobs')
+        .find((j) => j.id === input.id)
+    : undefined
   if (input.id && !existing) throw new Error(`Job not found: ${input.id}`)
 
   const job: Job = {
@@ -115,7 +123,9 @@ export function remove(jobId: string): void {
   const job = get(jobId)
   store().set(
     'jobs',
-    store().get('jobs').filter((j) => j.id !== jobId)
+    store()
+      .get('jobs')
+      .filter((j) => j.id !== jobId)
   )
   changed(job.projectId)
 }
@@ -130,7 +140,9 @@ export function setEnabled(jobId: string, enabled: boolean): Job {
 export function forgetProject(projectId: string): void {
   store().set(
     'jobs',
-    store().get('jobs').filter((j) => j.projectId !== projectId)
+    store()
+      .get('jobs')
+      .filter((j) => j.projectId !== projectId)
   )
 }
 
@@ -224,7 +236,10 @@ export function start(): void {
   // No catch-up: every enabled job is re-scheduled from now.
   const now = new Date()
   const jobs = store().get('jobs')
-  store().set('jobs', jobs.map((j) => scheduled(j, now)))
+  store().set(
+    'jobs',
+    jobs.map((j) => scheduled(j, now))
+  )
 
   timer = setInterval(() => {
     void tick()

@@ -13,7 +13,13 @@ import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Modal, SkeletonList, Toggle } from '../components/ui'
 import { DiffView } from '../components/diff-view'
-import { draftFrom, FieldEditor, sameDraft, toPatchValue, type Draft } from '../components/field-editor'
+import {
+  draftFrom,
+  FieldEditor,
+  sameDraft,
+  toPatchValue,
+  type Draft
+} from '../components/field-editor'
 
 const FIELD_LABEL_KEY: Record<string, TranslationKey> = {
   client_id: 'auth.fieldLabel.clientId',
@@ -159,7 +165,9 @@ export function AuthProviders({ project }: { project: Project }): ReactNode {
               {copied ? t('auth.copied') : t('dashboard.quickLinks.copy')}
             </Button>
           </div>
-          <p className="-mt-1 px-1 text-small leading-relaxed text-muted">{t('auth.callbackHint')}</p>
+          <p className="-mt-1 px-1 text-small leading-relaxed text-muted">
+            {t('auth.callbackHint')}
+          </p>
 
           {doc.loading && (
             <Card title={t('auth.providers')}>
@@ -181,8 +189,7 @@ export function AuthProviders({ project }: { project: Project }): ReactNode {
                 {AUTH_PROVIDERS.map((meta) => {
                   const on = isEnabled(meta.id)
                   const expanded = open === meta.id
-                  const configured =
-                    values[`auth.external.${meta.id}.client_id`]?.present === true
+                  const configured = values[`auth.external.${meta.id}.client_id`]?.present === true
                   return (
                     <li key={meta.id}>
                       <div className="flex items-center gap-3 px-3.5 py-2">
@@ -280,7 +287,9 @@ export function AuthProviders({ project }: { project: Project }): ReactNode {
         >
           <p className="mb-3 text-note text-muted">
             {t('auth.diffChangedLines', { count: preview.changedLines })}
-            {preview.restartRequired && <span className="text-warn"> {t('auth.restartRequired')}</span>}
+            {preview.restartRequired && (
+              <span className="text-warn"> {t('auth.restartRequired')}</span>
+            )}
           </p>
           <DiffView before={preview.before} after={preview.after} />
         </Modal>

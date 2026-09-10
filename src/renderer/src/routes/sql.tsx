@@ -82,9 +82,13 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
     RESULTS_HEIGHT.default
   )
   const saved = useQuery('queries:list', { id: project.id })
-  const completion = useQuery('db:completion', { id: project.id, envId }, {
-    enabled: ready
-  })
+  const completion = useQuery(
+    'db:completion',
+    { id: project.id, envId },
+    {
+      enabled: ready
+    }
+  )
 
   const execute = useCallback(async () => {
     const text = editor.current?.read() ?? doc
@@ -251,7 +255,10 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
             <Select
               value={String(maxRows)}
               onChange={(v) => setMaxRows(Number(v))}
-              options={MAX_ROWS.map((n) => ({ value: String(n), label: t('sql.rowCount', { count: n }) }))}
+              options={MAX_ROWS.map((n) => ({
+                value: String(n),
+                label: t('sql.rowCount', { count: n })
+              }))}
             />
           </div>
           <div className="w-[92px]">
@@ -291,7 +298,9 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
         {env && <RemoteNote env={env} />}
         {!readOnly && (
           <p className="border-b border-line-soft bg-warn-bg px-3 py-1.5 text-small text-warn">
-            {t('sql.writeModeOn', { target: env ? t('sql.writeModeTarget', { name: env.name }) : '' })}
+            {t('sql.writeModeOn', {
+              target: env ? t('sql.writeModeTarget', { name: env.name }) : ''
+            })}
           </p>
         )}
         {blocked && <div className="flex-1">{blocked}</div>}
@@ -338,10 +347,14 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
                 {run?.ok && current && (
                   <>
                     <span className="text-text">{current.command ?? 'OK'}</span>
-                    <span className="text-muted">· {t('sql.rowCount', { count: current.rows.length })}</span>
+                    <span className="text-muted">
+                      · {t('sql.rowCount', { count: current.rows.length })}
+                    </span>
                     <span className="text-muted">· {run.durationMs} ms</span>
                     {current.truncated && (
-                      <Badge tone="warn">{t('sql.firstRows', { count: current.rows.length })}</Badge>
+                      <Badge tone="warn">
+                        {t('sql.firstRows', { count: current.rows.length })}
+                      </Badge>
                     )}
                     {run.readOnly && <Badge tone="muted">{t('sql.readOnly')}</Badge>}
                   </>
@@ -386,7 +399,10 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
                 )}
                 {!busy && run?.ok && current && current.columns.length === 0 && (
                   <p className="px-3.5 py-6 text-center text-note text-muted">
-                    {t('sql.rowsAffected', { command: current.command ?? 'OK', count: current.rowCount ?? 0 })}
+                    {t('sql.rowsAffected', {
+                      command: current.command ?? 'OK',
+                      count: current.rowCount ?? 0
+                    })}
                   </p>
                 )}
               </div>
