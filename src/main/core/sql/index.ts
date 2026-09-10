@@ -26,6 +26,7 @@ import {
   pkColumns,
   TEXT_TYPES,
   toResult,
+  failedRun,
   toSqlError
 } from './build.js'
 import * as introspect from './introspect.js'
@@ -63,13 +64,7 @@ export async function execute(id: string, sql: string, opts: ExecuteOpts): Promi
     try {
       return await target.adapter.runSql(sql, { readOnly, maxRows, timeoutMs })
     } catch (err) {
-      return {
-        ok: false,
-        results: [],
-        durationMs: Date.now() - started,
-        readOnly,
-        error: toSqlError(err)
-      }
+      return failedRun(started, readOnly, err)
     }
   }
 
@@ -77,13 +72,7 @@ export async function execute(id: string, sql: string, opts: ExecuteOpts): Promi
   try {
     client = await poolFor(id).connect()
   } catch (err) {
-    return {
-      ok: false,
-      results: [],
-      durationMs: Date.now() - started,
-      readOnly,
-      error: toSqlError(err)
-    }
+    return failedRun(started, readOnly, err)
   }
 
   try {
@@ -110,13 +99,7 @@ export async function execute(id: string, sql: string, opts: ExecuteOpts): Promi
     return { ok: true, results, durationMs: Date.now() - started, readOnly, error: null }
   } catch (err) {
     if (readOnly) await client.query('rollback').catch(() => undefined)
-    return {
-      ok: false,
-      results: [],
-      durationMs: Date.now() - started,
-      readOnly,
-      error: toSqlError(err)
-    }
+    return failedRun(started, readOnly, err)
   } finally {
     if (opts.token) inflight.delete(opts.token)
     await client.query('set statement_timeout to default').catch(() => undefined)

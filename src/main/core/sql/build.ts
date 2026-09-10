@@ -17,7 +17,8 @@ import type {
   DbRow,
   SqlColumn,
   SqlErrorInfo,
-  SqlResult
+  SqlResult,
+  SqlRun
 } from '@shared/types/index.js'
 import { quoteIdent, qualify } from './ident.js'
 
@@ -80,6 +81,21 @@ export function toSqlError(err: unknown): SqlErrorInfo {
     table: str('table'),
     column: str('column'),
     constraint: str('constraint')
+  }
+}
+
+/**
+ * The shape a failed run comes back as. Four call sites built this by hand —
+ * the two remote transports and both failure paths of the local one — and a
+ * failure is exactly where a forgotten field is least likely to be noticed.
+ */
+export function failedRun(started: number, readOnly: boolean, err: unknown): SqlRun {
+  return {
+    ok: false,
+    results: [],
+    durationMs: Date.now() - started,
+    readOnly,
+    error: toSqlError(err)
   }
 }
 

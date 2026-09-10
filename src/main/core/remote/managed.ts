@@ -36,7 +36,8 @@ import { supabase, supabaseJson } from '../cli.js'
 import { get as getSecret, keys } from '../secrets.js'
 import { readTree } from '../filetree.js'
 import type { MigrationFile } from '../migrations.js'
-import { toSqlError } from '../sql/build.js'
+import { failedRun } from '../sql/build.js'
+import { checkEndpoints } from './index.js'
 import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 
 const API = 'https://api.supabase.com'
@@ -375,19 +376,10 @@ export class ManagedAdapter implements RemoteAdapter {
 
   async verify(): Promise<VerifyReport> {
     const base = `https://${this.env.projectRef}.supabase.co`
-    const checks: VerifyReport['checks'] = []
-    for (const [label, url] of [
+    return checkEndpoints([
       ['REST', `${base}/rest/v1/`],
       ['Auth', `${base}/auth/v1/health`]
-    ] as const) {
-      try {
-        const res = await fetch(url, { method: 'GET' })
-        checks.push({ label, ok: res.status < 500, info: `HTTP ${res.status}` })
-      } catch (err) {
-        checks.push({ label, ok: false, info: (err as Error).message })
-      }
-    }
-    return { ok: checks.every((c) => c.ok), checks }
+    ])
   }
 
   /* ------------------------------------------------------------ SQL */
@@ -425,13 +417,7 @@ export class ManagedAdapter implements RemoteAdapter {
         error: null
       }
     } catch (err) {
-      return {
-        ok: false,
-        results: [],
-        durationMs: Date.now() - started,
-        readOnly: opts.readOnly,
-        error: toSqlError(err)
-      }
+      return failedRun(started, opts.readOnly, err)
     }
   }
 }

@@ -37,6 +37,7 @@ import {
   serviceKeyOf,
   sq
 } from './remote-scripts.js'
+import { checkEndpoints } from './index.js'
 import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 
 const LEDGER_QUERY =
@@ -481,22 +482,13 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   async verify(): Promise<VerifyReport> {
-    const checks: VerifyReport['checks'] = []
+    const base = this.env.apiUrl.replace(/\/+$/, '')
     const targets: Array<[string, string]> = [
-      ['REST', `${this.env.apiUrl.replace(/\/+$/, '')}/rest/v1/`],
-      ['Auth', `${this.env.apiUrl.replace(/\/+$/, '')}/auth/v1/health`]
+      ['REST', `${base}/rest/v1/`],
+      ['Auth', `${base}/auth/v1/health`]
     ]
     if (this.env.siteUrl) targets.push(['App', this.env.siteUrl])
-
-    for (const [label, url] of targets) {
-      try {
-        const res = await fetch(url, { method: 'GET' })
-        checks.push({ label, ok: res.status < 500, info: `HTTP ${res.status}` })
-      } catch (err) {
-        checks.push({ label, ok: false, info: (err as Error).message })
-      }
-    }
-    return { ok: checks.every((c) => c.ok), checks }
+    return checkEndpoints(targets)
   }
 
   /* ------------------------------------------------------------ SQL */
