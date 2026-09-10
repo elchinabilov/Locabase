@@ -23,7 +23,16 @@ import importPlugin from 'eslint-plugin-import'
 import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'out/**', 'node_modules/**', 'resources/**', '*.tsbuildinfo'] },
+  {
+    ignores: [
+      'dist/**',
+      'out/**',
+      'coverage/**',
+      'node_modules/**',
+      'resources/**',
+      '*.tsbuildinfo'
+    ]
+  },
 
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
