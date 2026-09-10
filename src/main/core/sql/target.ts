@@ -26,8 +26,6 @@ export function targetFor(id: string, envId: string | null): Target {
   return { id, envId, label: env.name, adapter: adapterFor(project, env) }
 }
 
-export const isRemote = (t: Target): boolean => t.adapter !== null
-
 /**
  * An internal query: results come back as object rows with types preserved
  * (local `pg` parsers, `json_agg` remotely).

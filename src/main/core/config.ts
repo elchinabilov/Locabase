@@ -127,13 +127,4 @@ export function write(projectId: string, patches: ConfigPatch[]): PatchPreview {
   return result
 }
 
-/** The project's local API address — callback URLs are derived from it. */
-export function localApiUrl(projectId: string): string {
-  const project = getProject(projectId)
-  const parsed = parseToml(readFileSync(paths.configToml(project), 'utf8'))
-  const port = pick(parsed, 'api.port')
-  const tls = pick(parsed, 'api.tls.enabled') === true
-  return `${tls ? 'https' : 'http'}://127.0.0.1:${typeof port === 'number' ? port : 54321}`
-}
-
 export type { ConfigValue }

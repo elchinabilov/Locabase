@@ -104,8 +104,3 @@ export function whichBin(cmd: string): string | null {
   }
   return null
 }
-
-/** For diagnostics: where we looked. */
-export function searchedDirs(): string[] {
-  return resolvedPath().split(delimiter)
-}

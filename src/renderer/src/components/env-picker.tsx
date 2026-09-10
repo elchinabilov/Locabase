@@ -10,7 +10,7 @@ import type { ReactNode } from 'react'
 import type { Project, RemoteEnv } from '@shared/types'
 import { useQuery } from '../lib/ipc'
 import { useT } from '../i18n'
-import { Badge, Empty, Select, Spinner } from './ui'
+import { Empty, Select, Spinner } from './ui'
 
 export function EnvPicker({
   project,
@@ -106,10 +106,4 @@ export function useDbGate(
       />
     )
   }
-}
-
-export function EnvBadge({ env }: { env: RemoteEnv | null }): ReactNode {
-  const t = useT()
-  if (!env) return <Badge tone="muted">{t('envPicker.localBadge')}</Badge>
-  return <Badge tone={env.kind === 'managed' ? 'info' : 'warn'}>{env.name}</Badge>
 }

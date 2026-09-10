@@ -431,35 +431,6 @@ export function Skeleton({
   )
 }
 
-/** A few lines of text; the last line is short so it reads like a paragraph. */
-export function SkeletonText({
-  lines = 3,
-  delay = 0,
-  className
-}: {
-  lines?: number
-  delay?: number
-  className?: string
-}): ReactNode {
-  const t = useT()
-  return (
-    <div
-      className={cx('flex flex-col gap-2', className)}
-      role="status"
-      aria-label={t('common.loading')}
-    >
-      {Array.from({ length: lines }, (_, i) => (
-        <Skeleton
-          key={i}
-          h={10}
-          w={i === lines - 1 ? '55%' : `${88 - (i % 3) * 9}%`}
-          delay={delay + i * 70}
-        />
-      ))}
-    </div>
-  )
-}
-
 /**
  * The loading stand-in for `divide-y` lists (a `<ul>` inside a Card). `avatar`
  * leaves room for a dot/toggle on the left, `trailing` for the badge column on the right.
