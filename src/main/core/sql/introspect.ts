@@ -5,9 +5,9 @@
  * doesn't report `attidentity`/`attgenerated` cleanly, has no row estimate, and
  * is noticeably slower.
  */
+import type { DbColumn, DbCompletion, DbRelKind, DbSchema, DbTable } from '@shared/types/index.js'
 import { rowsOf, targetFor } from './target.js'
 import { qualify } from './ident.js'
-import type { DbColumn, DbCompletion, DbRelKind, DbSchema, DbTable } from '@shared/types.js'
 
 /** Supabase's own schemas — not filtered out, just collapsed in the UI. */
 const SUPABASE_SCHEMAS = new Set([
@@ -51,9 +51,7 @@ export async function schemas(
     owner: r.owner,
     comment: r.comment,
     system:
-      SUPABASE_SCHEMAS.has(r.name) ||
-      r.name === 'information_schema' ||
-      r.name.startsWith('pg_')
+      SUPABASE_SCHEMAS.has(r.name) || r.name === 'information_schema' || r.name.startsWith('pg_')
   }))
 }
 
@@ -84,11 +82,7 @@ interface TableRaw extends Record<string, unknown> {
   has_pk: boolean
 }
 
-export async function tables(
-  id: string,
-  envId: string | null,
-  schema: string
-): Promise<DbTable[]> {
+export async function tables(id: string, envId: string | null, schema: string): Promise<DbTable[]> {
   const rows = await rowsOf<TableRaw>(targetFor(id, envId), TABLES_SQL, [schema])
   return rows.map((r) => {
     const kind = r.kind as DbRelKind
@@ -106,10 +100,10 @@ export async function tables(
       editableReason: editable
         ? null
         : isTable
-          ? 'PK yoxdur'
+          ? 'no-pk'
           : kind === 'v' || kind === 'm'
-            ? 'A view cannot be edited'
-            : 'A foreign table cannot be edited'
+            ? 'view'
+            : 'foreign-table'
     }
   })
 }
@@ -174,7 +168,22 @@ interface ColumnRaw extends Record<string, unknown> {
 
 /** Row CRUD reads columns on every operation — a short cache cuts the round trips. */
 const COL_TTL_MS = 5_000
+/**
+ * Entries expire by time but nothing evicted them, so the map grew with every
+ * schema/table ever browsed and lived for the process. The cap is generous —
+ * far more tables than anyone opens in a session — and drops the oldest first.
+ */
+const COL_CACHE_MAX = 500
 const colCache = new Map<string, { at: number; cols: DbColumn[] }>()
+
+function rememberColumns(key: string, cols: DbColumn[]): void {
+  // Map preserves insertion order, so the first key is the least recently added.
+  if (colCache.size >= COL_CACHE_MAX) {
+    const oldest = colCache.keys().next().value
+    if (oldest !== undefined) colCache.delete(oldest)
+  }
+  colCache.set(key, { at: Date.now(), cols })
+}
 
 export async function columns(
   id: string,
@@ -202,7 +211,7 @@ export async function columns(
     refColumn: r.ref_column,
     comment: r.comment
   }))
-  colCache.set(key, { at: Date.now(), cols })
+  rememberColumns(key, cols)
   return cols
 }
 

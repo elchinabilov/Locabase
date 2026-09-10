@@ -6,11 +6,11 @@
  *    they go through stdin or the environment instead.
  *  - every output line lands on the log bus, so the UI can follow along live.
  */
-import { spawn, type SpawnOptions } from 'node:child_process'
+import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { createReadStream, createWriteStream, rmSync, statSync } from 'node:fs'
+import type { TaskResult } from '@shared/types/index.js'
 import { logBus } from './log.js'
 import { resolvedPath, whichBin } from './env-path.js'
-import type { TaskResult } from '@shared/types.js'
 
 export interface RunOptions {
   cwd?: string
@@ -33,6 +33,8 @@ export interface RunOptions {
 }
 
 const MAX_OUTPUT_LINES = 200
+/** How long a SIGTERM has to work before SIGKILL follows. */
+const SIGKILL_GRACE_MS = 3000
 
 export class CommandError extends Error {
   constructor(
@@ -43,92 +45,130 @@ export class CommandError extends Error {
   }
 }
 
+/**
+ * The spawn lifecycle every runner needs: resolve the binary, log the command,
+ * arm the timeout, escalate SIGTERM → SIGKILL, honour an abort signal, and make
+ * sure the caller settles exactly once.
+ *
+ * `run`, `runToFile` and `runFromFile` each used to carry their own copy of
+ * this. They differ only in where stdout goes and where stdin comes from, which
+ * is what `onStdout`/`onStdin` are for.
+ */
+interface SpawnHandlers {
+  /** Called for each stdout chunk. Omit to let stdout be piped elsewhere. */
+  onStdout?: (text: string) => void
+  onStderr?: (text: string) => void
+  /** Given the child's stdin so the caller can pipe or end it. */
+  onStdin?: (child: ChildProcess) => void
+  /** Given the child before any listener is attached — for piping stdout. */
+  onSpawn?: (child: ChildProcess) => void
+  /** Settled exactly once, with the exit code or a failure message. */
+  onSettle: (code: number | null, error: string | null) => void
+}
+
+function spawnManaged(
+  cmd: string,
+  args: string[],
+  opts: RunOptions,
+  handlers: SpawnHandlers
+): void {
+  const path = resolvedPath()
+  const spawnOpts: SpawnOptions = {
+    cwd: opts.cwd,
+    env: { ...process.env, PATH: path, ...opts.env, NO_COLOR: '1' },
+    stdio: ['pipe', 'pipe', 'pipe']
+  }
+
+  // An app launched from the GUI has a poor PATH; we resolve the binary
+  // ourselves and call it by full path so spawn doesn't fail with ENOENT.
+  const child = spawn(whichBin(cmd) ?? cmd, args, spawnOpts)
+  handlers.onSpawn?.(child)
+
+  let settled = false
+  const settle = (code: number | null, error: string | null): void => {
+    if (settled) return
+    settled = true
+    clearTimeout(timer)
+    handlers.onSettle(code, error)
+  }
+
+  const kill = (): void => {
+    child.kill('SIGTERM')
+    setTimeout(() => child.kill('SIGKILL'), SIGKILL_GRACE_MS).unref?.()
+  }
+
+  const timer = opts.timeoutMs ? setTimeout(kill, opts.timeoutMs) : undefined
+
+  if (opts.signal) {
+    if (opts.signal.aborted) kill()
+    else opts.signal.addEventListener('abort', kill, { once: true })
+  }
+
+  if (handlers.onStdout) {
+    child.stdout?.on('data', (buf: Buffer) => handlers.onStdout!(buf.toString()))
+  }
+  if (handlers.onStderr) {
+    child.stderr?.on('data', (buf: Buffer) => handlers.onStderr!(buf.toString()))
+  }
+
+  if (handlers.onStdin) handlers.onStdin(child)
+  else if (opts.input !== undefined) child.stdin?.end(opts.input)
+  else child.stdin?.end()
+
+  child.on('error', (err) => {
+    const e = err as NodeJS.ErrnoException
+    settle(
+      null,
+      e.code === 'ENOENT'
+        ? `\`${cmd}\` not found — is it installed and on PATH? (PATH searched: ${path})`
+        : err.message
+    )
+  })
+  child.on('close', (code) => settle(code, null))
+}
+
+/**
+ * Trailing output kept, honouring the caller's limit.
+ *
+ * Command output almost always ends in a newline, which `split` turns into a
+ * final empty element — counting it would silently return one line fewer than
+ * the caller asked for, and for `psql --csv` that is a dropped row.
+ */
+function tail(chunks: string[], maxOutputLines?: number): string {
+  const all = chunks.join('')
+  const limit = maxOutputLines ?? MAX_OUTPUT_LINES
+  const trailingNewline = all.endsWith('\n')
+  const lines = (trailingNewline ? all.slice(0, -1) : all).split('\n')
+  if (lines.length <= limit) return all
+  return lines.slice(-limit).join('\n') + (trailingNewline ? '\n' : '')
+}
+
 export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise<TaskResult> {
   const stream = opts.stream ?? cmd
   return new Promise((resolve) => {
-    const path = resolvedPath()
-    const spawnOpts: SpawnOptions = {
-      cwd: opts.cwd,
-      env: { ...process.env, PATH: path, ...opts.env, NO_COLOR: '1' },
-      stdio: ['pipe', 'pipe', 'pipe']
-    }
     if (!opts.quiet) logBus.push(stream, 'info', `$ ${cmd} ${args.join(' ')}`)
-
-    // An app launched from the GUI has a poor PATH; we resolve the binary
-    // ourselves and call it by full path so spawn doesn't fail with ENOENT.
-    const bin = whichBin(cmd) ?? cmd
-    const child = spawn(bin, args, spawnOpts)
     const chunks: string[] = []
-    let settled = false
+    const collect =
+      (level: 'stdout' | 'stderr') =>
+      (text: string): void => {
+        chunks.push(text)
+        if (!opts.quiet) logBus.push(stream, level, text)
+      }
 
-    const timer = opts.timeoutMs
-      ? setTimeout(() => {
-          child.kill('SIGTERM')
-          setTimeout(() => child.kill('SIGKILL'), 3000)
-        }, opts.timeoutMs)
-      : null
-
-    const collect = (level: 'stdout' | 'stderr') => (buf: Buffer) => {
-      const text = buf.toString()
-      chunks.push(text)
-      if (!opts.quiet) logBus.push(stream, level, text)
-    }
-    const kill = (): void => {
-      child.kill('SIGTERM')
-      setTimeout(() => child.kill('SIGKILL'), 3000)
-    }
-    if (opts.signal) {
-      if (opts.signal.aborted) kill()
-      else opts.signal.addEventListener('abort', kill, { once: true })
-    }
-
-    child.stdout?.on('data', collect('stdout'))
-    child.stderr?.on('data', collect('stderr'))
-
-    if (opts.input !== undefined) {
-      child.stdin?.end(opts.input)
-    } else {
-      child.stdin?.end()
-    }
-
-    const finish = (code: number | null, error: string | null): void => {
-      if (settled) return
-      settled = true
-      if (timer) clearTimeout(timer)
-      const all = chunks.join('')
-      const limit = opts.maxOutputLines ?? MAX_OUTPUT_LINES
-      const lines = all.split('\n')
-      resolve({
-        ok: code === 0 && error === null,
-        code,
-        output: lines.length > limit ? lines.slice(-limit).join('\n') : all,
-        error
-      })
-    }
-
-    child.on('error', (err) => {
-      const msg =
-        (err as NodeJS.ErrnoException).code === 'ENOENT'
-          ? `\`${cmd}\` not found — is it installed and on PATH? (PATH searched: ${path})`
-          : err.message
-      if (!opts.quiet) logBus.push(stream, 'error', msg)
-      finish(null, msg)
+    spawnManaged(cmd, args, opts, {
+      onStdout: collect('stdout'),
+      onStderr: collect('stderr'),
+      onSettle: (code, error) => {
+        if (error && !opts.quiet) logBus.push(stream, 'error', error)
+        resolve({
+          ok: code === 0 && error === null,
+          code,
+          output: tail(chunks, opts.maxOutputLines),
+          error
+        })
+      }
     })
-    child.on('close', (code) => finish(code, null))
   })
-}
-
-/** Variant that throws on failure. */
-export async function runOrThrow(
-  cmd: string,
-  args: string[],
-  opts: RunOptions = {}
-): Promise<TaskResult> {
-  const res = await run(cmd, args, opts)
-  if (!res.ok) {
-    throw new CommandError(res.error ?? `${cmd} ${args[0] ?? ''} failed (code ${res.code})`, res)
-  }
-  return res
 }
 
 /**
@@ -164,11 +204,7 @@ function balancedSlice(text: string, start: number): string | null {
  * contain brackets itself (`Stopped services: [supabase_imgproxy_...]`). So every
  * candidate position is tried and the first slice that **parses** wins.
  */
-export async function runJson<T>(
-  cmd: string,
-  args: string[],
-  opts: RunOptions = {}
-): Promise<T> {
+export async function runJson<T>(cmd: string, args: string[], opts: RunOptions = {}): Promise<T> {
   const res = await run(cmd, args, { ...opts, quiet: true })
   const text = res.output
   let last: string | null = null
@@ -205,30 +241,13 @@ export async function runToFile(
   opts: RunOptions = {}
 ): Promise<{ bytes: number }> {
   const stream = opts.stream ?? cmd
-  const path = resolvedPath()
   if (!opts.quiet) logBus.push(stream, 'info', `$ ${cmd} ${args.join(' ')} > ${file}`)
 
   return new Promise((resolve, reject) => {
-    const child = spawn(whichBin(cmd) ?? cmd, args, {
-      cwd: opts.cwd,
-      env: { ...process.env, PATH: path, ...opts.env, NO_COLOR: '1' },
-      stdio: ['pipe', 'pipe', 'pipe']
-    })
     const out = createWriteStream(file)
     const errLines: string[] = []
-    let settled = false
-
-    const timer = opts.timeoutMs
-      ? setTimeout(() => {
-          child.kill('SIGTERM')
-          setTimeout(() => child.kill('SIGKILL'), 3000)
-        }, opts.timeoutMs)
-      : null
 
     const fail = (message: string): void => {
-      if (settled) return
-      settled = true
-      if (timer) clearTimeout(timer)
       out.destroy()
       // A half-written dump is worse than none — it looks like a valid backup.
       try {
@@ -239,56 +258,34 @@ export async function runToFile(
       reject(new Error(message))
     }
 
-    child.stdout?.pipe(out)
-    child.stderr?.on('data', (buf: Buffer) => {
-      const text = buf.toString()
-      errLines.push(text)
-      logBus.push(stream, 'stderr', text)
-    })
-
-    if (opts.signal) {
-      const kill = (): void => {
-        child.kill('SIGTERM')
-        setTimeout(() => child.kill('SIGKILL'), 3000)
-      }
-      if (opts.signal.aborted) kill()
-      else opts.signal.addEventListener('abort', kill, { once: true })
-    }
-
-    if (opts.input !== undefined) child.stdin?.end(opts.input)
-    else child.stdin?.end()
-
-    child.on('error', (err) => {
-      const e = err as NodeJS.ErrnoException
-      fail(
-        e.code === 'ENOENT'
-          ? `\`${cmd}\` not found — is it installed and on PATH? (PATH searched: ${path})`
-          : err.message
-      )
-    })
-
-    child.on('close', (code) => {
-      // The file is only complete once the write stream has flushed.
-      out.end(() => {
-        if (settled) return
-        if (code !== 0) {
-          fail(
-            `${cmd} exited with code ${code}${errLines.length ? `: ${errLines.join('').trim().split('\n').slice(-3).join(' ')}` : ''}`
-          )
+    spawnManaged(cmd, args, opts, {
+      onSpawn: (child) => child.stdout?.pipe(out),
+      onStderr: (text) => {
+        errLines.push(text)
+        logBus.push(stream, 'stderr', text)
+      },
+      onSettle: (code, error) => {
+        if (error) {
+          fail(error)
           return
         }
-        settled = true
-        if (timer) clearTimeout(timer)
-        try {
-          resolve({ bytes: statSync(file).size })
-        } catch (err) {
-          reject(err as Error)
-        }
-      })
+        // The file is only complete once the write stream has flushed.
+        out.end(() => {
+          if (code !== 0) {
+            const detail = errLines.join('').trim().split('\n').slice(-3).join(' ')
+            fail(`${cmd} exited with code ${code}${detail ? `: ${detail}` : ''}`)
+            return
+          }
+          try {
+            resolve({ bytes: statSync(file).size })
+          } catch (err) {
+            reject(err instanceof Error ? err : new Error(String(err)))
+          }
+        })
+      }
     })
   })
 }
-
 
 /**
  * Like `run()`, but stdin is **streamed from a file**.
@@ -305,63 +302,48 @@ export function runFromFile(
 ): Promise<TaskResult> {
   const stream = opts.stream ?? cmd
   return new Promise((resolve) => {
-    const path = resolvedPath()
     if (!opts.quiet) logBus.push(stream, 'info', `$ ${cmd} ${args.join(' ')} < ${file}`)
-
-    const child = spawn(whichBin(cmd) ?? cmd, args, {
-      cwd: opts.cwd,
-      env: { ...process.env, PATH: path, ...opts.env, NO_COLOR: '1' },
-      stdio: ['pipe', 'pipe', 'pipe']
-    })
     const chunks: string[] = []
-    let settled = false
+    const collect =
+      (level: 'stdout' | 'stderr') =>
+      (text: string): void => {
+        chunks.push(text)
+        if (!opts.quiet) logBus.push(stream, level, text)
+      }
 
-    const timer = opts.timeoutMs
-      ? setTimeout(() => {
-          child.kill('SIGTERM')
-          setTimeout(() => child.kill('SIGKILL'), 3000)
-        }, opts.timeoutMs)
-      : null
+    // An unreadable dump file is the caller's real error, but the child settles
+    // first (on EPIPE or a non-zero exit), so it is recorded and reported there.
+    let inputError: string | null = null
 
-    const finish = (code: number | null, error: string | null): void => {
-      if (settled) return
-      settled = true
-      if (timer) clearTimeout(timer)
-      const all = chunks.join('')
-      const limit = opts.maxOutputLines ?? MAX_OUTPUT_LINES
-      const lines = all.split('\n')
-      resolve({
-        ok: code === 0 && error === null,
-        code,
-        output: lines.length > limit ? lines.slice(-limit).join('\n') : all,
-        error
-      })
-    }
-
-    const collect = (level: 'stdout' | 'stderr') => (buf: Buffer) => {
-      const text = buf.toString()
-      chunks.push(text)
-      if (!opts.quiet) logBus.push(stream, level, text)
-    }
-    child.stdout?.on('data', collect('stdout'))
-    child.stderr?.on('data', collect('stderr'))
-    child.on('error', (err) => finish(null, (err as Error).message))
-    child.on('close', (code) => finish(code, null))
-
-    const input = createReadStream(file)
-    // EPIPE: the command gave up early (a bad dump) — its own exit code and
-    // stderr are the real error, so the broken pipe itself is not reported.
-    input.on('error', (err) => finish(null, (err as Error).message))
-    child.stdin?.on('error', () => undefined)
-    input.pipe(child.stdin!)
+    spawnManaged(cmd, args, opts, {
+      onStdout: collect('stdout'),
+      onStderr: collect('stderr'),
+      onStdin: (child) => {
+        const input = createReadStream(file)
+        input.on('error', (err) => {
+          inputError = err.message
+          child.stdin?.destroy()
+        })
+        // EPIPE: the command gave up early (a bad dump) — its own exit code and
+        // stderr are the real error, so the broken pipe itself is not reported.
+        child.stdin?.on('error', () => undefined)
+        if (child.stdin) input.pipe(child.stdin)
+      },
+      onSettle: (code, error) => {
+        const failure = error ?? inputError
+        resolve({
+          ok: code === 0 && failure === null,
+          code,
+          output: tail(chunks, opts.maxOutputLines),
+          error: failure
+        })
+      }
+    })
   })
 }
 
 /** Run the `supabase` CLI inside the project folder. */
-export function supabase(
-  args: string[],
-  opts: RunOptions & { cwd: string }
-): Promise<TaskResult> {
+export function supabase(args: string[], opts: RunOptions & { cwd: string }): Promise<TaskResult> {
   return run('supabase', args, opts)
 }
 

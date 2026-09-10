@@ -8,7 +8,7 @@
  */
 import { createReadStream, createWriteStream, rmSync, statSync } from 'node:fs'
 import { request as httpsRequest, type RequestOptions } from 'node:https'
-import type { StorageObject } from '@shared/types.js'
+import type { StorageObject } from '@shared/types/index.js'
 import { signRequest, uriEncode, EMPTY_SHA256, UNSIGNED_PAYLOAD } from './sigv4.js'
 
 export interface S3Target {

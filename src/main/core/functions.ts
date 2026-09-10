@@ -6,13 +6,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { checksums, readTree } from './filetree.js'
 import { parse as parseToml } from 'smol-toml'
-import { get as getProject, getEnv, paths } from './projects.js'
-import { adapterFor } from './remote/index.js'
-import { write as writeConfig } from './config.js'
-import { supabase } from './cli.js'
-import { logBus } from './log.js'
 import type {
   FunctionDiff,
   FunctionDrift,
@@ -20,22 +14,32 @@ import type {
   FunctionInfo,
   RemoteFile,
   RemoteFileChecksum
-} from '@shared/types.js'
+} from '@shared/types/index.js'
+import { checksums, readTree } from './filetree.js'
+import { get as getProject, getEnv, paths } from './projects.js'
+import { adapterFor } from './remote/index.js'
+import { write as writeConfig } from './config.js'
+import { supabase } from './cli.js'
+import { logBus } from './log.js'
 
 /**
  * Content hash of a folder plus per-file md5s. Files are read once: the same
  * listing feeds both the overall hash and the comparison against the remote.
  */
-export function hashDir(dir: string): { hash: string; files: number; checksums: RemoteFileChecksum[] } {
-  const list = checksums(dir)
+export function hashDir(dir: string): {
+  hash: string
+  files: number
+  checksums: RemoteFileChecksum[]
+} {
+  const sums = checksums(dir)
   const h = createHash('sha256')
-  for (const f of list) {
+  for (const f of sums) {
     h.update(f.path)
     h.update('\0')
     h.update(f.md5)
     h.update('\0')
   }
-  return { hash: h.digest('hex').slice(0, 16), files: list.length, checksums: list }
+  return { hash: h.digest('hex').slice(0, 16), files: sums.length, checksums: sums }
 }
 
 /** Compare remote and local file md5s. */
@@ -65,13 +69,11 @@ export async function list(id: string, envId: string | null): Promise<FunctionIn
   const localSums = new Map<string, RemoteFileChecksum[]>()
   const local: FunctionInfo[] = readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith('_') && !e.name.startsWith('.'))
-    .map((e) => {
+    .map((e): FunctionInfo => {
       const path = join(dir, e.name)
       const { hash, files, checksums: sums } = hashDir(path)
       localSums.set(e.name, sums)
-      const entrypoint = ['index.ts', 'index.js', 'main.ts'].find((f) =>
-        existsSync(join(path, f))
-      )
+      const entrypoint = ['index.ts', 'index.js', 'main.ts'].find((f) => existsSync(join(path, f)))
       return {
         name: e.name,
         path,
@@ -81,7 +83,7 @@ export async function list(id: string, envId: string | null): Promise<FunctionIn
         verifyJwt: verifyJwtOf(configPath, e.name),
         remote: null,
         // until the remote listing is read, the difference is unknown
-        drift: 'unknown' as FunctionDrift
+        drift: 'unknown'
       }
     })
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -138,7 +140,11 @@ export async function diff(id: string, envId: string, name: string): Promise<Fun
   } catch (err) {
     if (localFiles.length === 0) throw err
     // missing on the remote is fine — everything shows up as "local only"
-    logBus.push('functions', 'warn', `${name}: could not read the remote source — ${(err as Error).message}`)
+    logBus.push(
+      'functions',
+      'warn',
+      `${name}: could not read the remote source — ${(err as Error).message}`
+    )
   }
 
   const byPath = new Map(remoteFiles.map((f) => [f.path, f]))
@@ -148,7 +154,13 @@ export async function diff(id: string, envId: string, name: string): Promise<Fun
     const r = byPath.get(path) ?? null
     const binary = (l?.binary ?? false) || (r?.binary ?? false)
     const status: FunctionFileDiff['status'] =
-      l === null ? 'remote-only' : r === null ? 'local-only' : l.content === r.content ? 'same' : 'changed'
+      l === null
+        ? 'remote-only'
+        : r === null
+          ? 'local-only'
+          : l.content === r.content
+            ? 'same'
+            : 'changed'
     return { path, status, local: l?.content ?? null, remote: r?.content ?? null, binary }
   })
   return { name, files, changed: files.filter((f) => f.status !== 'same').length }
@@ -185,7 +197,9 @@ const NAME_RE = /^[a-z][a-z0-9-]*$/
 
 export function create(id: string, name: string): { path: string } {
   if (!NAME_RE.test(name)) {
-    throw new Error('The name must start with a lowercase letter and may only contain letters, digits and dashes.')
+    throw new Error(
+      'The name must start with a lowercase letter and may only contain letters, digits and dashes.'
+    )
   }
   const project = getProject(id)
   const dir = join(paths.functionsDir(project), name)
@@ -221,12 +235,25 @@ export function serve(id: string, on: boolean): void {
     cwd: project.path,
     stream,
     signal: controller.signal
-  }).then(() => serving.delete(id))
+    // A fast stop → start replaces the entry before this settles; deleting
+    // unconditionally would drop the *new* controller.
+  }).then(() => {
+    if (serving.get(id) === controller) serving.delete(id)
+  })
   logBus.push(stream, 'info', 'functions serve started — changes are reloaded on every request')
 }
 
 export function isServing(id: string): boolean {
   return serving.has(id)
+}
+
+/**
+ * Called on quit. Without this the Deno server outlives the app and keeps its
+ * port, so the next launch cannot serve functions.
+ */
+export function stopAllServes(): void {
+  for (const controller of serving.values()) controller.abort()
+  serving.clear()
 }
 
 /** Is the path a file: `statSync` for existence only. */

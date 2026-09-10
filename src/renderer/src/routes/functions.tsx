@@ -1,19 +1,40 @@
 import { useCallback, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { cx } from '../lib/format'
 import { useT } from '../i18n'
-import { Badge, Button, Card, ErrorNote, Input, Modal, Select, SkeletonList, Toggle } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorNote,
+  Input,
+  Modal,
+  Select,
+  SkeletonList,
+  Toggle
+} from '../components/ui'
+import { envOptions } from '../components/env-picker'
 import { DRIFT, FunctionDiffModal } from '../components/function-diff'
+
+/** The remembered environment choice; '' is the local stack. */
+const ENV_ID = z.string().max(200)
 
 export function FunctionsRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
-  const [envId, setEnvId] = useState<string>(project.environments[0]?.id ?? '')
-  const list = useQuery('functions:list', { id: project.id, envId: envId || null }, [project.id, envId])
+  // `picked` is the explicit choice, remembered between visits; the id is
+  // re-derived every render so a removed environment falls back to local instead
+  // of being queried after it has stopped existing. Empty string = the local stack.
+  const [picked, setPicked] = useUiState(projectKey(project.id, 'functions.env'), ENV_ID, '')
+  const envId = project.environments.some((e) => e.id === picked) ? picked : ''
+  const setEnvId = setPicked
+  const list = useQuery('functions:list', { id: project.id, envId: envId || null })
+  const { run, busy, runningLabel, error } = useAction()
   const [serving, setServing] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [deploying, setDeploying] = useState<string | null>(null)
   const [confirmDeploy, setConfirmDeploy] = useState<string[] | null>(null)
   const [diffFn, setDiffFn] = useState<string | null>(null)
 
@@ -23,21 +44,19 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
 
   const toggleServe = useCallback(async () => {
     const next = !serving
-    await call('functions:serve', { id: project.id, on: next })
-    setServing(next)
-  }, [project.id, serving])
+    // Previously uncaught: a serve that failed to start still flipped the toggle.
+    const ok = await run(() => call('functions:serve', { id: project.id, on: next }))
+    if (ok !== undefined) setServing(next)
+  }, [project.id, serving, run])
 
   const setVerify = useCallback(
     async (name: string, verifyJwt: boolean) => {
-      setError(null)
-      try {
-        await call('functions:setVerifyJwt', { id: project.id, name, verifyJwt })
-        list.refresh()
-      } catch (err) {
-        setError((err as Error).message)
-      }
+      const ok = await run(() =>
+        call('functions:setVerifyJwt', { id: project.id, name, verifyJwt })
+      )
+      if (ok !== undefined) list.refresh()
     },
-    [project.id, list]
+    [project.id, list, run]
   )
 
   return (
@@ -48,10 +67,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
           <Select
             value={envId}
             onChange={setEnvId}
-            options={[
-              { value: '', label: t('functions.localOnly') },
-              ...project.environments.map((e) => ({ value: e.id, label: `↔ ${e.name}` }))
-            ]}
+            options={envOptions(project, t('functions.localOnly'))}
           />
         </div>
         <div className="flex-1" />
@@ -73,7 +89,10 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
 
           {envId && stale.length > 0 && (
             <div className="rounded-md border border-info-border bg-info-bg px-3.5 py-2 text-note text-info">
-              {t('functions.staleWarning', { count: stale.length, names: stale.map((f) => f.name).join(', ') })}
+              {t('functions.staleWarning', {
+                count: stale.length,
+                names: stale.map((f) => f.name).join(', ')
+              })}
             </div>
           )}
 
@@ -121,10 +140,12 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
                       disabled={fn.path === ''}
                       onChange={(v) => void setVerify(fn.name, v)}
                     />
-                    {envId && <Button onClick={() => setDiffFn(fn.name)}>{t('functions.diff')}</Button>}
+                    {envId && (
+                      <Button onClick={() => setDiffFn(fn.name)}>{t('functions.diff')}</Button>
+                    )}
                     {envId && fn.path !== '' && (
                       <Button
-                        loading={deploying === fn.name}
+                        loading={runningLabel === fn.name}
                         onClick={() => setConfirmDeploy([fn.name])}
                       >
                         {t('functions.deploy')}
@@ -136,7 +157,9 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
             </ul>
           </Card>
 
-          <p className="px-1 text-small leading-relaxed text-muted">{t('functions.verifyJwtHint')}</p>
+          <p className="px-1 text-small leading-relaxed text-muted">
+            {t('functions.verifyJwtHint')}
+          </p>
         </div>
       </div>
 
@@ -150,11 +173,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
       )}
 
       {creating && (
-        <Modal
-          title={t('functions.newTitle')}
-          onClose={() => setCreating(false)}
-          footer={null}
-        >
+        <Modal title={t('functions.newTitle')} onClose={() => setCreating(false)} footer={null}>
           <NewFunction
             onCreate={async (name) => {
               await call('functions:create', { id: project.id, name })
@@ -175,30 +194,31 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
               <Button onClick={() => setConfirmDeploy(null)}>{t('common.cancel')}</Button>
               <Button
                 variant="primary"
-                loading={deploying !== null}
+                loading={busy}
                 onClick={() => {
-                  setDeploying(confirmDeploy.join(','))
-                  void call('sync:deploy', {
-                    id: project.id,
-                    confirm: project.name,
-                    plan: {
-                      envId,
-                      steps: ['functions'],
-                      migrations: [],
-                      functions: confirmDeploy,
-                      secrets: [],
-                      dryRun: false
-                    }
+                  void run(
+                    async () => {
+                      const res = await call('sync:deploy', {
+                        id: project.id,
+                        confirm: project.name,
+                        plan: {
+                          envId,
+                          steps: ['functions'],
+                          migrations: [],
+                          functions: confirmDeploy,
+                          secrets: [],
+                          dryRun: false
+                        }
+                      })
+                      // A deploy that fails reports it in the result, not by throwing.
+                      if (!res.ok) throw new Error(res.error ?? t('functions.deployFailed'))
+                      return res
+                    },
+                    confirmDeploy.length === 1 ? confirmDeploy[0] : undefined
+                  ).finally(() => {
+                    setConfirmDeploy(null)
+                    list.refresh()
                   })
-                    .then((res) => {
-                      if (!res.ok) setError(res.error ?? t('functions.deployFailed'))
-                      setConfirmDeploy(null)
-                    })
-                    .catch((e: Error) => setError(e.message))
-                    .finally(() => {
-                      setDeploying(null)
-                      list.refresh()
-                    })
                 }}
               >
                 {t('functions.deployNow')}

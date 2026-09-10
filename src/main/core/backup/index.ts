@@ -26,7 +26,7 @@ import type {
   RemoteEnv,
   RestoreOptions,
   RestoreResult
-} from '@shared/types.js'
+} from '@shared/types/index.js'
 import { runFromFile, runToFile } from '../cli.js'
 import { servicesFor } from '../docker.js'
 import { logBus } from '../log.js'
@@ -87,13 +87,17 @@ export function list(projectId: string): BackupRecord[] {
 }
 
 export function get(backupId: string): BackupRecord {
-  const found = store().get('backups').find((b) => b.id === backupId)
+  const found = store()
+    .get('backups')
+    .find((b) => b.id === backupId)
   if (!found) throw new Error(`Backup not found: ${backupId}`)
   return found
 }
 
 function put(record: BackupRecord): BackupRecord {
-  const rest = store().get('backups').filter((b) => b.id !== record.id)
+  const rest = store()
+    .get('backups')
+    .filter((b) => b.id !== record.id)
   store().set('backups', [...rest, record])
   return record
 }
@@ -101,7 +105,9 @@ function put(record: BackupRecord): BackupRecord {
 function forget(backupId: string): void {
   store().set(
     'backups',
-    store().get('backups').filter((b) => b.id !== backupId)
+    store()
+      .get('backups')
+      .filter((b) => b.id !== backupId)
   )
 }
 
@@ -435,7 +441,9 @@ export async function upload(backupId: string, storageId: string): Promise<Backu
 export function forgetProject(projectId: string): void {
   store().set(
     'backups',
-    store().get('backups').filter((b) => b.projectId !== projectId)
+    store()
+      .get('backups')
+      .filter((b) => b.projectId !== projectId)
   )
 }
 

@@ -10,7 +10,7 @@ import {
   renameFor,
   writeFor
 } from '../src/main/core/queries.js'
-import type { Project } from '../src/shared/types.js'
+import type { Project } from '../src/shared/types/index.js'
 
 let root: string
 let project: Project
@@ -35,7 +35,9 @@ describe('saved queries', () => {
 
   it('write → list → read → rename → remove cycle', () => {
     writeFor(project, 'active users', 'select * from auth.users;')
-    expect(existsSync(join(root, 'supabase', '.locabase', 'queries', 'active users.sql'))).toBe(true)
+    expect(existsSync(join(root, 'supabase', '.locabase', 'queries', 'active users.sql'))).toBe(
+      true
+    )
 
     const all = listFor(project)
     expect(all).toHaveLength(1)

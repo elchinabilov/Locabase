@@ -53,7 +53,10 @@ export function uriEncode(value: string, keepSlash = false): string {
 
 /** `20240131T090501Z` and its date half — the two stamps SigV4 asks for. */
 export function stamps(now: Date): { amzDate: string; dateStamp: string } {
-  const amzDate = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  const amzDate = now
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '')
   return { amzDate, dateStamp: amzDate.slice(0, 8) }
 }
 
@@ -61,7 +64,10 @@ export function stamps(now: Date): { amzDate: string; dateStamp: string } {
  * The canonical request — the exact bytes both sides hash. Exported because it
  * is where signing goes wrong, and a mismatch here is invisible in a 403.
  */
-export function canonicalRequest(input: SignInput, amzDate: string): {
+export function canonicalRequest(
+  input: SignInput,
+  amzDate: string
+): {
   text: string
   signedHeaders: string
   headers: Record<string, string>
@@ -121,12 +127,7 @@ export function signRequest(input: SignInput): Record<string, string> {
   const { amzDate, dateStamp } = stamps(input.now)
   const canonical = canonicalRequest(input, amzDate)
   const scope = `${dateStamp}/${input.region}/${input.service}/aws4_request`
-  const stringToSign = [
-    'AWS4-HMAC-SHA256',
-    amzDate,
-    scope,
-    sha256(canonical.text)
-  ].join('\n')
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256(canonical.text)].join('\n')
   const signature = createHmac(
     'sha256',
     signingKey(input.secretAccessKey, dateStamp, input.region, input.service)

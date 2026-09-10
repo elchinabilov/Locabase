@@ -123,7 +123,13 @@ export function Splitter({
     [axis, step, mode, invert, value, min, max, onChange, defaultValue]
   )
 
+  /*
+   * A window splitter is the one `separator` that is *meant* to be focusable and
+   * operable (WAI-ARIA window-splitter pattern) — the generic rules cannot tell
+   * it apart from a decorative rule, so they are turned off for this element.
+   */
   return (
+    /* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */
     <div
       role="separator"
       aria-orientation={axis === 'x' ? 'vertical' : 'horizontal'}
@@ -131,6 +137,7 @@ export function Splitter({
       aria-valuenow={Math.round(value)}
       aria-valuemin={min}
       aria-valuemax={max}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see above
       tabIndex={0}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

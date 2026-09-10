@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import type { ConfigField, ConfigValue, FieldValue } from '@shared/types'
-import { Input, Select, Toggle } from './ui'
 import { cx } from '../lib/format'
 import { useT } from '../i18n'
+import { Input, Select, Toggle } from './ui'
 
 export type PatchInput = ConfigValue | { env: string } | undefined
 

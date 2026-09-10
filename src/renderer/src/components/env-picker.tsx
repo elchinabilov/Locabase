@@ -8,9 +8,29 @@
  */
 import type { ReactNode } from 'react'
 import type { Project, RemoteEnv } from '@shared/types'
-import { useQuery } from '../lib/ipc'
+import { useStackStatus } from '../lib/stack-status'
 import { useT } from '../i18n'
-import { Badge, Empty, Select, Spinner } from './ui'
+import { Empty, Select, Spinner } from './ui'
+
+/**
+ * The environment list as `<Select>` options, with the local stack first.
+ *
+ * Five screens built this inline, and they had drifted into three different icon
+ * conventions for the same three things — `⌂/☁/⛁` here, a bare `↔` on
+ * Migrations and Functions. One list, one set of icons.
+ */
+export function envOptions(
+  project: Project,
+  localLabel: string
+): Array<{ value: string; label: string }> {
+  return [
+    { value: '', label: `⌂ ${localLabel}` },
+    ...project.environments.map((e) => ({
+      value: e.id,
+      label: `${e.kind === 'managed' ? '☁' : '⛁'} ${e.name}`
+    }))
+  ]
+}
 
 export function EnvPicker({
   project,
@@ -29,13 +49,7 @@ export function EnvPicker({
       <Select
         value={envId ?? ''}
         onChange={(v) => onChange(v || null)}
-        options={[
-          { value: '', label: `⌂ ${t('envPicker.local')}` },
-          ...project.environments.map((e) => ({
-            value: e.id,
-            label: `${e.kind === 'managed' ? '☁' : '⛁'} ${e.name}`
-          }))
-        ]}
+        options={envOptions(project, t('envPicker.local'))}
       />
     </div>
   )
@@ -69,10 +83,9 @@ export function useDbGate(
   envId: string | null
 ): { ready: boolean; blocked: ReactNode | null } {
   const t = useT()
-  const status = useQuery('stack:status', { id: projectId }, [projectId], {
-    pollMs: 10_000,
-    enabled: envId === null
-  })
+  // Subscribing unconditionally keeps the hook order fixed; the shared poller
+  // already collapses this into the one request the screen behind it makes.
+  const status = useStackStatus(projectId)
   if (envId !== null) return { ready: true, blocked: null }
 
   const dbUp = status.data?.services.some((s) => s.key === 'db' && s.state === 'running') ?? false
@@ -95,16 +108,11 @@ export function useDbGate(
         title={t('envPicker.dbDownTitle')}
         hint={
           <>
-            {t('envPicker.dbDownHintBefore')} «{t('app.nav.dashboard')}» {t('envPicker.dbDownHintAfter')}
+            {t('envPicker.dbDownHintBefore')} «{t('app.nav.dashboard')}»{' '}
+            {t('envPicker.dbDownHintAfter')}
           </>
         }
       />
     )
   }
-}
-
-export function EnvBadge({ env }: { env: RemoteEnv | null }): ReactNode {
-  const t = useT()
-  if (!env) return <Badge tone="muted">{t('envPicker.localBadge')}</Badge>
-  return <Badge tone={env.kind === 'managed' ? 'info' : 'warn'}>{env.name}</Badge>
 }

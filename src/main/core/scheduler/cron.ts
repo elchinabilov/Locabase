@@ -6,7 +6,7 @@
  * 03:00" means 03:00 on the machine, across a DST change too, which is what a
  * person setting a nightly backup means.
  */
-import type { ScheduleSpec } from '@shared/types.js'
+import type { ScheduleSpec } from '@shared/types/index.js'
 
 const MINUTE = 60_000
 

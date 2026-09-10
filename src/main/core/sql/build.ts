@@ -8,7 +8,6 @@
  *  2. IDENTIFIERS always go through `quoteIdent` AND must first appear in the
  *     column list returned by introspection (`requireColumn`).
  */
-import { quoteIdent, qualify } from './ident.js'
 import type {
   DbCells,
   DbColumn,
@@ -18,8 +17,10 @@ import type {
   DbRow,
   SqlColumn,
   SqlErrorInfo,
-  SqlResult
-} from '@shared/types.js'
+  SqlResult,
+  SqlRun
+} from '@shared/types/index.js'
+import { quoteIdent, qualify } from './ident.js'
 
 /* ------------------------------------------------------------ normalizasiya */
 
@@ -65,7 +66,7 @@ export function toResult(
  */
 export function toSqlError(err: unknown): SqlErrorInfo {
   const e = (err ?? {}) as Record<string, unknown>
-  const str = (k: string): string | null => (typeof e[k] === 'string' ? (e[k] as string) : null)
+  const str = (k: string): string | null => (typeof e[k] === 'string' ? e[k] : null)
   const rawPos = e.position
   // pg's `position` is a 1-based character offset; CodeMirror is 0-based
   const pos = typeof rawPos === 'string' || typeof rawPos === 'number' ? Number(rawPos) : NaN
@@ -83,6 +84,21 @@ export function toSqlError(err: unknown): SqlErrorInfo {
   }
 }
 
+/**
+ * The shape a failed run comes back as. Four call sites built this by hand —
+ * the two remote transports and both failure paths of the local one — and a
+ * failure is exactly where a forgotten field is least likely to be noticed.
+ */
+export function failedRun(started: number, readOnly: boolean, err: unknown): SqlRun {
+  return {
+    ok: false,
+    results: [],
+    durationMs: Date.now() - started,
+    readOnly,
+    error: toSqlError(err)
+  }
+}
+
 /* ---------------------------------------------------------- column helpers */
 
 export function requireColumn(cols: DbColumn[], name: string): DbColumn {
@@ -93,9 +109,7 @@ export function requireColumn(cols: DbColumn[], name: string): DbColumn {
 
 /** PK columns, in PK order. An empty array means there is no PK. */
 export function pkColumns(cols: DbColumn[]): DbColumn[] {
-  return cols
-    .filter((c) => c.pkOrd !== null)
-    .sort((a, b) => (a.pkOrd ?? 0) - (b.pkOrd ?? 0))
+  return cols.filter((c) => c.pkOrd !== null).sort((a, b) => (a.pkOrd ?? 0) - (b.pkOrd ?? 0))
 }
 
 /* ------------------------------------------------------------ where / order */

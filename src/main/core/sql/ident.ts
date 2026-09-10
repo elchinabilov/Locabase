@@ -4,7 +4,7 @@
  *
  * THE RULE: only names that came from introspection and were checked against the
  * column list are pasted into SQL text. NEVER USER VALUES — those always travel
- * `$n` parametridir (bax: `build.ts`).
+ * as a `$n` parameter instead (see `build.ts`).
  */
 
 export function quoteIdent(name: string): string {
@@ -44,7 +44,7 @@ export function quoteLiteral(value: string | null): string {
 export function inlineParams(text: string, params: Array<string | null>): string {
   return text.replace(/\$(\d+)/g, (_m, n: string) => {
     const i = Number(n) - 1
-    if (i < 0 || i >= params.length) throw new Error(`Parametr yoxdur: $${n}`)
+    if (i < 0 || i >= params.length) throw new Error(`No such parameter: $${n}`)
     return quoteLiteral(params[i] ?? null)
   })
 }

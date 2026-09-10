@@ -1,6 +1,6 @@
 name: Bug report
 description: Something in Locabase does not work as documented
-labels: ["bug"]
+labels: ['bug']
 body:
   - type: markdown
     attributes:
@@ -50,14 +50,14 @@ body:
     id: locabase-version
     attributes:
       label: Locabase version
-      placeholder: "0.2.0, or the commit SHA if you run from source"
+      placeholder: '0.2.0, or the commit SHA if you run from source'
     validations:
       required: true
   - type: input
     id: os
     attributes:
       label: Operating system
-      placeholder: "macOS 15.6 (Apple Silicon), Windows 11, Ubuntu 24.04"
+      placeholder: 'macOS 15.6 (Apple Silicon), Windows 11, Ubuntu 24.04'
     validations:
       required: true
   - type: input
@@ -65,14 +65,14 @@ body:
     attributes:
       label: supabase CLI version
       description: Output of `supabase --version`
-      placeholder: "2.34.3"
+      placeholder: '2.34.3'
     validations:
       required: true
   - type: input
     id: docker
     attributes:
       label: Container runtime
-      placeholder: "Docker Desktop 4.44, OrbStack 1.12, colima"
+      placeholder: 'Docker Desktop 4.44, OrbStack 1.12, colima'
     validations:
       required: true
   - type: textarea

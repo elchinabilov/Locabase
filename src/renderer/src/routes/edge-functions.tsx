@@ -10,15 +10,18 @@
  * time: deploying a function and setting the key it needs is one task, not two
  * screens a list apart.
  */
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
+import { z } from 'zod'
 import type { Project } from '@shared/types'
+import { useUiState } from '../lib/ui-state'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import { Splitter, useStoredSize } from '../components/splitter'
 import { FunctionsRoute } from './functions'
 import { SecretsRoute } from './secrets'
 
-type Section = 'functions' | 'secrets'
+const SECTION_IDS = ['functions', 'secrets'] as const
+type Section = (typeof SECTION_IDS)[number]
 
 const SECTIONS: Array<{ id: Section; key: TranslationKey; icon: string }> = [
   { id: 'functions', key: 'app.nav.functions', icon: 'ƒ' },
@@ -29,7 +32,12 @@ const SIDEBAR = { default: 200, min: 160, max: 360 }
 
 export function EdgeFunctionsRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
-  const [section, setSection] = useState<Section>('functions')
+  // As on the Authentication screen: the open page is remembered for the window.
+  const [section, setSection] = useUiState(
+    'edgeFunctions.section',
+    z.enum(SECTION_IDS),
+    'functions'
+  )
   const [width, setWidth] = useStoredSize('locabase.edgeFunctions.sidebarWidth', SIDEBAR.default)
 
   return (

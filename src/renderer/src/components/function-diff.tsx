@@ -17,14 +17,16 @@ const STATUS_KEY: Record<
 }
 
 /** A human-readable name for the drift state — used as a badge in listings. */
-export const DRIFT: Record<FunctionDrift, { labelKey: TranslationKey; tone: 'ok' | 'warn' | 'info' | 'muted' }> =
-  {
-    same: { labelKey: 'functionDiff.drift.same', tone: 'ok' },
-    changed: { labelKey: 'functionDiff.drift.changed', tone: 'warn' },
-    'local-only': { labelKey: 'functionDiff.drift.localOnly', tone: 'info' },
-    'remote-only': { labelKey: 'functionDiff.drift.remoteOnly', tone: 'warn' },
-    unknown: { labelKey: 'functionDiff.drift.unknown', tone: 'muted' }
-  }
+export const DRIFT: Record<
+  FunctionDrift,
+  { labelKey: TranslationKey; tone: 'ok' | 'warn' | 'info' | 'muted' }
+> = {
+  same: { labelKey: 'functionDiff.drift.same', tone: 'ok' },
+  changed: { labelKey: 'functionDiff.drift.changed', tone: 'warn' },
+  'local-only': { labelKey: 'functionDiff.drift.localOnly', tone: 'info' },
+  'remote-only': { labelKey: 'functionDiff.drift.remoteOnly', tone: 'warn' },
+  unknown: { labelKey: 'functionDiff.drift.unknown', tone: 'muted' }
+}
 
 /**
  * The file-by-file diff of one function. In the diff the **left side is the
@@ -43,7 +45,7 @@ export function FunctionDiffModal({
   onClose: () => void
 }): ReactNode {
   const t = useT()
-  const diff = useQuery('functions:diff', { id: projectId, envId, name }, [projectId, envId, name])
+  const diff = useQuery('functions:diff', { id: projectId, envId, name })
   const changed = diff.data?.changed ?? 0
 
   return (
@@ -71,7 +73,9 @@ export function FunctionDiffModal({
               <FileBlock key={f.path} file={f} />
             ))}
             {diff.data.files.length === 0 && (
-              <p className="py-6 text-center text-note text-muted">{t('functionDiff.fileNotFound')}</p>
+              <p className="py-6 text-center text-note text-muted">
+                {t('functionDiff.fileNotFound')}
+              </p>
             )}
           </div>
         </>

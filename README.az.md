@@ -12,16 +12,16 @@ boşluğu doldurur: **hər şey UI-dan, faylı əl ilə açmadan.**
 
 ## Nə edir
 
-| Ekran | Nə verir |
-| --- | --- |
-| **Ümumi** | Servis keçidləri (on/off) + **konteyner başına RAM**, start/stop/restart/`db reset`, Studio·Mailpit·API·DB linkləri, port toqquşması xəbərdarlığı |
-| **Konfiqurasiya** | `config.toml`-un 108 sahəsi forma kimi, 14 qrupda; diff önizləməsi, restart banneri |
-| **Auth** | 19 OAuth provider, callback URL-in avtomatik hesablanması, `env()` bağlantısı |
-| **Secrets** | Kök `.env` redaktoru, maskalama, `config.toml`-un gözlədiyi boş referenslərin siyahısı |
-| **Cədvəllər** | Sxem/cədvəl siyahısı, sətirlərə baxış (filtr, sıralama, səhifələmə), sətir əlavə/redaktə/sil, struktur (tip, PK, FK, default) |
-| **SQL** | CodeMirror redaktoru (sxem avtotamamlaması, ⌘↵), yalnız-oxu rejimi, çoxifadəli skript nəticələri, sorğuların repo-da saxlanması, «miqrasiya kimi saxla» |
-| **Miqrasiyalar** | Fayllar · lokal ledger · remote ledger yan-yana; new/up/diff/repair |
-| **Funksiyalar** | Siyahı, şablondan yaratma, lokal serve, `verify_jwt`, tək-tək və ya toplu deploy |
+| Ekran             | Nə verir                                                                                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Ümumi**         | Servis keçidləri (on/off) + **konteyner başına RAM**, start/stop/restart/`db reset`, Studio·Mailpit·API·DB linkləri, port toqquşması xəbərdarlığı                         |
+| **Konfiqurasiya** | `config.toml`-un 108 sahəsi forma kimi, 14 qrupda; diff önizləməsi, restart banneri                                                                                       |
+| **Auth**          | 19 OAuth provider, callback URL-in avtomatik hesablanması, `env()` bağlantısı                                                                                             |
+| **Secrets**       | Kök `.env` redaktoru, maskalama, `config.toml`-un gözlədiyi boş referenslərin siyahısı                                                                                    |
+| **Cədvəllər**     | Sxem/cədvəl siyahısı, sətirlərə baxış (filtr, sıralama, səhifələmə), sətir əlavə/redaktə/sil, struktur (tip, PK, FK, default)                                             |
+| **SQL**           | CodeMirror redaktoru (sxem avtotamamlaması, ⌘↵), yalnız-oxu rejimi, çoxifadəli skript nəticələri, sorğuların repo-da saxlanması, «miqrasiya kimi saxla»                   |
+| **Miqrasiyalar**  | Fayllar · lokal ledger · remote ledger yan-yana; new/up/diff/repair                                                                                                       |
+| **Funksiyalar**   | Siyahı, şablondan yaratma, lokal serve, `verify_jwt`, tək-tək və ya toplu deploy                                                                                          |
 | **Sync / Deploy** | Beş ox üzrə fərq (miqrasiya, sxem, funksiya, secret, auth), **funksiyaların fayl-fayl məzmun diffi**, seçmə deploy, quru rejim, **remote konteynerlərin on/off və RAM-ı** |
 
 ## Layihə əlavə etmək
@@ -47,11 +47,11 @@ seçimlə işə düşür.
 
 Nəqliyyat mühitə görə dəyişir, sorğu mətnləri isə eynidir:
 
-| Mühit | Necə gedir | Məhdudiyyət |
-| --- | --- | --- |
-| Lokal | `pg` sürücüsü, `$n` parametrləri | — |
-| Managed | Management API `database/query` | Sütun tipləri yoxdur, eyniadlı sütunlar birləşir, `read_only` API tərəfindən tətbiq olunur |
-| Self-hosted | SSH + `docker exec psql -q --csv` | Bir nəticə bloku, xəta mövqeyi yoxdur |
+| Mühit       | Necə gedir                        | Məhdudiyyət                                                                                |
+| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------ |
+| Lokal       | `pg` sürücüsü, `$n` parametrləri  | —                                                                                          |
+| Managed     | Management API `database/query`   | Sütun tipləri yoxdur, eyniadlı sütunlar birləşir, `read_only` API tərəfindən tətbiq olunur |
+| Self-hosted | SSH + `docker exec psql -q --csv` | Bir nəticə bloku, xəta mövqeyi yoxdur                                                      |
 
 Uzaq nəqliyyatda `$n` bağlana bilmədiyinə görə **bizim qurduğumuz** sorğularda
 dəyər `quoteLiteral()` ilə yapışdırılır (istifadəçinin SQL-i heç vaxt buradan
@@ -175,6 +175,20 @@ yamaqsız keçid bayt-bayt eyni nəticə verməli, `auth.jwt_expiry` dəyişikli
 - `db reset` və remote deploy layihə adının yazılması ilə təsdiqlənir.
 - Remote sxem dəyişikliyindən əvvəl **həmişə** yedək alınır.
 
+## Qaldığın yer
+
+Ekranlar qaldığın yerdən açılır: layihə və bölmə, hər ekranda seçilmiş mühit,
+sxem və seçili cədvəl, hər cədvəlin öz sıralaması və filtrləri, «İstifadəçilər»
+və «Konfiqurasiya» filtrləri, həmçinin SQL redaktorunun mətni — yadda saxlanmış
+olsa da, olmasa da.
+
+Bunun üçün bir `localStorage` yazısı işlədilir: açılışda bir dəfə oxunur, yazı isə
+250 ms-lik gecikmə ilə toplanır — yəni filtr sətrinə basılan hər hərf serializasiya
+deyil, sadəcə bir dəyər təyini deməkdir. Geri oxunan hər dəyər yoxlanılır, ona
+görə silinmiş sxem və ya mühit sorğulanmır, defolta qayıdır. Üç şey qəsdən yadda
+saxlanmır: SQL-in **read-only** açarı (hər açılışda yenidən qoşulur), yadda
+saxlanmamış `config.toml` və `.env` dəyişiklikləri, və «secret-ləri göstər».
+
 ## Testlər
 
 ```bash
@@ -190,8 +204,8 @@ Tətbiq əvvəl «Supabase GUI» adlanırdı. Electron istifadəçi qovluğunu a
 üzərindən qurduğuna görə ilk açılışda köhnə registry avtomatik köçürülür
 (`src/main/core/userdata.ts`) — köhnə qovluq silinmir.
 
-İşarə iki yumru primitivdən qurulan «L»-dir: şaquli sap (*local*) və onun
-oturduğu geniş plita (*base*). İkisi ayrı tonda olduğuna görə birləşmə
+İşarə iki yumru primitivdən qurulan «L»-dir: şaquli sap (_local_) və onun
+oturduğu geniş plita (_base_). İkisi ayrı tonda olduğuna görə birləşmə
 nöqtəsində tikiş görünür — forma bütöv oxunsa da, konstruksiya seçilir.
 Rasterləşdirməni `scripts/make-icons.mjs` Electron-un Chromium-u ilə edir,
 sistemdə əlavə alət tələb olunmur.

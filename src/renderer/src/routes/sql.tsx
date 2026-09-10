@@ -9,18 +9,20 @@
  *     not writing it to the ledger is exactly the drift this app tries to prevent.
  */
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type { Project, SqlErrorInfo, SqlRun } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { cx } from '../lib/format'
 import { useT, type TranslationKey } from '../i18n'
 import {
   Badge,
   Button,
   ErrorNote,
-  Input,
   Modal,
+  NameModal,
   Select,
-  SkeletonRows,
   SkeletonTable,
   Spinner
 } from '../components/ui'
@@ -28,8 +30,23 @@ import { DataGrid } from '../components/data-grid'
 import { SqlEditor, type SqlEditorHandle } from '../components/sql-editor'
 import { EnvPicker, RemoteNote, envOf, useDbGate } from '../components/env-picker'
 import { Splitter, useStoredSize } from '../components/splitter'
+import { SavedQueriesPanel } from '../components/sql/saved-queries-panel'
 
 const MAX_ROWS = [100, 500, 1000, 5000]
+
+const TIMEOUTS: Array<{ value: number; labelKey: TranslationKey }> = [
+  { value: 5_000, labelKey: 'sql.timeout.5s' },
+  { value: 30_000, labelKey: 'sql.timeout.30s' },
+  { value: 120_000, labelKey: 'sql.timeout.2m' }
+]
+const TIMEOUT_MS = TIMEOUTS.map((tm) => tm.value)
+
+/* What the screen restores. The row limit and the timeout drive `<Select>`s, so
+   a value outside their options would render as a blank box. */
+const ENV_ID = z.string().min(1).max(200).nullable()
+const MAX_ROWS_VALUE = z.number().refine((n) => MAX_ROWS.includes(n))
+const TIMEOUT_VALUE = z.number().refine((n) => TIMEOUT_MS.includes(n))
+const QUERY_NAME = z.string().min(1).max(512).nullable()
 
 /* The three panes are user-resizable; these are where they start. The queries
    list is in pixels — a sidebar should keep its width when the window grows —
@@ -44,29 +61,51 @@ function starterDoc(t: (k: TranslationKey) => string): string {
 
 export function SqlRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
-  const TIMEOUTS: Array<{ value: number; label: string }> = [
-    { value: 5_000, label: t('sql.timeout.5s') },
-    { value: 30_000, label: t('sql.timeout.30s') },
-    { value: 120_000, label: t('sql.timeout.2m') }
-  ]
-  // Local by default — a remote environment only on an explicit choice
-  const [envId, setEnvId] = useState<string | null>(null)
+  // Local by default — a remote environment only on an explicit choice. `picked`
+  // is the choice; the id is re-derived, so an environment removed since the last
+  // visit falls back to local instead of being queried.
+  const [pickedEnv, setEnvId] = useUiState(projectKey(project.id, 'sql.env'), ENV_ID, null)
+  const envId = pickedEnv !== null && envOf(project, pickedEnv) ? pickedEnv : null
   const { ready, blocked } = useDbGate(project.id, envId)
   const env = envOf(project, envId)
 
+  /**
+   * NOT remembered, and the one thing on this screen that must not be: a session
+   * that ended in write mode has to start the next one read-only. See the note at
+   * the top of the file.
+   */
   const [readOnly, setReadOnly] = useState(true)
-  const [maxRows, setMaxRows] = useState(500)
-  const [timeoutMs, setTimeoutMs] = useState(30_000)
+  const [maxRows, setMaxRows] = useUiState(
+    projectKey(project.id, 'sql.maxRows'),
+    MAX_ROWS_VALUE,
+    500
+  )
+  const [timeoutMs, setTimeoutMs] = useUiState(
+    projectKey(project.id, 'sql.timeoutMs'),
+    TIMEOUT_VALUE,
+    30_000
+  )
 
-  const [doc, setDoc] = useState(() => starterDoc(t))
+  /* The buffer itself comes back, saved or not — an unsaved query is often the
+     reason the app is still open. A query past the 200 KB cap in `ui-state.ts` is
+     not remembered at all, and the next open starts from the starter query. */
+  const [doc, setDoc] = useUiState(projectKey(project.id, 'sql.doc'), z.string(), starterDoc(t))
   const [docKey, setDocKey] = useState(0)
-  const [activeName, setActiveName] = useState<string | null>(null)
-  const [dirty, setDirty] = useState(false)
+  const [activeName, setActiveName] = useUiState(
+    projectKey(project.id, 'sql.activeName'),
+    QUERY_NAME,
+    null
+  )
+  const [dirty, setDirty] = useUiState(projectKey(project.id, 'sql.dirty'), z.boolean(), false)
 
   const [run, setRun] = useState<SqlRun | null>(null)
   const [tab, setTab] = useState(0)
   const [busy, setBusy] = useState<string | null>(null)
-  const [dialog, setDialog] = useState<'save' | 'migration' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'save' | 'migration' | 'rename' | 'delete' | null>(null)
+  /** The saved query a rename/delete dialog acts on — not always the open one. */
+  const [target, setTarget] = useState<string | null>(null)
+  // `run` is taken here by the SQL result, so the action helper keeps its own name.
+  const { run: runAction, error: actionError } = useAction()
 
   const editor = useRef<SqlEditorHandle | null>(null)
   // The percentage the results pane is measured against.
@@ -79,10 +118,14 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
     'locabase.sql.resultsHeight',
     RESULTS_HEIGHT.default
   )
-  const saved = useQuery('queries:list', { id: project.id }, [project.id])
-  const completion = useQuery('db:completion', { id: project.id, envId }, [project.id, envId], {
-    enabled: ready
-  })
+  const saved = useQuery('queries:list', { id: project.id })
+  const completion = useQuery(
+    'db:completion',
+    { id: project.id, envId },
+    {
+      enabled: ready
+    }
+  )
 
   const execute = useCallback(async () => {
     const text = editor.current?.read() ?? doc
@@ -130,7 +173,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
       setActiveName(name)
       setDirty(false)
     },
-    [project.id]
+    [project.id, setActiveName, setDirty, setDoc]
   )
 
   const save = useCallback(
@@ -140,7 +183,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
       setDirty(false)
       saved.refresh()
     },
-    [project.id, doc, saved]
+    [project.id, doc, saved, setActiveName, setDirty]
   )
 
   const statements = useMemo(() => countStatements(doc), [doc])
@@ -151,42 +194,24 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className="flex shrink-0 flex-col bg-panel" style={{ width: `${queriesWidth}px` }}>
-        <div className="flex items-center justify-between border-b border-line-soft px-3 py-2">
-          <span className="text-badge font-semibold tracking-[0.09em] text-muted uppercase">
-            {t('sql.queries')}
-          </span>
-          <button
-            onClick={() => setDialog('save')}
-            title={t('common.save')}
-            className="rounded px-1.5 text-h2 leading-none text-muted hover:bg-panel-2 hover:text-accent"
-          >
-            +
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto p-1.5">
-          {saved.loading && saved.data === null && <SkeletonRows rows={5} />}
-          {saved.data !== null && saved.data.length === 0 && (
-            <p className="px-2 py-3 text-small leading-relaxed text-muted">{t('sql.noSaved')}</p>
-          )}
-          {(saved.data ?? []).map((q) => (
-            <button
-              key={q.name}
-              onClick={() => void load(q.name)}
-              className={cx(
-                'mb-0.5 flex w-full items-center gap-1.5 rounded-md px-2.5 py-1.5 text-left text-note',
-                q.name === activeName ? 'bg-panel-2 text-text' : 'text-muted hover:bg-hover'
-              )}
-            >
-              <span className="min-w-0 flex-1 truncate">{q.name}</span>
-              {q.name === activeName && dirty && <span className="text-accent">•</span>}
-            </button>
-          ))}
-        </div>
-        <p className="border-t border-line-soft px-3 py-2 text-badge leading-relaxed text-muted">
-          <code>supabase/.locabase/queries/</code> {t('sql.sharedViaGit')}
-        </p>
-      </aside>
+      <SavedQueriesPanel
+        width={queriesWidth}
+        queries={saved.data}
+        loading={saved.loading}
+        activeName={activeName}
+        dirty={dirty}
+        error={actionError}
+        onOpen={(name) => void load(name)}
+        onNew={() => setDialog('save')}
+        onRename={(name) => {
+          setTarget(name)
+          setDialog('rename')
+        }}
+        onDelete={(name) => {
+          setTarget(name)
+          setDialog('delete')
+        }}
+      />
 
       <Splitter
         axis="x"
@@ -221,14 +246,17 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
             <Select
               value={String(maxRows)}
               onChange={(v) => setMaxRows(Number(v))}
-              options={MAX_ROWS.map((n) => ({ value: String(n), label: t('sql.rowCount', { count: n }) }))}
+              options={MAX_ROWS.map((n) => ({
+                value: String(n),
+                label: t('sql.rowCount', { count: n })
+              }))}
             />
           </div>
           <div className="w-[92px]">
             <Select
               value={String(timeoutMs)}
               onChange={(v) => setTimeoutMs(Number(v))}
-              options={TIMEOUTS.map((tm) => ({ value: String(tm.value), label: tm.label }))}
+              options={TIMEOUTS.map((tm) => ({ value: String(tm.value), label: t(tm.labelKey) }))}
             />
           </div>
 
@@ -237,7 +265,13 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
           <Button onClick={() => setDialog('save')}>{t('common.save')}</Button>
           <Button onClick={() => setDialog('migration')}>{t('sql.saveAsMigration')}</Button>
           {activeName && (
-            <Button variant="danger" onClick={() => setDialog('delete')}>
+            <Button
+              variant="danger"
+              onClick={() => {
+                setTarget(activeName)
+                setDialog('delete')
+              }}
+            >
               {t('common.delete')}
             </Button>
           )}
@@ -255,7 +289,9 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
         {env && <RemoteNote env={env} />}
         {!readOnly && (
           <p className="border-b border-line-soft bg-warn-bg px-3 py-1.5 text-small text-warn">
-            {t('sql.writeModeOn', { target: env ? t('sql.writeModeTarget', { name: env.name }) : '' })}
+            {t('sql.writeModeOn', {
+              target: env ? t('sql.writeModeTarget', { name: env.name }) : ''
+            })}
           </p>
         )}
         {blocked && <div className="flex-1">{blocked}</div>}
@@ -302,10 +338,14 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
                 {run?.ok && current && (
                   <>
                     <span className="text-text">{current.command ?? 'OK'}</span>
-                    <span className="text-muted">· {t('sql.rowCount', { count: current.rows.length })}</span>
+                    <span className="text-muted">
+                      · {t('sql.rowCount', { count: current.rows.length })}
+                    </span>
                     <span className="text-muted">· {run.durationMs} ms</span>
                     {current.truncated && (
-                      <Badge tone="warn">{t('sql.firstRows', { count: current.rows.length })}</Badge>
+                      <Badge tone="warn">
+                        {t('sql.firstRows', { count: current.rows.length })}
+                      </Badge>
                     )}
                     {run.readOnly && <Badge tone="muted">{t('sql.readOnly')}</Badge>}
                   </>
@@ -350,7 +390,10 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
                 )}
                 {!busy && run?.ok && current && current.columns.length === 0 && (
                   <p className="px-3.5 py-6 text-center text-note text-muted">
-                    {t('sql.rowsAffected', { command: current.command ?? 'OK', count: current.rowCount ?? 0 })}
+                    {t('sql.rowsAffected', {
+                      command: current.command ?? 'OK',
+                      count: current.rowCount ?? 0
+                    })}
                   </p>
                 )}
               </div>
@@ -368,6 +411,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
           title={t('sql.saveQueryTitle')}
           initial={activeName ?? ''}
           hint={t('sql.saveQueryHint')}
+          confirmLabel={t('common.save')}
           valid={(v) => /^[\wəöğışçüĞÖİŞÇÜƏ -]{1,64}$/.test(v)}
           onClose={() => setDialog(null)}
           onSubmit={async (name) => {
@@ -383,6 +427,7 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
           initial=""
           placeholder="add_feedback_table"
           hint={t('migrations.nameHint', { name: '<ad>' })}
+          confirmLabel={t('common.save')}
           valid={(v) => /^[a-z0-9_]+$/.test(v)}
           onClose={() => setDialog(null)}
           onSubmit={async (name) => {
@@ -396,9 +441,27 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
         />
       )}
 
-      {dialog === 'delete' && activeName && (
+      {dialog === 'rename' && target && (
+        <NameModal
+          title={t('sql.renameQueryTitle', { name: target })}
+          initial={target}
+          hint={t('sql.saveQueryHint')}
+          confirmLabel={t('common.rename')}
+          valid={(v) => /^[\wəöğışçüĞÖİŞÇÜƏ -]{1,64}$/.test(v) && v !== target}
+          onClose={() => setDialog(null)}
+          onSubmit={async (to) => {
+            await call('queries:rename', { id: project.id, name: target, to })
+            // The editor keeps its content; only the name it is filed under moves.
+            if (activeName === target) setActiveName(to)
+            setDialog(null)
+            saved.refresh()
+          }}
+        />
+      )}
+
+      {dialog === 'delete' && target && (
         <Modal
-          title={t('sql.deleteConfirmTitle', { name: activeName })}
+          title={t('sql.deleteConfirmTitle', { name: target })}
           onClose={() => setDialog(null)}
           footer={
             <>
@@ -406,8 +469,11 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
               <Button
                 variant="danger"
                 onClick={() => {
-                  void call('queries:remove', { id: project.id, name: activeName }).then(() => {
-                    setActiveName(null)
+                  void runAction(() =>
+                    call('queries:remove', { id: project.id, name: target })
+                  ).then((ok) => {
+                    if (ok === undefined) return
+                    if (activeName === target) setActiveName(null)
                     setDialog(null)
                     saved.refresh()
                   })
@@ -464,70 +530,6 @@ function SqlError({
         </div>
       )}
     </div>
-  )
-}
-
-function NameModal({
-  title,
-  initial,
-  hint,
-  placeholder,
-  valid,
-  onClose,
-  onSubmit
-}: {
-  title: string
-  initial: string
-  hint: string
-  placeholder?: string
-  valid: (v: string) => boolean
-  onClose: () => void
-  onSubmit: (name: string) => Promise<void>
-}): ReactNode {
-  const t = useT()
-  const [name, setName] = useState(initial)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  return (
-    <Modal
-      title={title}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            variant="primary"
-            disabled={!valid(name)}
-            loading={busy}
-            onClick={() => {
-              setBusy(true)
-              setError(null)
-              void onSubmit(name)
-                .catch((e: Error) => setError(e.message))
-                .finally(() => setBusy(false))
-            }}
-          >
-            {t('common.save')}
-          </Button>
-        </>
-      }
-    >
-      <label className="mb-1 block text-note text-muted">{t('newProject.name.label')}</label>
-      <Input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder={placeholder}
-        className="font-mono"
-        autoFocus
-      />
-      <p className="mt-2 text-small leading-relaxed text-muted">{hint}</p>
-      {error && (
-        <div className="mt-3">
-          <ErrorNote>{error}</ErrorNote>
-        </div>
-      )}
-    </Modal>
   )
 }
 

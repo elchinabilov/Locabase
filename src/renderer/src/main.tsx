@@ -5,13 +5,17 @@ import { App } from './app'
 import { I18nProvider } from './i18n'
 import { ThemeProvider } from './theme'
 import { FontProvider } from './fonts'
+import { ErrorBoundary } from './components/error-boundary'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
       <FontProvider>
         <I18nProvider>
-          <App />
+          {/* Inside the providers: the fallback itself needs `t()` and the palette. */}
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
         </I18nProvider>
       </FontProvider>
     </ThemeProvider>

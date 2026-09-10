@@ -5,8 +5,8 @@
  */
 import { readFileSync } from 'node:fs'
 import { parse as parseToml } from 'smol-toml'
+import type { ConfigPatch, PortConflict, PortUsage, Project } from '@shared/types/index.js'
 import { list as listProjects, paths } from './projects.js'
-import type { ConfigPatch, PortConflict, PortUsage, Project } from '@shared/types.js'
 
 /** Supabase's default port base: 543xx. */
 export const DEFAULT_PORT_BASE = 543
@@ -52,7 +52,11 @@ export function portsOf(project: Project): PortUsage[] {
   for (const p of PORT_PATHS) {
     const v = pick(parsed, p)
     if (typeof v === 'number' && v > 0) {
-      out.push({ port: v, key: p.replace(/\.port$/, '').replace(/\./g, ' '), projectId: project.id })
+      out.push({
+        port: v,
+        key: p.replace(/\.port$/, '').replace(/\./g, ' '),
+        projectId: project.id
+      })
     }
   }
   return out

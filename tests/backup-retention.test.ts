@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { selectPrunable } from '../src/main/core/backup/retention.js'
-import type { BackupRecord } from '../src/shared/types.js'
+import type { BackupRecord } from '../src/shared/types/index.js'
 
 function record(id: string, daysAgo: number, status: BackupRecord['status'] = 'ok'): BackupRecord {
   const startedAt = new Date(Date.UTC(2026, 0, 31) - daysAgo * 86_400_000).toISOString()

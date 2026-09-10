@@ -1,19 +1,25 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { Project } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
 import { cx } from '../lib/format'
 import { useT } from '../i18n'
 import { Badge, Button, Card, ErrorNote, Input, Modal, SkeletonList } from '../components/ui'
 
 export function SecretsRoute({ project }: { project: Project }): ReactNode {
   const t = useT()
+  /**
+   * Neither of these is remembered, and both on purpose: "reveal" starts masked
+   * every time — a shoulder-surfable `.env` should not be one restart away — and
+   * `edits` are values the user never saved, against a file that may have changed
+   * since.
+   */
   const [reveal, setReveal] = useState(false)
-  const entries = useQuery('env:read', { id: project.id, reveal }, [project.id, reveal])
-  const doc = useQuery('config:read', { id: project.id }, [project.id])
+  const entries = useQuery('env:read', { id: project.id, reveal })
+  const doc = useQuery('config:read', { id: project.id })
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [adding, setAdding] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  const { run, busy: saving, error } = useAction()
 
   /** When `config.toml` says `env(X)` but `.env` has no X. */
   const missing = useMemo(() => {
@@ -28,22 +34,17 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
   const dirty = Object.keys(edits).length > 0
 
   const save = useCallback(async () => {
-    setSaving(true)
-    setError(null)
-    try {
-      await call('env:write', {
+    const ok = await run(() =>
+      call('env:write', {
         id: project.id,
         entries: Object.entries(edits).map(([key, value]) => ({ key, value }))
       })
-      setEdits({})
-      entries.refresh()
-      doc.refresh()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }, [project.id, edits, entries, doc])
+    )
+    if (ok === undefined) return
+    setEdits({})
+    entries.refresh()
+    doc.refresh()
+  }, [project.id, edits, entries, doc, run])
 
   const remove = useCallback(
     async (key: string) => {
@@ -84,7 +85,9 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
 
           {missing.length > 0 && (
             <div className="rounded-md border border-warn-border bg-warn-bg px-3.5 py-2.5 text-note text-warn">
-              <p className="mb-1.5 font-medium">{t('secrets.missingHeading', { count: missing.length })}</p>
+              <p className="mb-1.5 font-medium">
+                {t('secrets.missingHeading', { count: missing.length })}
+              </p>
               <ul className="space-y-0.5 font-mono text-meta">
                 {missing.slice(0, 8).map((m) => (
                   <li key={m.path}>
@@ -109,7 +112,10 @@ export function SecretsRoute({ project }: { project: Project }): ReactNode {
                 return (
                   <li
                     key={e.key}
-                    className={cx('grid grid-cols-[minmax(220px,300px)_1fr_auto] items-start gap-3 px-3.5 py-2', changed && 'bg-accent-tint')}
+                    className={cx(
+                      'grid grid-cols-[minmax(220px,300px)_1fr_auto] items-start gap-3 px-3.5 py-2',
+                      changed && 'bg-accent-tint'
+                    )}
                   >
                     <div className="pt-1.5">
                       <code className="font-mono text-note text-text">{e.key}</code>
@@ -205,7 +211,12 @@ function AddVar({
       <div className="flex flex-col gap-3">
         <div>
           <label className="mb-1 block text-note text-muted">{t('newProject.name.label')}</label>
-          <Input value={key} onChange={(e) => setKey(e.target.value)} className="font-mono" autoFocus />
+          <Input
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            className="font-mono"
+            autoFocus
+          />
         </div>
         <div>
           <label className="mb-1 block text-note text-muted">{t('secrets.value')}</label>

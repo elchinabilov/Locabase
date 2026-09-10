@@ -9,13 +9,13 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
+import { sanitizeProjectId } from '@shared/naming.js'
+import type { ConfigPatch, Project } from '@shared/types/index.js'
 import { supabase } from './cli.js'
 import { logBus } from './log.js'
 import { add as addProject, update as updateProject, ProjectError } from './projects.js'
 import { remapPatches, suggestRange } from './ports.js'
 import { applyPatches } from './toml/patch.js'
-import { sanitizeProjectId } from '@shared/naming.js'
-import type { ConfigPatch, Project } from '@shared/types.js'
 
 const STREAM = 'new-project'
 const INIT_TIMEOUT = 3 * 60 * 1000
@@ -83,7 +83,7 @@ export async function create({ path, name, portBase }: CreateInput): Promise<Pro
   ]
   const patched = applyPatches(raw, patches)
   if (patched.changed) writeFileSync(configPath, patched.text, 'utf8')
-  logBus.push(STREAM, 'info', `project_id=${projectId}, portlar ${base}xx blokunda`)
+  logBus.push(STREAM, 'info', `project_id=${projectId}, ports in the ${base}xx block`)
 
   for (const sub of SUBDIRS) mkdirSync(join(dir, 'supabase', sub), { recursive: true })
   for (const [file, body] of [

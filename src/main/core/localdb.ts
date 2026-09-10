@@ -7,8 +7,8 @@
 import { readFileSync } from 'node:fs'
 import { Client } from 'pg'
 import { parse as parseToml } from 'smol-toml'
+import type { Project } from '@shared/types/index.js'
 import { paths } from './projects.js'
-import type { Project } from '@shared/types.js'
 
 export interface LedgerRow {
   version: string
@@ -31,7 +31,10 @@ const LEDGER_SQL = `
 
 /** Read the ledger rows. Returns `null` if the database is down (never throws). */
 export async function readLedger(project: Project): Promise<LedgerRow[] | null> {
-  const client = new Client({ connectionString: connectionString(project), connectionTimeoutMillis: 4000 })
+  const client = new Client({
+    connectionString: connectionString(project),
+    connectionTimeoutMillis: 4000
+  })
   try {
     await client.connect()
     const res = await client.query<LedgerRow>(LEDGER_SQL)

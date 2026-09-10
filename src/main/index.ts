@@ -4,6 +4,7 @@ import { app, BrowserWindow, nativeTheme, shell } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { registerIpc, pipeEvents } from './ipc/router.js'
 import { stopAllTails } from './core/docker.js'
+import { stopAllServes } from './core/functions.js'
 import { closeAll as closeSqlPools } from './core/sql/pool.js'
 import { migrateUserData } from './core/userdata.js'
 import { fixPath } from './core/env-path.js'
@@ -33,6 +34,11 @@ function createWindow(): BrowserWindow {
     backgroundColor: prefs.BACKGROUND[nativeTheme.shouldUseDarkColors ? 'dark' : 'light'],
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
+      // The OS sandbox stays off because the preload is built as ESM
+      // (`index.mjs`) and a sandboxed preload must be CommonJS. The renderer is
+      // still isolated: `contextIsolation` is on, Node is off, the bridge is a
+      // fixed channel allowlist and `index.html` carries a `default-src 'self'`
+      // CSP. Turning this on means moving the preload build to CJS first.
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false
@@ -52,7 +58,12 @@ function createWindow(): BrowserWindow {
       setTimeout(
         () => {
           void (js ? win.webContents.executeJavaScript(js) : Promise.resolve())
-            .then(() => new Promise((r) => setTimeout(r, js ? Number(process.env['LOCABASE_SHOT_WAIT'] ?? 2500) : 0)))
+            .then(
+              () =>
+                new Promise((r) =>
+                  setTimeout(r, js ? Number(process.env['LOCABASE_SHOT_WAIT'] ?? 2500) : 0)
+                )
+            )
             .then(() => win.webContents.capturePage())
             .then((img) => {
               const width = Number(process.env['LOCABASE_SHOT_WIDTH'] ?? 0)
@@ -71,6 +82,21 @@ function createWindow(): BrowserWindow {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
+
+  // `setWindowOpenHandler` only covers `window.open`. A top-level navigation
+  // (`location.href = …`) would replace the app with a remote origin that still
+  // has the preload bridge attached, so it is refused and sent to the browser.
+  win.webContents.on('will-navigate', (event, url) => {
+    const devUrl = process.env['ELECTRON_RENDERER_URL']
+    if (url.startsWith('file://') || (devUrl && url.startsWith(devUrl))) return
+    event.preventDefault()
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
+  })
+
+  // Nothing in the renderer needs a camera, a microphone or a location.
+  win.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) =>
+    callback(false)
+  )
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -98,14 +124,32 @@ void app.whenReady().then(() => {
   })
 })
 
-app.on('window-all-closed', () => {
+/** Everything that owns a child process, a socket or a timer. */
+function releaseAll(): void {
   stopAllTails()
+  stopAllServes()
   closeSqlPools()
+}
+
+app.on('window-all-closed', () => {
+  releaseAll()
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('before-quit', () => {
-  stopAllTails()
-  closeSqlPools()
+  releaseAll()
   scheduler.stop()
+})
+
+/**
+ * The last line of defence. A rejected promise nobody awaited would otherwise
+ * take the whole main process down — and with it the user's running stack — so
+ * it is logged to the panel the user already has open instead.
+ */
+process.on('unhandledRejection', (reason) => {
+  logBus.push('app', 'error', `unhandled rejection: ${String(reason)}`)
+})
+
+process.on('uncaughtException', (err) => {
+  logBus.push('app', 'error', `uncaught exception: ${err.message}`)
 })

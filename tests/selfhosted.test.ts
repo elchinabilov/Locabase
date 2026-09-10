@@ -2,9 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
 import { mkdirSync } from 'node:fs'
-import { decodeDump, dumpScript, envMergeScript } from '../src/main/core/remote/selfhosted.js'
+import { describe, expect, it } from 'vitest'
+import { decodeDump, dumpScript, envMergeScript } from '../src/main/core/remote/remote-scripts.js'
 
 const TOKEN = '__LOCABASE_test__'
 const b64 = (s: string): string => Buffer.from(s, 'utf8').toString('base64')
@@ -38,7 +38,13 @@ describe('decodeDump', () => {
   })
 
   it('the `!` marker flags a file as binary/large — it stays in the listing', () => {
-    const out = decodeDump(dump([['bundle.wasm', null], ['index.ts', 'ok\n']]), TOKEN)
+    const out = decodeDump(
+      dump([
+        ['bundle.wasm', null],
+        ['index.ts', 'ok\n']
+      ]),
+      TOKEN
+    )
     expect(out.map((f) => [f.path, f.binary, f.content])).toEqual([
       ['bundle.wasm', true, null],
       ['index.ts', false, 'ok\n']

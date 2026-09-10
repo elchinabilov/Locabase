@@ -2,10 +2,10 @@
  * Talking to Docker. Supabase CLI containers are named
  * `supabase_<service>_<project_id>` — that suffix is how we pick out a project's own.
  */
-import Docker from 'dockerode'
 import type { Duplex } from 'node:stream'
+import Docker from 'dockerode'
+import type { ServiceStatus } from '@shared/types/index.js'
 import { logBus } from './log.js'
-import type { ServiceStatus } from '@shared/types.js'
 
 let docker: Docker | null = null
 
@@ -55,10 +55,7 @@ async function memoryOf(
   }
 }
 
-export async function servicesFor(
-  projectId: string,
-  withStats = false
-): Promise<ServiceStatus[]> {
+export async function servicesFor(projectId: string, withStats = false): Promise<ServiceStatus[]> {
   const suffix = `_${projectId}`
   const containers = await client().listContainers({ all: true })
   const out: ServiceStatus[] = []
@@ -89,7 +86,7 @@ export async function servicesFor(
   return out.sort((a, b) => a.key.localeCompare(b.key))
 }
 
-/* ------------------------------------------------------------- loglar */
+/* --------------------------------------------------------------- logs */
 
 const tails = new Map<string, Duplex>()
 

@@ -6,10 +6,10 @@
  *  - remote: Management API / `psql`, where `$n` cannot be bound, so literals are
  *    pasted in with `inlineParams()` before the call.
  */
-import { poolFor } from './pool.js'
-import { inlineParams } from './ident.js'
 import { get as getProject, getEnv } from '../projects.js'
 import { adapterFor, type RemoteAdapter } from '../remote/index.js'
+import { poolFor } from './pool.js'
+import { inlineParams } from './ident.js'
 
 export interface Target {
   id: string
@@ -25,8 +25,6 @@ export function targetFor(id: string, envId: string | null): Target {
   const env = getEnv(id, envId)
   return { id, envId, label: env.name, adapter: adapterFor(project, env) }
 }
-
-export const isRemote = (t: Target): boolean => t.adapter !== null
 
 /**
  * An internal query: results come back as object rows with types preserved

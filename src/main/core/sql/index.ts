@@ -5,6 +5,16 @@
  * only returns `string`, `position`/`hint`/`detail` would be lost. The error
  * travels inside a successful response, in `SqlRun.error` (`TaskResult` style).
  */
+import type {
+  DbCells,
+  DbColumn,
+  DbFilter,
+  DbOrder,
+  DbRow,
+  DbRowsPage,
+  SqlResult,
+  SqlRun
+} from '@shared/types/index.js'
 import { oidNames, poolFor } from './pool.js'
 import {
   buildCount,
@@ -16,21 +26,11 @@ import {
   pkColumns,
   TEXT_TYPES,
   toResult,
-  toSqlError
+  failedRun
 } from './build.js'
 import * as introspect from './introspect.js'
 import { inlineParams } from './ident.js'
 import { rowsOf, targetFor, type Target } from './target.js'
-import type {
-  DbCells,
-  DbColumn,
-  DbFilter,
-  DbOrder,
-  DbRow,
-  DbRowsPage,
-  SqlResult,
-  SqlRun
-} from '@shared/types.js'
 
 export { invalidate, closeAll, poolFor } from './pool.js'
 export { introspect }
@@ -63,13 +63,7 @@ export async function execute(id: string, sql: string, opts: ExecuteOpts): Promi
     try {
       return await target.adapter.runSql(sql, { readOnly, maxRows, timeoutMs })
     } catch (err) {
-      return {
-        ok: false,
-        results: [],
-        durationMs: Date.now() - started,
-        readOnly,
-        error: toSqlError(err)
-      }
+      return failedRun(started, readOnly, err)
     }
   }
 
@@ -77,7 +71,7 @@ export async function execute(id: string, sql: string, opts: ExecuteOpts): Promi
   try {
     client = await poolFor(id).connect()
   } catch (err) {
-    return { ok: false, results: [], durationMs: Date.now() - started, readOnly, error: toSqlError(err) }
+    return failedRun(started, readOnly, err)
   }
 
   try {
@@ -104,13 +98,7 @@ export async function execute(id: string, sql: string, opts: ExecuteOpts): Promi
     return { ok: true, results, durationMs: Date.now() - started, readOnly, error: null }
   } catch (err) {
     if (readOnly) await client.query('rollback').catch(() => undefined)
-    return {
-      ok: false,
-      results: [],
-      durationMs: Date.now() - started,
-      readOnly,
-      error: toSqlError(err)
-    }
+    return failedRun(started, readOnly, err)
   } finally {
     if (opts.token) inflight.delete(opts.token)
     await client.query('set statement_timeout to default').catch(() => undefined)
@@ -192,7 +180,14 @@ async function runFragment(
 
 function cellOrNull(v: unknown): string | null {
   if (v === null || v === undefined) return null
-  return typeof v === 'string' ? v : String(v)
+  if (typeof v === 'string') return v
+  // `TEXT_TYPES` casts most columns to text, but the remote transports hand back
+  // parsed JSON. `String({})` would render every one of those as '[object
+  // Object]' in the grid.
+  if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint') return String(v)
+  // json/array columns come back parsed from the remote transports; `String({})`
+  // would render every one of them as '[object Object]' in the grid.
+  return JSON.stringify(v) ?? null
 }
 
 export interface SelectRowsReq {
@@ -221,9 +216,7 @@ export async function selectRows(id: string, req: SelectRowsReq): Promise<DbRows
     offset: req.offset,
     castText: target.adapter !== null
   })
-  const data = target.adapter
-    ? await selectRemote(target, cols, sel)
-    : await selectLocal(id, sel)
+  const data = target.adapter ? await selectRemote(target, cols, sel) : await selectLocal(id, sel)
 
   let total: number | null = null
   const wantCount = req.exactCount !== false
@@ -242,7 +235,7 @@ export async function selectRows(id: string, req: SelectRowsReq): Promise<DbRows
     rows: data,
     total,
     editable,
-    editableReason: editable ? null : 'PK yoxdur'
+    editableReason: editable ? null : 'no-pk'
   }
 }
 
@@ -265,10 +258,7 @@ async function selectRemote(
   sel: { text: string; params: Array<string | null> }
 ): Promise<DbRow[]> {
   const names = cols.map((c) => c.name)
-  const rows = await rowsOf<Record<string, unknown>>(
-    target,
-    inlineParams(sel.text, sel.params)
-  )
+  const rows = await rowsOf<Record<string, unknown>>(target, inlineParams(sel.text, sel.params))
   return rows.map((row) => names.map((n) => cellOrNull(row[n])))
 }
 
@@ -338,9 +328,7 @@ export async function updateRow(
     })
     if (res.rowCount !== 1) {
       await client.query('rollback')
-      throw new Error(
-        `Expected 1 row, changed ${res.rowCount ?? 0} — the change was rolled back.`
-      )
+      throw new Error(`Expected 1 row, changed ${res.rowCount ?? 0} — the change was rolled back.`)
     }
     await client.query('commit')
     return { row: (res.rows?.[0] ?? []) as DbRow }
@@ -368,10 +356,11 @@ export async function deleteRows(
   if (target.adapter) {
     // The number of `returning` rows is the number deleted — remotely `rowCount`
     // is not reliable (command tags are off in psql's CSV mode)
-    const run = await target.adapter.runSql(
-      `${inlineParams(q.text, q.params)} returning 1`,
-      { readOnly: false, maxRows: 5000, timeoutMs: 60_000 }
-    )
+    const run = await target.adapter.runSql(`${inlineParams(q.text, q.params)} returning 1`, {
+      readOnly: false,
+      maxRows: 5000,
+      timeoutMs: 60_000
+    })
     if (!run.ok) throw new Error(run.error?.message ?? 'The delete failed')
     const deleted = run.results[0]?.rows.length ?? 0
     if (deleted > pks.length) {

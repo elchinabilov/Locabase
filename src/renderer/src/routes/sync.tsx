@@ -1,18 +1,35 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import type {
   DeployStep,
   HealthReport,
   Project,
   RemoteEnv,
-  SyncReport
+  SyncReport,
+  TaskResult
 } from '@shared/types'
 import { call, useQuery } from '../lib/ipc'
+import { useAction } from '../lib/use-action'
+import { projectKey, useUiState } from '../lib/ui-state'
 import { cx, timeAgo } from '../lib/format'
 import { useI18n, useT } from '../i18n'
-import { Badge, Button, Card, Dot, Empty, ErrorNote, Input, Modal, Skeleton } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  Dot,
+  Empty,
+  ErrorNote,
+  Input,
+  Modal,
+  Skeleton
+} from '../components/ui'
 import { EnvForm } from '../components/env-form'
 import { RemoteServices } from '../components/remote-services'
 import { DRIFT, FunctionDiffModal } from '../components/function-diff'
+
+/** The remembered environment choice; null falls through to the first one. */
+const ENV_ID = z.string().min(1).max(200).nullable()
 
 export function SyncRoute({
   project,
@@ -22,9 +39,14 @@ export function SyncRoute({
   onChanged: () => void
 }): ReactNode {
   const t = useT()
-  const [envId, setEnvId] = useState<string>(project.environments[0]?.id ?? '')
+  // Derived, not seeded from props: seeding at mount left `envId` empty forever
+  // when the first environment was added from the empty state below, so the
+  // panel never appeared. `picked` is only what the user chose explicitly — it is
+  // remembered, and an id that has since been removed falls through to the first.
+  const [picked, setPicked] = useUiState(projectKey(project.id, 'sync.env'), ENV_ID, null)
   const [editing, setEditing] = useState<RemoteEnv | null | 'new'>(null)
-  const env = project.environments.find((e) => e.id === envId) ?? null
+  const env = project.environments.find((e) => e.id === picked) ?? project.environments[0] ?? null
+  const envId = env?.id ?? ''
 
   if (project.environments.length === 0) {
     return (
@@ -59,7 +81,7 @@ export function SyncRoute({
         {project.environments.map((e) => (
           <button
             key={e.id}
-            onClick={() => setEnvId(e.id)}
+            onClick={() => setPicked(e.id)}
             className={cx(
               'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-note',
               e.id === envId
@@ -68,10 +90,7 @@ export function SyncRoute({
             )}
           >
             <span
-              className={cx(
-                'size-1.5 rounded-full',
-                e.kind === 'managed' ? 'bg-info' : 'bg-warn'
-              )}
+              className={cx('size-1.5 rounded-full', e.kind === 'managed' ? 'bg-info' : 'bg-warn')}
             />
             {e.name}
           </button>
@@ -105,9 +124,10 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
   const t = useT()
   const { locale } = useI18n()
   const [report, setReport] = useState<SyncReport | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const health = useQuery('envs:ping', { id: project.id, envId: env.id }, [env.id])
+  const { run, busy: loading, error } = useAction()
+  /** The output of the last dry run — otherwise the button looks inert. */
+  const [dryRun, setDryRun] = useState<TaskResult | null>(null)
+  const health = useQuery('envs:ping', { id: project.id, envId: env.id })
 
   const [pickedMigrations, setPickedMigrations] = useState<Set<string>>(new Set())
   const [pickedFunctions, setPickedFunctions] = useState<Set<string>>(new Set())
@@ -117,28 +137,22 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
   const [diffFn, setDiffFn] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const r = await call('sync:report', { id: project.id, envId: env.id })
-      setReport(r)
-      setPickedMigrations(
-        new Set(r.migrations.items.filter((m) => m.state === 'pending-remote').map((m) => m.version))
+    const r = await run(() => call('sync:report', { id: project.id, envId: env.id }))
+    if (!r) return
+    setReport(r)
+    setDryRun(null)
+    setPickedMigrations(
+      new Set(r.migrations.items.filter((m) => m.state === 'pending-remote').map((m) => m.version))
+    )
+    setPickedFunctions(
+      new Set(
+        r.functions.items
+          .filter((f) => f.path !== '' && (f.drift === 'local-only' || f.drift === 'changed'))
+          .map((f) => f.name)
       )
-      setPickedFunctions(
-        new Set(
-          r.functions.items
-            .filter((f) => f.path !== '' && (f.drift === 'local-only' || f.drift === 'changed'))
-            .map((f) => f.name)
-        )
-      )
-      setPickedSecrets(new Set())
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [project.id, env.id])
+    )
+    setPickedSecrets(new Set())
+  }, [project.id, env.id, run])
 
   const plan = useMemo(() => {
     const steps: DeployStep[] = ['backup']
@@ -162,7 +176,12 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4">
       <div className="mx-auto flex max-w-5xl flex-col gap-3">
-        <Health report={health.data ?? null} loading={health.loading} error={health.error} env={env} />
+        <Health
+          report={health.data ?? null}
+          loading={health.loading}
+          error={health.error}
+          env={env}
+        />
 
         <RemoteServices project={project} env={env} />
 
@@ -180,10 +199,14 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
             <>
               <Button
                 onClick={() =>
-                  void call('sync:deploy', {
-                    id: project.id,
-                    confirm: project.name,
-                    plan: { ...plan, dryRun: true }
+                  void run(async () => {
+                    const res = await call('sync:deploy', {
+                      id: project.id,
+                      confirm: project.name,
+                      plan: { ...plan, dryRun: true }
+                    })
+                    setDryRun(res)
+                    return res
                   })
                 }
               >
@@ -197,6 +220,21 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
         </div>
 
         {error && <ErrorNote>{error}</ErrorNote>}
+
+        {dryRun && (
+          <Card
+            title={t('sync.dryRunResult')}
+            actions={
+              <Button onClick={() => setDryRun(null)} aria-label={t('common.close')}>
+                ✕
+              </Button>
+            }
+          >
+            <pre className="max-h-64 overflow-auto px-3.5 py-3 font-mono text-small leading-relaxed whitespace-pre-wrap text-muted">
+              {dryRun.output.trim() || dryRun.error || t('sync.dryRunEmpty')}
+            </pre>
+          </Card>
+        )}
 
         {!report && !loading && (
           <p className="px-1 py-6 text-center text-note text-muted">{t('sync.beforeReport')}</p>
@@ -367,7 +405,9 @@ function Health({
   return (
     <Card
       title={env.name}
-      subtitle={env.kind === 'managed' ? `managed · ${env.projectRef}` : `self-hosted · ${env.sshHost}`}
+      subtitle={
+        env.kind === 'managed' ? `managed · ${env.projectRef}` : `self-hosted · ${env.sshHost}`
+      }
     >
       {loading && (
         <ul className="divide-y divide-line-soft" role="status" aria-label={t('common.checking')}>
@@ -430,9 +470,7 @@ function Axis({
         </>
       }
     >
-      {error && (
-        <p className="px-3.5 py-2 text-small leading-relaxed text-muted">{error}</p>
-      )}
+      {error && <p className="px-3.5 py-2 text-small leading-relaxed text-muted">{error}</p>}
       {children}
     </Card>
   )
@@ -498,26 +536,25 @@ function DeployModal({
 }): ReactNode {
   const t = useT()
   const [text, setText] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { run, busy, error } = useAction()
   const [result, setResult] = useState<string | null>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  // This dialog is keyed by environment id, so it can be unmounted before the
+  // timer fires; without the cleanup `onDone` would reload a panel that is gone.
+  useEffect(() => () => clearTimeout(closeTimer.current), [])
 
   const go = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
-      const res = await call('sync:deploy', { id: project.id, plan, confirm: text })
-      if (res.ok) {
-        setResult(res.output)
-        setTimeout(onDone, 1200)
-      } else {
-        setError(res.error ?? t('dashboard.reset.genericError'))
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+    const res = await run(async () => {
+      const r = await call('sync:deploy', { id: project.id, plan, confirm: text })
+      // A refused deploy reports itself in the result rather than throwing.
+      if (!r.ok) throw new Error(r.error ?? t('dashboard.reset.genericError'))
+      return r
+    })
+    if (!res) return
+    setResult(res.output)
+    // A beat on the result before the dialog closes itself.
+    closeTimer.current = setTimeout(onDone, 1200)
   }
 
   return (
@@ -544,7 +581,8 @@ function DeployModal({
             <span className="text-muted">•</span>
             <span>
               {s === 'backup' && t('sync.step.backup')}
-              {s === 'migrations' && t('sync.step.migrations', { list: plan.migrations.join(', ') })}
+              {s === 'migrations' &&
+                t('sync.step.migrations', { list: plan.migrations.join(', ') })}
               {s === 'functions' && t('sync.step.functions', { list: plan.functions.join(', ') })}
               {s === 'secrets' && t('sync.step.secrets', { list: plan.secrets.join(', ') })}
               {s === 'verify' && t('sync.step.verify')}

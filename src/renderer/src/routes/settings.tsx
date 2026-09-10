@@ -209,7 +209,9 @@ function TypographyCard(): ReactNode {
  * Which page is showing lives in `App`, so another screen can send the user
  * straight to the one it means (Backups → Storage).
  */
-export type SettingsSection = 'appearance' | 'language' | 'storage' | 'system'
+export const SETTINGS_SECTIONS = ['appearance', 'language', 'storage', 'system'] as const
+
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
 
 const SECTIONS: Array<{ id: SettingsSection; key: TranslationKey; icon: string }> = [
   { id: 'appearance', key: 'settings.section.appearance', icon: '◐' },

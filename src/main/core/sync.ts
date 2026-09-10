@@ -6,13 +6,6 @@
  * verify**. When a schema change touches application code the migration has to
  * land first, which is why functions come after it.
  */
-import { readMap } from './envfile.js'
-import { logBus } from './log.js'
-import { listFiles, report as migrationReport } from './migrations.js'
-import { list as listFunctions } from './functions.js'
-import { get as getProject, getEnv, paths } from './projects.js'
-import { adapterFor } from './remote/index.js'
-import { diff as schemaDiff } from './migrations.js'
 import type {
   DeployPlan,
   FunctionInfo,
@@ -21,7 +14,14 @@ import type {
   SyncAxis,
   SyncReport,
   TaskResult
-} from '@shared/types.js'
+} from '@shared/types/index.js'
+import { readMap } from './envfile.js'
+import { logBus } from './log.js'
+import { listFiles, report as migrationReport } from './migrations.js'
+import { list as listFunctions } from './functions.js'
+import { get as getProject, getEnv, paths } from './projects.js'
+import { adapterFor } from './remote/index.js'
+import { diff as schemaDiff } from './migrations.js'
 
 function axis<T>(items: T[], dirty: boolean, error: string | null = null): SyncAxis<T> {
   return { items, dirty, error }
@@ -40,15 +40,17 @@ export async function report(id: string, envId: string): Promise<SyncReport> {
   const env = getEnv(id, envId)
   const adapter = adapterFor(project, env)
 
-  /* --- miqrasiyalar --- */
+  /* --- migrations --- */
   const migrations = await migrationReport(id, envId)
-  const pending = migrations.rows.filter((r) => r.state === 'pending-remote' || r.state === 'remote-only')
+  const pending = migrations.rows.filter(
+    (r) => r.state === 'pending-remote' || r.state === 'remote-only'
+  )
 
   /* --- sxem diffi --- */
   const [schema, schemaErr] = await safe(async () => (await schemaDiff(id)).sql, '')
   const schemaClean = schema.trim().length === 0 || /no schema changes found/i.test(schema)
 
-  /* --- funksiyalar --- */
+  /* --- functions --- */
   const [functions, fnErr] = await safe(() => listFunctions(id, envId), [] as FunctionInfo[])
   // Only functions whose content differs (or that are missing remotely) are "dirty";
   // `unknown` means the remote gives no file listing, so the diff is computed on demand.
@@ -110,9 +112,9 @@ export async function deploy(id: string, plan: DeployPlan, confirm: string): Pro
   try {
     if (plan.dryRun) {
       log('DRY RUN — nothing is changed')
-      log(`miqrasiyalar: ${plan.migrations.join(', ') || 'yoxdur'}`)
-      log(`funksiyalar: ${plan.functions.join(', ') || 'yoxdur'}`)
-      log(`secrets: ${plan.secrets.join(', ') || 'yoxdur'}`)
+      log(`migrations: ${plan.migrations.join(', ') || 'none'}`)
+      log(`functions: ${plan.functions.join(', ') || 'none'}`)
+      log(`secrets: ${plan.secrets.join(', ') || 'none'}`)
       return { ok: true, code: 0, output: 'dry run finished', error: null }
     }
 
@@ -125,12 +127,12 @@ export async function deploy(id: string, plan: DeployPlan, confirm: string): Pro
     if (plan.steps.includes('migrations') && plan.migrations.length > 0) {
       const files = listFiles(project.path).filter((f) => plan.migrations.includes(f.version))
       await adapter.applyMigrations(files, log)
-      done.push(`miqrasiyalar (${files.length})`)
+      done.push(`migrations (${files.length})`)
     }
 
     if (plan.steps.includes('functions') && plan.functions.length > 0) {
       await adapter.deployFunctions(plan.functions, log)
-      done.push(`funksiyalar (${plan.functions.length})`)
+      done.push(`functions (${plan.functions.length})`)
     }
 
     if (plan.steps.includes('secrets') && plan.secrets.length > 0) {

@@ -2,18 +2,18 @@
  * Local stack control. Runs the `supabase` CLI inside the project folder and
  * reads container state from Docker.
  */
+import { SERVICE_GROUPS } from '@shared/services.js'
 import { servicesFor } from './docker.js'
 import { run, supabase, supabaseJson } from './cli.js'
 import { get as getProject } from './projects.js'
 import { logBus } from './log.js'
 import { write as writeConfig } from './config.js'
-import { SERVICE_GROUPS } from '@shared/services.js'
 
 /** Only keys from the catalog are allowed — no arbitrary config path may be written. */
 const SERVICE_PATHS = new Set(
   SERVICE_GROUPS.map((g) => g.configPath).filter((p): p is string => p !== null)
 )
-import type { StackStatus, TaskResult } from '@shared/types.js'
+import type { StackStatus, TaskResult } from '@shared/types/index.js'
 
 const START_TIMEOUT = 10 * 60 * 1000
 const STOP_TIMEOUT = 3 * 60 * 1000
