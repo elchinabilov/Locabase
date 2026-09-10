@@ -9,6 +9,7 @@ import type { ReactNode } from 'react'
 import type { SavedQuery } from '@shared/types'
 import { cx } from '../../lib/format'
 import { useT } from '../../i18n'
+import { Menu } from '../menu'
 import { ErrorNote, SkeletonRows } from '../ui'
 
 export function SavedQueriesPanel({
@@ -77,23 +78,26 @@ export function SavedQueriesPanel({
               <span className="min-w-0 flex-1 truncate">{q.name}</span>
               {q.name === activeName && dirty && <span className="text-accent">•</span>}
             </button>
-            {/* Row actions stay hidden until the row is hovered or focused —
-                  a list of names should read as names, not as a toolbar. */}
-            <span className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-              <button
-                onClick={() => onRename(q.name)}
-                title={t('common.rename')}
-                className="rounded px-1 py-0.5 leading-none text-muted hover:bg-panel-3 hover:text-text"
-              >
-                ✎
-              </button>
-              <button
-                onClick={() => onDelete(q.name)}
-                title={t('common.delete')}
-                className="rounded px-1 py-0.5 text-card leading-none text-muted hover:bg-panel-3 hover:text-danger"
-              >
-                ×
-              </button>
+            {/* The menu trigger stays hidden until the row is hovered or focused —
+                  a list of names should read as names, not as a toolbar. The open
+                  menu keeps its trigger visible via `has-[[aria-expanded=true]]`. */}
+            <span className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100">
+              <Menu
+                label={t('sql.queryMenu', { name: q.name })}
+                items={[
+                  {
+                    id: 'rename',
+                    label: t('common.rename'),
+                    onSelect: () => onRename(q.name)
+                  },
+                  {
+                    id: 'delete',
+                    label: t('common.delete'),
+                    tone: 'danger',
+                    onSelect: () => onDelete(q.name)
+                  }
+                ]}
+              />
             </span>
           </div>
         ))}

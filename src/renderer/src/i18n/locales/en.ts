@@ -752,6 +752,7 @@ const en = {
     resizeResults: 'Resize the results pane',
     queries: 'Queries',
     noSaved: 'No saved queries yet.',
+    queryMenu: 'Actions for «{name}»',
     sharedViaGit: '— shared via git.',
     untitled: 'Untitled query',
     readOnly: 'read only',

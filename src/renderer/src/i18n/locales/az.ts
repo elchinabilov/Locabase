@@ -745,6 +745,7 @@ const az = {
     resizeResults: 'Nəticə panelinin hündürlüyünü dəyiş',
     queries: 'Sorğular',
     noSaved: 'Hələ saxlanmış sorğu yoxdur.',
+    queryMenu: '«{name}» üçün əməliyyatlar',
     sharedViaGit: '— git ilə paylaşılır.',
     untitled: 'Adsız sorğu',
     readOnly: 'yalnız oxu',
