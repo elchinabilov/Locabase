@@ -127,12 +127,20 @@ function spawnManaged(
   child.on('close', (code) => settle(code, null))
 }
 
-/** Trailing output kept, honouring the caller's limit. */
+/**
+ * Trailing output kept, honouring the caller's limit.
+ *
+ * Command output almost always ends in a newline, which `split` turns into a
+ * final empty element — counting it would silently return one line fewer than
+ * the caller asked for, and for `psql --csv` that is a dropped row.
+ */
 function tail(chunks: string[], maxOutputLines?: number): string {
   const all = chunks.join('')
   const limit = maxOutputLines ?? MAX_OUTPUT_LINES
-  const lines = all.split('\n')
-  return lines.length > limit ? lines.slice(-limit).join('\n') : all
+  const trailingNewline = all.endsWith('\n')
+  const lines = (trailingNewline ? all.slice(0, -1) : all).split('\n')
+  if (lines.length <= limit) return all
+  return lines.slice(-limit).join('\n') + (trailingNewline ? '\n' : '')
 }
 
 export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise<TaskResult> {

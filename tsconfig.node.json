@@ -27,6 +27,9 @@
     "src/shared/**/*",
     "src/renderer/src/i18n/types.ts",
     "src/renderer/src/i18n/locales/**/*",
-    "tests/**/*"
+    // Pure, DOM-free renderer helpers — tested under the node project.
+    "src/renderer/src/lib/format.ts",
+    "src/renderer/src/lib/diff.ts",
+    "tests/**/*.ts"
   ]
 }
