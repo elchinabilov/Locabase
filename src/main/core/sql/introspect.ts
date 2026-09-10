@@ -100,10 +100,10 @@ export async function tables(id: string, envId: string | null, schema: string): 
       editableReason: editable
         ? null
         : isTable
-          ? 'PK yoxdur'
+          ? 'no-pk'
           : kind === 'v' || kind === 'm'
-            ? 'A view cannot be edited'
-            : 'A foreign table cannot be edited'
+            ? 'view'
+            : 'foreign-table'
     }
   })
 }

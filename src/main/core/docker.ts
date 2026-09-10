@@ -86,7 +86,7 @@ export async function servicesFor(projectId: string, withStats = false): Promise
   return out.sort((a, b) => a.key.localeCompare(b.key))
 }
 
-/* ------------------------------------------------------------- loglar */
+/* --------------------------------------------------------------- logs */
 
 const tails = new Map<string, Duplex>()
 

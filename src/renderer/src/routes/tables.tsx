@@ -190,7 +190,9 @@ export function TablesRoute({ project }: { project: Project }): ReactNode {
               </h1>
               <Badge tone="muted">{t(KIND_LABEL_KEY[active.kind] ?? 'tables.kind.table')}</Badge>
               {active.rls && <Badge tone="info">RLS</Badge>}
-              {!active.editable && <Badge tone="warn">{active.editableReason}</Badge>}
+              {!active.editable && active.editableReason && (
+                <Badge tone="warn">{t(`tables.editableReason.${active.editableReason}`)}</Badge>
+              )}
               <div className="flex-1" />
               <div className="flex rounded-md border border-line p-0.5">
                 {(['rows', 'structure'] as const).map((tabId) => (
@@ -385,7 +387,11 @@ function RowsPane({
       )}
       {!editable && rows.data && (
         <p className="border-b border-line-soft bg-warn-bg px-3 py-1.5 text-small text-warn">
-          {t('tables.notEditable', { reason: rows.data.editableReason ?? '' })}
+          {t('tables.notEditable', {
+            reason: rows.data.editableReason
+              ? t(`tables.editableReason.${rows.data.editableReason}`)
+              : ''
+          })}
         </p>
       )}
 

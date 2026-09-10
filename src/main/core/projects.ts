@@ -48,7 +48,7 @@ export function inspect(dir: string): InspectResult {
     const parsed = parseToml(readFileSync(configPath, 'utf8')) as { project_id?: unknown }
     const id = typeof parsed.project_id === 'string' ? parsed.project_id : null
     if (!id) {
-      return { valid: false, projectId: null, reason: 'config.toml-da `project_id` yoxdur' }
+      return { valid: false, projectId: null, reason: 'config.toml has no `project_id`' }
     }
     return { valid: true, projectId: id, reason: null }
   } catch (err) {

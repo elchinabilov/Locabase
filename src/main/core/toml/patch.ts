@@ -106,7 +106,7 @@ export function applyPatches(source: string, patches: ConfigPatch[]): PatchResul
     const existing = scan.byPath.get(patch.path)
 
     if (patch.value === undefined) {
-      if (!existing) continue // onsuz da yoxdur
+      if (!existing) continue // already absent
       // delete the line entirely (together with its newline)
       let end = existing.lineEnd
       if (source[end] === '\r' && source[end + 1] === '\n') end += 2

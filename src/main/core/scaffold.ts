@@ -83,7 +83,7 @@ export async function create({ path, name, portBase }: CreateInput): Promise<Pro
   ]
   const patched = applyPatches(raw, patches)
   if (patched.changed) writeFileSync(configPath, patched.text, 'utf8')
-  logBus.push(STREAM, 'info', `project_id=${projectId}, portlar ${base}xx blokunda`)
+  logBus.push(STREAM, 'info', `project_id=${projectId}, ports in the ${base}xx block`)
 
   for (const sub of SUBDIRS) mkdirSync(join(dir, 'supabase', sub), { recursive: true })
   for (const [file, body] of [

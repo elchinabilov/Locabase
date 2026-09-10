@@ -421,7 +421,7 @@ export interface SavedQuery {
   updatedAt: string
 }
 
-/* ---------------------------------------------------------------- introspeksiya */
+/* --------------------------------------------------------- introspection */
 
 export interface DbSchema {
   name: string
@@ -445,7 +445,7 @@ export interface DbTable {
   comment: string | null
   editable: boolean
   /** the reason when `editable: false`, e.g. «No PK» */
-  editableReason: string | null
+  editableReason: EditableReason | null
 }
 
 export interface DbColumn {
@@ -480,13 +480,19 @@ export interface DbOrder {
   dir: 'asc' | 'desc'
 }
 
+/**
+ * Why a relation cannot be edited. A CODE, not a sentence: the main process has
+ * no locale, so the wording belongs to the renderer's dictionary.
+ */
+export type EditableReason = 'no-pk' | 'view' | 'foreign-table'
+
 export interface DbRowsPage {
   columns: DbColumn[]
   rows: DbRow[]
   /** null = no exact count was computed (the table is large) */
   total: number | null
   editable: boolean
-  editableReason: string | null
+  editableReason: EditableReason | null
 }
 
 /* ------------------------------------------------------------------- auth */

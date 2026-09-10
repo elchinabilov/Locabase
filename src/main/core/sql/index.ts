@@ -253,7 +253,7 @@ export async function selectRows(id: string, req: SelectRowsReq): Promise<DbRows
     rows: data,
     total,
     editable,
-    editableReason: editable ? null : 'PK yoxdur'
+    editableReason: editable ? null : 'no-pk'
   }
 }
 

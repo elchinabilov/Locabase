@@ -258,6 +258,7 @@ const en = {
     }
   },
   auth: {
+    callbackUrl: 'Callback URL',
     resizeSidebar: 'Resize the section list',
     section: { users: 'Users', providers: 'Sign In / Providers' },
     title: 'Authentication',
@@ -783,6 +784,11 @@ const en = {
     goToError: 'Go to error'
   },
   tables: {
+    editableReason: {
+      'no-pk': 'No primary key',
+      view: 'A view cannot be edited',
+      'foreign-table': 'A foreign table cannot be edited'
+    },
     resizeSidebar: 'Resize the table list',
     op: { isnull: 'is empty', notnull: 'is not empty' },
     kind: {

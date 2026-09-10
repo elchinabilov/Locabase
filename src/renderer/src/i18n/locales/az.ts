@@ -254,6 +254,7 @@ const az = {
     }
   },
   auth: {
+    callbackUrl: 'Callback URL',
     resizeSidebar: 'Bölmə siyahısının enini dəyiş',
     section: { users: 'İstifadəçilər', providers: 'Giriş / Provayderlər' },
     title: 'Authentication',
@@ -776,6 +777,11 @@ const az = {
     goToError: 'Səhv yerə keç'
   },
   tables: {
+    editableReason: {
+      'no-pk': 'PK yoxdur',
+      view: 'View redaktə edilə bilməz',
+      'foreign-table': 'Foreign table redaktə edilə bilməz'
+    },
     resizeSidebar: 'Cədvəl siyahısının enini dəyiş',
     op: { isnull: 'boşdur', notnull: 'boş deyil' },
     kind: {

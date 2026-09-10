@@ -119,7 +119,7 @@ const handlers: Handlers = {
     await docker.tailLogs(container, stack.streamFor(project.projectId), on)
   },
 
-  /* --- portlar --- */
+  /* --- ports --- */
   'ports:conflicts': async () => ports.conflicts(),
   'ports:suggestRange': async () => ports.suggestRange(),
 
@@ -170,7 +170,7 @@ const handlers: Handlers = {
   'envs:ping': async ({ id, envId }) =>
     adapterFor(projects.get(id), projects.getEnv(id, envId)).ping(),
 
-  /* --- miqrasiyalar --- */
+  /* --- migrations --- */
   'migrations:report': async ({ id, envId }) => migrations.report(id, envId),
   'migrations:new': async ({ id, name }) => migrations.create(id, name),
   'migrations:up': async ({ id }) => migrations.up(id),
@@ -178,7 +178,7 @@ const handlers: Handlers = {
   'migrations:repair': async ({ id, envId, version, status }) =>
     migrations.repair(id, envId, version, status),
 
-  /* --- funksiyalar --- */
+  /* --- functions --- */
   'functions:list': async ({ id, envId }) => functions.list(id, envId),
   'functions:diff': async ({ id, envId, name }) => functions.diff(id, envId, name),
   'functions:create': async ({ id, name }) => functions.create(id, name),
@@ -211,7 +211,7 @@ const handlers: Handlers = {
     }
   },
 
-  /* --- SQL redaktoru --- */
+  /* --- SQL editor --- */
   'sql:execute': async ({ id, envId, sql: text, readOnly, maxRows, timeoutMs, token }) => {
     const run = await sql.execute(id, text, { envId, readOnly, maxRows, timeoutMs, token })
     // DDL may have changed the schema — the column cache is stale
@@ -286,7 +286,7 @@ const handlers: Handlers = {
   'jobs:setEnabled': async ({ jobId, enabled }) => scheduler.setEnabled(jobId, enabled),
   'jobs:runNow': async ({ jobId }) => scheduler.runJob(jobId),
 
-  /* --- sistem --- */
+  /* --- system --- */
   'system:doctor': async () => stack.doctor(),
   'system:setTheme': async ({ theme }) => {
     nativeTheme.themeSource = theme

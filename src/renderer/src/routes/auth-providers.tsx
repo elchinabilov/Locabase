@@ -153,7 +153,7 @@ export function AuthProviders({ project }: { project: Project }): ReactNode {
       <div className="min-h-0 flex-1 overflow-auto p-4">
         <div className="mx-auto flex max-w-4xl flex-col gap-3">
           <div className="flex items-center gap-3 rounded-lg border border-line bg-panel px-3.5 py-2.5">
-            <span className="text-note text-muted">Callback URL</span>
+            <span className="text-note text-muted">{t('auth.callbackUrl')}</span>
             <code className="min-w-0 flex-1 truncate font-mono text-note text-accent">{cb}</code>
             <Button
               onClick={() => {
