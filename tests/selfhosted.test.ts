@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { decodeDump, dumpScript, envMergeScript } from '../src/main/core/remote/selfhosted.js'
+import { decodeDump, dumpScript, envMergeScript } from '../src/main/core/remote/remote-scripts.js'
 
 const TOKEN = '__LOCABASE_test__'
 const b64 = (s: string): string => Buffer.from(s, 'utf8').toString('base64')
