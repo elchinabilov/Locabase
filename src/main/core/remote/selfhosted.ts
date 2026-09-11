@@ -40,8 +40,25 @@ import {
 import { checkEndpoints } from './index.js'
 import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
 
-const LEDGER_QUERY =
-  "select version || '\\t' || coalesce(name, '') from supabase_migrations.schema_migrations order by version"
+const LEDGER_TABLE = 'supabase_migrations.schema_migrations'
+
+// `E'…'` and not `'…'`: with standard_conforming_strings on, a plain `'\t'` is a
+// backslash followed by a `t`, so the version and the name would come back glued
+// together and every row would be dropped as unparsable.
+const LEDGER_QUERY = `select version || E'\\t' || coalesce(name, '') from ${LEDGER_TABLE} order by version`
+
+/**
+ * The ledger Supabase itself keeps. A database that has never had a migration
+ * applied simply does not have it — that is an empty ledger, not drift, so the
+ * read below checks first and the write paths create it. The shape matches what
+ * the CLI creates on its own first push.
+ */
+const ENSURE_LEDGER = [
+  'create schema if not exists supabase_migrations;',
+  `create table if not exists ${LEDGER_TABLE} (version text primary key);`,
+  `alter table ${LEDGER_TABLE} add column if not exists statements text[];`,
+  `alter table ${LEDGER_TABLE} add column if not exists name text;`
+].join('\n')
 
 export class SelfHostedAdapter implements RemoteAdapter {
   readonly kind = 'self-hosted' as const
@@ -137,7 +154,15 @@ export class SelfHostedAdapter implements RemoteAdapter {
     return { ok: details.every((d) => d.ok), kind: this.kind, details }
   }
 
+  /** Create the ledger if it is missing. Only for paths that write to it. */
+  private async ensureLedger(): Promise<void> {
+    await this.psql(ENSURE_LEDGER)
+  }
+
   async listAppliedMigrations(): Promise<LedgerRow[]> {
+    // A read must not create anything, so a missing ledger is reported as empty.
+    const exists = await this.psql(`select to_regclass('${LEDGER_TABLE}') is not null;`, ['-At'])
+    if (!/^t/i.test(exists.trim())) return []
     const out = await this.psql(`${LEDGER_QUERY};`, ['-At'])
     return out
       .split('\n')
@@ -155,6 +180,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
    * row — so a half-applied migration can't be left behind.
    */
   async applyMigrations(files: MigrationFile[], log: LogFn): Promise<void> {
+    await this.ensureLedger()
     for (const file of files) {
       log(`${file.version} — ${basename(file.file)}`)
       const sql = [
@@ -409,6 +435,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
         ? `insert into supabase_migrations.schema_migrations (version) values (${v}) on conflict (version) do nothing;`
         : `delete from supabase_migrations.schema_migrations where version = ${v};`
     log(`ledger repair: ${version} → ${status}`)
+    await this.ensureLedger()
     await this.psql(sql)
   }
 

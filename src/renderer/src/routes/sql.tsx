@@ -264,17 +264,6 @@ export function SqlRoute({ project }: { project: Project }): ReactNode {
 
           <Button onClick={() => setDialog('save')}>{t('common.save')}</Button>
           <Button onClick={() => setDialog('migration')}>{t('sql.saveAsMigration')}</Button>
-          {activeName && (
-            <Button
-              variant="danger"
-              onClick={() => {
-                setTarget(activeName)
-                setDialog('delete')
-              }}
-            >
-              {t('common.delete')}
-            </Button>
-          )}
           {busy && canCancel ? (
             <Button variant="danger" onClick={() => void cancel()}>
               <Spinner /> {t('common.cancel')}

@@ -143,6 +143,23 @@ function tail(chunks: string[], maxOutputLines?: number): string {
   return lines.slice(-limit).join('\n') + (trailingNewline ? '\n' : '')
 }
 
+/**
+ * Why a command failed, when the spawn itself was fine.
+ *
+ * A CLI that exits non-zero says why on stdout/stderr, not through an error the
+ * runner can see. Callers that only surface `error` used to show a bare
+ * "Failed", so the tail of the output becomes the message.
+ */
+const FAILURE_LINES = 8
+
+function failureText(output: string, code: number | null): string {
+  const lines = output
+    .split('\n')
+    .map((l) => l.trimEnd())
+    .filter((l) => l.trim().length > 0)
+  return lines.slice(-FAILURE_LINES).join('\n') || `the command exited with code ${code}`
+}
+
 export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise<TaskResult> {
   const stream = opts.stream ?? cmd
   return new Promise((resolve) => {
@@ -160,11 +177,13 @@ export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise
       onStderr: collect('stderr'),
       onSettle: (code, error) => {
         if (error && !opts.quiet) logBus.push(stream, 'error', error)
+        const output = tail(chunks, opts.maxOutputLines)
+        const failure = error ?? (code === 0 ? null : failureText(output, code))
         resolve({
           ok: code === 0 && error === null,
           code,
-          output: tail(chunks, opts.maxOutputLines),
-          error
+          output,
+          error: failure
         })
       }
     })
