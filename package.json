@@ -1,6 +1,6 @@
 {
 	"name": "locabase",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "Desktop control room for Supabase — run the local stack, edit config.toml from a UI, and diff/deploy against managed or self-hosted projects.",
 	"main": "./out/main/index.js",
 	"author": "Elchin Abilov",
