@@ -328,7 +328,9 @@ export class SelfHostedAdapter implements RemoteAdapter {
       if (v.includes('\n')) throw new Error(`${k}: multi-line values are not supported`)
     }
     const file = `${this.dir()}/.env`
-    log(`Updating ${entries.length} variable(s): ${entries.map(([k]) => k).join(', ')}`)
+    // The path is in the log on purpose: writing to the wrong `.env` is the one
+    // failure that otherwise looks exactly like success.
+    log(`Updating ${entries.length} variable(s) in ${file}: ${entries.map(([k]) => k).join(', ')}`)
 
     // The script lives in the remote command itself while stdin carries the **values** —
     // that way no secret ends up in an argument or in shell history.
@@ -336,6 +338,47 @@ export class SelfHostedAdapter implements RemoteAdapter {
 
     const payload = `${entries.map(([k, v]) => `${k}=${v}`).join('\n')}\n`
     await this.ssh(`bash -c ${sq(script)}`, { input: payload, quiet: true, timeoutMs: 60_000 })
+
+    await this.assertNames(
+      file,
+      entries.map(([k]) => k),
+      'present',
+      log
+    )
+  }
+
+  /**
+   * Read the remote `.env` back and prove the write did what it said.
+   *
+   * A merge that silently changes nothing is indistinguishable from one that
+   * worked — the deploy reports success, the screen goes clean, and the file on
+   * the server is untouched. Cheap to check, and the only way the caller learns
+   * that something between us and the file (a regenerated stack config, a
+   * read-only mount, the wrong path) undid the write.
+   */
+  private async assertNames(
+    file: string,
+    names: string[],
+    expect: 'present' | 'absent',
+    log: LogFn
+  ): Promise<void> {
+    const out = await this.ssh(
+      `grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' ${sq(file)} 2>/dev/null | tr -d '=' | sort -u || true`,
+      { quiet: true }
+    )
+    const found = new Set(out.split('\n').map((l) => l.trim()))
+    const wrong = names.filter((n) => (expect === 'present' ? !found.has(n) : found.has(n)))
+    if (wrong.length === 0) {
+      log(`Verified in ${file}: ${names.length} variable(s) ${expect}`)
+      return
+    }
+    throw new Error(
+      expect === 'present'
+        ? `${file} still does not contain ${wrong.join(', ')} after the write — ` +
+            'something is rewriting the file (on Coolify the stack .env is regenerated on deploy), ' +
+            'or the path is not the file the service actually reads.'
+        : `${file} still contains ${wrong.join(', ')} after the removal.`
+    )
   }
 
   /**
@@ -351,12 +394,14 @@ export class SelfHostedAdapter implements RemoteAdapter {
       }
     }
     const file = `${this.dir()}/.env`
-    log(`Removing ${names.length} variable(s): ${names.join(', ')}`)
+    log(`Removing ${names.length} variable(s) from ${file}: ${names.join(', ')}`)
     await this.ssh(`bash -c ${sq(envRemoveScript(file))}`, {
       input: `${names.join('\n')}\n`,
       quiet: true,
       timeoutMs: 60_000
     })
+
+    await this.assertNames(file, names, 'absent', log)
   }
 
   async listFunctions(): Promise<RemoteFunctionInfo[]> {
