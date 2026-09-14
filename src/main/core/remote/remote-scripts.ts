@@ -70,6 +70,33 @@ export function envMergeScript(file: string): string {
 }
 
 /**
+ * The mirror of `envMergeScript`: the keys arriving on stdin are dropped from the
+ * remote `.env` and everything else is kept, byte for byte.
+ *
+ * `${K}` is pasted into a `grep` pattern unquoted, so the caller must have proved
+ * each name matches `^[A-Za-z_][A-Za-z0-9_]*$` first — same contract as the merge.
+ */
+export function envRemoveScript(file: string): string {
+  return [
+    'set -e',
+    'T="$(mktemp)"',
+    'trap \'rm -f "$T" "$T.old" "$T.new"\' EXIT',
+    'cat > "$T"',
+    `TARGET=${sq(file)}`,
+    'touch "$TARGET"',
+    'cp "$TARGET" "$T.old"',
+    'while IFS= read -r K; do',
+    '  [ -z "$K" ] && continue',
+    '  grep -v "^${K}=" "$T.old" > "$T.new" || true',
+    '  mv "$T.new" "$T.old"',
+    'done < "$T"',
+    'chmod 600 "$T.old"',
+    'mv "$T.old" "$TARGET"',
+    'echo updated'
+  ].join('\n')
+}
+
+/**
  * A bash script that streams every file in a folder as a `<token><path>` header
  * plus base64 content. For a large file a `<token>!` marker is sent instead of the
  * content — so the file stays in the listing and isn't reported as "local only".

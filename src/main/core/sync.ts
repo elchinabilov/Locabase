@@ -10,6 +10,7 @@ import type {
   DeployPlan,
   FunctionInfo,
   MigrationRow,
+  RemoteSecret,
   SecretDiff,
   SyncAxis,
   SyncReport,
@@ -21,6 +22,7 @@ import { listFiles, report as migrationReport } from './migrations.js'
 import { list as listFunctions } from './functions.js'
 import { get as getProject, getEnv, paths } from './projects.js'
 import { adapterFor } from './remote/index.js'
+import { buildSecretDiff, remoteNameOf, secretsDirty } from './secret-diff.js'
 import { diff as schemaDiff } from './migrations.js'
 
 function axis<T>(items: T[], dirty: boolean, error: string | null = null): SyncAxis<T> {
@@ -58,28 +60,20 @@ export async function report(id: string, envId: string): Promise<SyncReport> {
     (f) => f.path !== '' && (f.drift === 'local-only' || f.drift === 'changed')
   )
 
-  /* --- secret names --- */
-  const localNames = [...readMap(paths.envFile(project)).keys()]
-  const [remoteNames, secretErr] = await safe(() => adapter.listSecretNames(), [] as string[])
-  const secretDiff: SecretDiff[] = []
-  const remoteSet = new Set(remoteNames)
-  for (const key of localNames) {
-    secretDiff.push({ key, where: remoteSet.has(key) ? 'both' : 'local-only' })
-  }
-  for (const key of remoteNames) {
-    if (!localNames.includes(key)) secretDiff.push({ key, where: 'remote-only' })
-  }
+  /* --- secrets --- */
+  const [remoteSecrets, secretErr] = await safe(() => adapter.listSecrets(), [] as RemoteSecret[])
+  const secretDiff: SecretDiff[] = buildSecretDiff(
+    readMap(paths.envFile(project)),
+    remoteSecrets,
+    env.secretMap
+  )
 
   return {
     envId,
     migrations: axis<MigrationRow>(migrations.rows, pending.length > 0, migrations.error),
     schema: axis([{ sql: schema }], !schemaClean, schemaErr),
     functions: axis(functions, fnDirty.length > 0, fnErr),
-    secrets: axis(
-      secretDiff.sort((a, b) => a.key.localeCompare(b.key)),
-      secretDiff.some((s) => s.where !== 'both'),
-      secretErr
-    ),
+    secrets: axis(secretDiff, secretsDirty(secretDiff), secretErr),
     authConfig: axis(
       [],
       false,
@@ -115,6 +109,7 @@ export async function deploy(id: string, plan: DeployPlan, confirm: string): Pro
       log(`migrations: ${plan.migrations.join(', ') || 'none'}`)
       log(`functions: ${plan.functions.join(', ') || 'none'}`)
       log(`secrets: ${plan.secrets.join(', ') || 'none'}`)
+      log(`secret deletes: ${plan.secretDeletes.join(', ') || 'none'}`)
       return { ok: true, code: 0, output: 'dry run finished', error: null }
     }
 
@@ -135,16 +130,25 @@ export async function deploy(id: string, plan: DeployPlan, confirm: string): Pro
       done.push(`functions (${plan.functions.length})`)
     }
 
-    if (plan.steps.includes('secrets') && plan.secrets.length > 0) {
+    if (plan.steps.includes('secrets')) {
+      // `plan.secrets` holds LOCAL keys; the adapter is given remote names. The
+      // mapping is applied here and nowhere else, so an adapter never has to know
+      // that the two sides may spell a secret differently.
       const local = readMap(paths.envFile(project))
       const kv: Record<string, string> = {}
       for (const key of plan.secrets) {
         const value = local.get(key)
         if (value === undefined) throw new Error(`${key} is missing from the local .env`)
-        kv[key] = value
+        kv[remoteNameOf(env.secretMap, key)] = value
       }
-      await adapter.setSecrets(kv, log)
-      done.push(`secrets (${plan.secrets.length})`)
+      if (plan.secrets.length > 0) {
+        await adapter.setSecrets(kv, log)
+        done.push(`secrets (${plan.secrets.length})`)
+      }
+      if (plan.secretDeletes.length > 0) {
+        await adapter.unsetSecrets(plan.secretDeletes, log)
+        done.push(`secrets removed (${plan.secretDeletes.length})`)
+      }
     }
 
     if (plan.steps.includes('verify')) {

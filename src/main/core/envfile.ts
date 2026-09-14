@@ -39,8 +39,12 @@ function quoteValue(value: string, preferred: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`
 }
 
-export function readRaw(path: string): { text: string; entries: RawEntry[] } {
-  const text = existsSync(path) ? readFileSync(path, 'utf8') : ''
+/**
+ * Split `.env` text into entries. Separate from `readRaw` because the same
+ * format arrives from places that are not a local file — a self-hosted stack's
+ * remote `.env` is read over ssh and parsed with exactly these rules.
+ */
+export function parseEntries(text: string): RawEntry[] {
   const entries: RawEntry[] = []
   text.split('\n').forEach((line, i) => {
     if (/^\s*(#|$)/.test(line)) return
@@ -49,13 +53,23 @@ export function readRaw(path: string): { text: string; entries: RawEntry[] } {
     const { value, quote } = unquote(m[4]!)
     entries.push({ key: m[2]!, value, line: i, quote })
   })
-  return { text, entries }
+  return entries
+}
+
+/** `.env` text → key/value map; a repeated key keeps its last value. */
+export function parseMap(text: string): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const e of parseEntries(text)) out.set(e.key, e.value)
+  return out
+}
+
+export function readRaw(path: string): { text: string; entries: RawEntry[] } {
+  const text = existsSync(path) ? readFileSync(path, 'utf8') : ''
+  return { text, entries: parseEntries(text) }
 }
 
 export function readMap(path: string): Map<string, string> {
-  const out = new Map<string, string>()
-  for (const e of readRaw(path).entries) out.set(e.key, e.value)
-  return out
+  return parseMap(readRaw(path).text)
 }
 
 /** Write/update keys. A key that doesn't exist is appended to the file. */

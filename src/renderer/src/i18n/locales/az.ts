@@ -578,7 +578,17 @@ const az = {
       label: 'Postgres konteyneri',
       hint: "serverdə: docker ps --format '{{.Names}}' | grep supabase-db"
     },
-    remoteDir: { label: 'Servis qovluğu', hint: 'Coolify: /data/coolify/services/<id>' },
+    remoteDir: {
+      label: 'Servis qovluğu',
+      hint: 'Məcburidir. Coolify: /data/coolify/services/<id>. Boş qalsa serverin kökündəki /.env oxunardı.'
+    },
+    secretMap: {
+      label: 'Secret ad uyğunluğu',
+      hint: 'Lokal .env açarı remote-da başqa adla saxlanılırsa, burada qeyd et. Məsələn Coolify Supabase stack-i Google client id-ni GOOGLE_CLIENT_ID adlandırır. Qeyd olunmayan açarlar eyni adla göndərilir.',
+      localPlaceholder: 'SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID',
+      remotePlaceholder: 'GOOGLE_CLIENT_ID',
+      add: 'Uyğunluq əlavə et'
+    },
     functionsContainer: {
       label: 'Edge runtime konteyneri',
       hint: 'Boş qalsa funksiya deploy-u söndürülür'
@@ -655,9 +665,14 @@ const az = {
     schema: 'Sxem (db diff)',
     schemaClean: 'Lokal sxem miqrasiyalarla üst-üstə düşür.',
     viewDiff: 'fərqə bax',
-    secretNames: 'Secret adları',
+    secretNames: 'Secret-lər',
     localOnly: 'yalnız lokal',
-    secretsClean: 'Açar adları üst-üstə düşür.',
+    secretChanged: 'dəyər fərqlidir',
+    secretSame: 'eynidir',
+    secretsClean: 'Göndəriləsi dəyişiklik yoxdur.',
+    remoteOnlySecrets: 'Yalnız remote-da olan {count} açar',
+    toRemove: '{count} silinəcək',
+    secretDeleteWarning: 'Bu açarlar remote-dan SİLİNƏCƏK: {list}',
     authConfig: 'Auth konfiqurasiyası',
     selectedCount: '{count} seçilib',
     hasDiff: 'fərq var',

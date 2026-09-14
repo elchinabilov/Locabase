@@ -584,7 +584,17 @@ const en = {
       label: 'Postgres container',
       hint: "on the server: docker ps --format '{{.Names}}' | grep supabase-db"
     },
-    remoteDir: { label: 'Service folder', hint: 'Coolify: /data/coolify/services/<id>' },
+    remoteDir: {
+      label: 'Service folder',
+      hint: 'Required. Coolify: /data/coolify/services/<id>. Left empty, the app used to read /.env on the server root.'
+    },
+    secretMap: {
+      label: 'Secret name mapping',
+      hint: 'Set this when a local .env key is stored under a different name on the remote — a Coolify Supabase stack, for instance, calls the Google client id GOOGLE_CLIENT_ID. Keys not listed here are pushed under their own name.',
+      localPlaceholder: 'SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID',
+      remotePlaceholder: 'GOOGLE_CLIENT_ID',
+      add: 'Add mapping'
+    },
     functionsContainer: {
       label: 'Edge runtime container',
       hint: 'Leave empty to disable function deploys'
@@ -662,9 +672,14 @@ const en = {
     schema: 'Schema (db diff)',
     schemaClean: 'Local schema matches the migrations.',
     viewDiff: 'view diff',
-    secretNames: 'Secret names',
+    secretNames: 'Secrets',
     localOnly: 'local only',
-    secretsClean: 'Key names match.',
+    secretChanged: 'value differs',
+    secretSame: 'identical',
+    secretsClean: 'Nothing to push.',
+    remoteOnlySecrets: '{count} key(s) only on the remote',
+    toRemove: '{count} to remove',
+    secretDeleteWarning: 'These keys will be REMOVED from the remote: {list}',
     authConfig: 'Auth configuration',
     selectedCount: '{count} selected',
     hasDiff: 'diff found',

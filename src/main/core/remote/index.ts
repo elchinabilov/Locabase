@@ -11,6 +11,7 @@ import type {
   RemoteEnv,
   RemoteFile,
   RemoteFunctionInfo,
+  RemoteSecret,
   RemoteService,
   SqlRun,
   VerifyReport
@@ -62,8 +63,16 @@ export interface RemoteAdapter {
     clean: boolean,
     log: LogFn
   ): Promise<{ output: string }>
-  listSecretNames(): Promise<string[]>
+  /**
+   * Every secret the remote knows about. Self-hosted returns the values too —
+   * that `.env` is a plain file we can read — while managed returns only a
+   * digest, which is why `RemoteSecret` has both fields nullable.
+   */
+  listSecrets(): Promise<RemoteSecret[]>
+  /** `kv` is keyed by REMOTE name — `sync.ts` applies the mapping before calling. */
   setSecrets(kv: Record<string, string>, log: LogFn): Promise<void>
+  /** Remove secrets by their remote name. */
+  unsetSecrets(names: string[], log: LogFn): Promise<void>
   listFunctions(): Promise<RemoteFunctionInfo[]>
   /**
    * The remote **file contents** of one function — for "View diff". Called on

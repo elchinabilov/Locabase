@@ -207,6 +207,7 @@ export function FunctionsRoute({ project }: { project: Project }): ReactNode {
                           migrations: [],
                           functions: confirmDeploy,
                           secrets: [],
+                          secretDeletes: [],
                           dryRun: false
                         }
                       })

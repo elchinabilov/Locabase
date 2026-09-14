@@ -91,6 +91,40 @@ describe('parseIpcRequest', () => {
       ).toThrow(ZodError)
     })
 
+    // An empty service folder used to be accepted and then interpolated into
+    // `${remoteDir}/.env`, which resolved to `/.env` on the server root.
+    it('rejects an empty service folder', () => {
+      expect(() =>
+        parseIpcRequest('envs:upsert', { id: 'p1', env: selfHosted({ remoteDir: '' }) })
+      ).toThrow(ZodError)
+    })
+
+    it('rejects a relative service folder', () => {
+      expect(() =>
+        parseIpcRequest('envs:upsert', { id: 'p1', env: selfHosted({ remoteDir: 'supabase' }) })
+      ).toThrow(ZodError)
+    })
+
+    it('rejects a secret mapping whose name is not a variable name', () => {
+      expect(() =>
+        parseIpcRequest('envs:upsert', {
+          id: 'p1',
+          env: selfHosted({ secretMap: { GOOD: 'ALSO GOOD; rm -rf /' } })
+        })
+      ).toThrow(ZodError)
+    })
+
+    it('accepts a well-formed secret mapping', () => {
+      expect(() =>
+        parseIpcRequest('envs:upsert', {
+          id: 'p1',
+          env: selfHosted({
+            secretMap: { SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID: 'GOOGLE_CLIENT_ID' }
+          })
+        })
+      ).not.toThrow()
+    })
+
     it('rejects a non-http url for the external opener', () => {
       expect(() => parseIpcRequest('stack:openUrl', { url: 'not a url' })).toThrow(ZodError)
     })

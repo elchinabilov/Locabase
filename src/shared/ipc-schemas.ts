@@ -51,12 +51,27 @@ const dbCells = z.record(z.string().max(512), z.string().max(1_000_000).nullable
 
 const backupScope = z.enum(['full', 'schema', 'data'])
 
+/** A `.env` variable name — the shape both sides of a secret mapping must have. */
+const envVarName = z
+  .string()
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'Invalid variable name')
+  .max(255)
+
+/**
+ * Local key → remote name. Capped because it travels in the project registry and
+ * a runaway map would be written to disk on every save.
+ */
+const secretMap = z
+  .record(envVarName, envVarName)
+  .refine((m) => Object.keys(m).length <= 500, 'at most 500 mappings')
+
 const managedEnv = z.object({
   id: envId,
   name,
   kind: z.literal('managed'),
   projectRef: z.string().min(1).max(100),
-  hasToken: z.boolean()
+  hasToken: z.boolean(),
+  secretMap: secretMap.optional()
 })
 
 /**
@@ -75,12 +90,20 @@ const selfHostedEnv = z.object({
     .max(4096)
     .refine((v) => !v.startsWith('-'), 'may not start with `-`'),
   dbContainer: z.string().max(255),
-  remoteDir: z.string().max(4096),
+  // Required, and absolute. An empty value used to be accepted and then silently
+  // resolved to the server root — `${remoteDir}/.env` became `/.env`, so the app
+  // read and wrote a file that belonged to nothing.
+  remoteDir: z
+    .string()
+    .min(1, 'The service folder is required')
+    .max(4096)
+    .refine((v) => v.startsWith('/'), 'must be an absolute path'),
   functionsContainer: z.string().max(255),
   apiUrl: z.string().max(2048),
   siteUrl: z.string().max(2048),
   backupDir: z.string().max(4096),
-  backupRetentionDays: z.number().int().min(0).max(36500)
+  backupRetentionDays: z.number().int().min(0).max(36500),
+  secretMap: secretMap.optional()
 })
 
 const remoteEnv = z.discriminatedUnion('kind', [managedEnv, selfHostedEnv])
@@ -128,7 +151,8 @@ const deployPlan = z.object({
   steps: z.array(z.enum(['backup', 'migrations', 'functions', 'secrets', 'auth', 'verify'])),
   migrations: z.array(z.string().max(512)),
   functions: z.array(z.string().max(512)),
-  secrets: z.array(z.string().max(512)),
+  secrets: z.array(envVarName),
+  secretDeletes: z.array(envVarName),
   dryRun: z.boolean()
 })
 

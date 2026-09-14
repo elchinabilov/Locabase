@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { decodeDump, dumpScript, envMergeScript } from '../src/main/core/remote/remote-scripts.js'
+import {
+  decodeDump,
+  dumpScript,
+  envMergeScript,
+  envRemoveScript
+} from '../src/main/core/remote/remote-scripts.js'
 
 const TOKEN = '__LOCABASE_test__'
 const b64 = (s: string): string => Buffer.from(s, 'utf8').toString('base64')
@@ -121,6 +126,50 @@ describe('dumpScript', () => {
         content: null,
         binary: true
       })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('envRemoveScript', () => {
+  const runScript = (file: string, input: string): string =>
+    execFileSync('bash', ['-c', envRemoveScript(file)], { input })
+      .toString()
+      .trim()
+
+  it('drops the named keys and leaves everything else byte for byte', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'locabase-env-'))
+    const file = join(dir, '.env')
+    writeFileSync(file, '# comment\nA=1\nB=2\nC=3\n')
+    try {
+      expect(runScript(file, 'B\n')).toBe('updated')
+      expect(readFileSync(file, 'utf8')).toBe('# comment\nA=1\nC=3\n')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('removes several keys at once and ignores one that is not there', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'locabase-env-'))
+    const file = join(dir, '.env')
+    writeFileSync(file, 'A=1\nB=2\nC=3\n')
+    try {
+      runScript(file, 'A\nC\nMISSING\n')
+      expect(readFileSync(file, 'utf8')).toBe('B=2\n')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  // `AB=` must survive a removal of `A` — the pattern is anchored on `KEY=`.
+  it('does not touch a key that merely starts with the same letters', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'locabase-env-'))
+    const file = join(dir, '.env')
+    writeFileSync(file, 'A=1\nAB=2\n')
+    try {
+      runScript(file, 'A\n')
+      expect(readFileSync(file, 'utf8')).toBe('AB=2\n')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

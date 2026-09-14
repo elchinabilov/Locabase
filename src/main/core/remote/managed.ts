@@ -26,6 +26,7 @@ import type {
   Project,
   RemoteFile,
   RemoteFunctionInfo,
+  RemoteSecret,
   RemoteService,
   SqlColumn,
   SqlResult,
@@ -107,7 +108,9 @@ export class ManagedAdapter implements RemoteAdapter {
     if (!res.ok) {
       throw new Error(`Management API ${res.status}: ${(await res.text()).slice(0, 300)}`)
     }
-    return (await res.json()) as T
+    // A bulk delete answers 200 with an empty body — `res.json()` would throw.
+    const text = await res.text()
+    return (text.trim() === '' ? undefined : JSON.parse(text)) as T
   }
 
   async ping(): Promise<HealthReport> {
@@ -248,11 +251,19 @@ export class ManagedAdapter implements RemoteAdapter {
     return { output: `${this.env.projectRef}: restore query finished` }
   }
 
-  async listSecretNames(): Promise<string[]> {
-    const rows = await this.api<Array<{ name: string }>>(
+  /**
+   * The Management API never returns the plaintext — the `value` it sends back is
+   * a fingerprint (what `supabase secrets list` prints as DIGEST). It is carried
+   * as `digest` so the diff can at least recognise an unchanged value; see
+   * `valueMatches`.
+   */
+  async listSecrets(): Promise<RemoteSecret[]> {
+    const rows = await this.api<Array<{ name: string; value?: string }>>(
       `/v1/projects/${this.env.projectRef}/secrets`
     )
-    return rows.map((r) => r.name).sort()
+    return rows
+      .map((r) => ({ name: r.name, value: null, digest: r.value ?? null }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   }
 
   /** Values go through a temporary 0600 file — so they never show up in `ps`. */
@@ -274,6 +285,15 @@ export class ManagedAdapter implements RemoteAdapter {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  }
+
+  async unsetSecrets(names: string[], log: LogFn): Promise<void> {
+    if (names.length === 0) return
+    log(`Removing ${names.length} secret(s): ${names.join(', ')}`)
+    await this.api<void>(`/v1/projects/${this.env.projectRef}/secrets`, {
+      method: 'DELETE',
+      body: JSON.stringify(names)
+    })
   }
 
   async listFunctions(): Promise<RemoteFunctionInfo[]> {

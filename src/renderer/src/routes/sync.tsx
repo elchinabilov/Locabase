@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { z } from 'zod'
 import type {
+  DeployPlan,
   DeployStep,
   HealthReport,
   Project,
   RemoteEnv,
+  SecretDiff,
+  SecretWhere,
   SyncReport,
   TaskResult
 } from '@shared/types'
@@ -131,7 +134,12 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
 
   const [pickedMigrations, setPickedMigrations] = useState<Set<string>>(new Set())
   const [pickedFunctions, setPickedFunctions] = useState<Set<string>>(new Set())
+  /** local `.env` keys to push */
   const [pickedSecrets, setPickedSecrets] = useState<Set<string>>(new Set())
+  /** remote names to remove — a different namespace, so a separate set */
+  const [pickedDeletes, setPickedDeletes] = useState<Set<string>>(new Set())
+  /** the remote-only list is collapsed by default; on a self-hosted stack it is huge */
+  const [showRemoteOnly, setShowRemoteOnly] = useState(false)
   const [confirming, setConfirming] = useState(false)
   /** the function whose diff is open */
   const [diffFn, setDiffFn] = useState<string | null>(null)
@@ -151,14 +159,24 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
           .map((f) => f.name)
       )
     )
-    setPickedSecrets(new Set())
+    // Pre-selected: what we can prove is out of date. An unchanged key stays
+    // selectable — a managed remote returns no readable value, so "unchanged"
+    // there means "could not be compared".
+    setPickedSecrets(
+      new Set(
+        r.secrets.items
+          .filter((s) => s.where === 'local-only' || s.where === 'changed')
+          .map((s) => s.key)
+      )
+    )
+    setPickedDeletes(new Set())
   }, [project.id, env.id, run])
 
   const plan = useMemo(() => {
     const steps: DeployStep[] = ['backup']
     if (pickedMigrations.size > 0) steps.push('migrations')
     if (pickedFunctions.size > 0) steps.push('functions')
-    if (pickedSecrets.size > 0) steps.push('secrets')
+    if (pickedSecrets.size > 0 || pickedDeletes.size > 0) steps.push('secrets')
     steps.push('verify')
     return {
       envId: env.id,
@@ -166,12 +184,16 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
       migrations: [...pickedMigrations].sort(),
       functions: [...pickedFunctions].sort(),
       secrets: [...pickedSecrets].sort(),
+      secretDeletes: [...pickedDeletes].sort(),
       dryRun: false
-    }
-  }, [env.id, pickedMigrations, pickedFunctions, pickedSecrets])
+    } satisfies DeployPlan
+  }, [env.id, pickedMigrations, pickedFunctions, pickedSecrets, pickedDeletes])
 
   const nothing =
-    pickedMigrations.size === 0 && pickedFunctions.size === 0 && pickedSecrets.size === 0
+    pickedMigrations.size === 0 &&
+    pickedFunctions.size === 0 &&
+    pickedSecrets.size === 0 &&
+    pickedDeletes.size === 0
 
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4">
@@ -332,15 +354,14 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
               title={t('sync.secretNames')}
               dirty={report.secrets.dirty}
               error={report.secrets.error}
-              count={pickedSecrets.size}
+              count={pickedSecrets.size + pickedDeletes.size}
             >
               {report.secrets.items
-                .filter((s) => s.where !== 'both')
+                .filter((s) => s.where !== 'remote-only')
                 .map((s) => (
                   <Pick
                     key={s.key}
                     checked={pickedSecrets.has(s.key)}
-                    disabled={s.where === 'remote-only'}
                     onChange={(v) =>
                       setPickedSecrets((prev) => {
                         const next = new Set(prev)
@@ -349,14 +370,35 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
                         return next
                       })
                     }
-                    label={<code className="font-mono">{s.key}</code>}
-                    right={
-                      <Badge tone={s.where === 'local-only' ? 'info' : 'warn'}>
-                        {s.where === 'local-only' ? t('sync.localOnly') : t('functions.remoteOnly')}
-                      </Badge>
+                    label={
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <code className="truncate font-mono">{s.key}</code>
+                        {s.mapped && (
+                          <span className="truncate font-mono text-micro text-faint">
+                            → {s.remoteKey}
+                          </span>
+                        )}
+                      </span>
                     }
+                    right={<SecretBadge where={s.where} />}
                   />
                 ))}
+
+              <RemoteOnlySecrets
+                items={report.secrets.items.filter((s) => s.where === 'remote-only')}
+                open={showRemoteOnly}
+                onToggle={() => setShowRemoteOnly((v) => !v)}
+                picked={pickedDeletes}
+                onPick={(key, v) =>
+                  setPickedDeletes((prev) => {
+                    const next = new Set(prev)
+                    if (v) next.add(key)
+                    else next.delete(key)
+                    return next
+                  })
+                }
+              />
+
               {!report.secrets.dirty && <Clean text={t('sync.secretsClean')} />}
             </Axis>
 
@@ -514,6 +556,76 @@ function Pick({
   )
 }
 
+const SECRET_TONE: Record<SecretWhere, 'ok' | 'warn' | 'info'> = {
+  'local-only': 'info',
+  changed: 'warn',
+  both: 'ok',
+  'remote-only': 'warn'
+}
+
+function SecretBadge({ where }: { where: SecretWhere }): ReactNode {
+  const t = useT()
+  const label =
+    where === 'local-only'
+      ? t('sync.localOnly')
+      : where === 'changed'
+        ? t('sync.secretChanged')
+        : where === 'both'
+          ? t('sync.secretSame')
+          : t('functions.remoteOnly')
+  return <Badge tone={SECRET_TONE[where]}>{label}</Badge>
+}
+
+/**
+ * Keys the remote has and the project does not.
+ *
+ * Collapsed by default, and deliberately: a self-hosted `.env` is the Docker
+ * stack's own configuration, so this list is routinely a hundred rows of
+ * `POSTGRES_PORT`-shaped noise that is not drift and must not read as drift.
+ * Ticking one marks it for REMOVAL from the remote.
+ */
+function RemoteOnlySecrets({
+  items,
+  open,
+  onToggle,
+  picked,
+  onPick
+}: {
+  items: SecretDiff[]
+  open: boolean
+  onToggle: () => void
+  picked: Set<string>
+  onPick: (key: string, value: boolean) => void
+}): ReactNode {
+  const t = useT()
+  if (items.length === 0) return null
+
+  return (
+    <>
+      <button
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 border-t border-line-soft px-3.5 py-1.5 text-left text-meta text-muted hover:text-text"
+      >
+        <span className="text-faint">{open ? '▾' : '▸'}</span>
+        {t('sync.remoteOnlySecrets', { count: items.length })}
+        {picked.size > 0 && (
+          <Badge tone="danger">{t('sync.toRemove', { count: picked.size })}</Badge>
+        )}
+      </button>
+      {open &&
+        items.map((s) => (
+          <Pick
+            key={s.key}
+            checked={picked.has(s.key)}
+            onChange={(v) => onPick(s.key, v)}
+            label={<code className="font-mono text-faint">{s.key}</code>}
+            right={<Badge tone="warn">{t('functions.remoteOnly')}</Badge>}
+          />
+        ))}
+    </>
+  )
+}
+
 function DeployModal({
   project,
   env,
@@ -523,14 +635,7 @@ function DeployModal({
 }: {
   project: Project
   env: RemoteEnv
-  plan: {
-    envId: string
-    steps: DeployStep[]
-    migrations: string[]
-    functions: string[]
-    secrets: string[]
-    dryRun: boolean
-  }
+  plan: DeployPlan
   onClose: () => void
   onDone: () => void
 }): ReactNode {
@@ -584,12 +689,18 @@ function DeployModal({
               {s === 'migrations' &&
                 t('sync.step.migrations', { list: plan.migrations.join(', ') })}
               {s === 'functions' && t('sync.step.functions', { list: plan.functions.join(', ') })}
-              {s === 'secrets' && t('sync.step.secrets', { list: plan.secrets.join(', ') })}
+              {s === 'secrets' && t('sync.step.secrets', { list: plan.secrets.join(', ') || '—' })}
               {s === 'verify' && t('sync.step.verify')}
             </span>
           </li>
         ))}
       </ol>
+
+      {plan.secretDeletes.length > 0 && (
+        <p className="mb-3 rounded-md border border-danger-border bg-danger-bg px-3 py-2 text-small text-danger">
+          {t('sync.secretDeleteWarning', { list: plan.secretDeletes.join(', ') })}
+        </p>
+      )}
 
       {env.kind === 'managed' && plan.migrations.length > 0 && (
         <p className="mb-3 rounded-md border border-warn-border bg-warn-bg px-3 py-2 text-small text-warn">

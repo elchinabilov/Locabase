@@ -17,6 +17,7 @@ import type {
   RemoteFile,
   RemoteFileChecksum,
   RemoteFunctionInfo,
+  RemoteSecret,
   RemoteService,
   SelfHostedEnv,
   SqlRun,
@@ -28,10 +29,12 @@ import type { MigrationFile } from '../migrations.js'
 import { readMigration } from '../migrations.js'
 import { parsePsqlCsv, parsePsqlError } from '../sql/csv.js'
 import { quoteLiteral } from '../sql/ident.js'
+import { parseMap } from '../envfile.js'
 import {
   decodeDump,
   dumpScript,
   envMergeScript,
+  envRemoveScript,
   parseHealth,
   retentionDays,
   serviceKeyOf,
@@ -104,6 +107,25 @@ export class SelfHostedAdapter implements RemoteAdapter {
     })
     if (!res.ok) throw new Error(res.error ?? (res.output.trim() || 'the ssh command failed'))
     return res.output
+  }
+
+  /**
+   * The configured service folder, without its trailing slash.
+   *
+   * It throws when unset, and that is the point: interpolating an empty
+   * `remoteDir` used to produce `/.env` and `/volumes/functions` — real paths on
+   * the server root — so the app silently read and wrote the wrong files instead
+   * of saying it was not configured.
+   */
+  private dir(): string {
+    const value = this.env.remoteDir.trim().replace(/\/+$/, '')
+    if (value === '') {
+      throw new Error(
+        `No service folder is set for «${this.env.name}» — add it in the environment settings ` +
+          '(Coolify: /data/coolify/services/<id>).'
+      )
+    }
+    return value
   }
 
   /** `docker exec -i <db> psql ...` — the remote equivalent of a local psql session. */
@@ -273,16 +295,25 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   /** The key names in the remote `.env` — values are not fetched. */
-  async listSecretNames(): Promise<string[]> {
-    const file = `${this.env.remoteDir}/.env`
-    const out = await this.ssh(
-      `grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' ${sq(file)} 2>/dev/null | tr -d '=' | sort -u || true`,
-      { quiet: true }
-    )
-    return out
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(l))
+  /**
+   * The whole remote `.env`, values included — it is an ordinary file we can
+   * read, so the diff can compare values and not just names.
+   *
+   * Base64 rather than a line-wise `grep`: a value may hold quotes, spaces or a
+   * `#`, and the parser that already handles all of that for the local file is
+   * reused here. `quiet` keeps the values out of the log stream.
+   *
+   * NOTE: on a Coolify stack this file is the ENTIRE Docker configuration, not a
+   * list of Edge Function secrets — a hundred keys the project never declared is
+   * normal, which is why `buildSecretDiff` does not treat them as drift.
+   */
+  async listSecrets(): Promise<RemoteSecret[]> {
+    const file = `${this.dir()}/.env`
+    const out = await this.ssh(`base64 < ${sq(file)} 2>/dev/null || true`, { quiet: true })
+    const text = Buffer.from(out.replace(/\s+/g, ''), 'base64').toString('utf8')
+    return [...parseMap(text)]
+      .map(([name, value]) => ({ name, value, digest: null }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   }
 
   /**
@@ -296,7 +327,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) throw new Error(`invalid variable name: ${k}`)
       if (v.includes('\n')) throw new Error(`${k}: multi-line values are not supported`)
     }
-    const file = `${this.env.remoteDir}/.env`
+    const file = `${this.dir()}/.env`
     log(`Updating ${entries.length} variable(s): ${entries.map(([k]) => k).join(', ')}`)
 
     // The script lives in the remote command itself while stdin carries the **values** —
@@ -307,9 +338,30 @@ export class SelfHostedAdapter implements RemoteAdapter {
     await this.ssh(`bash -c ${sq(script)}`, { input: payload, quiet: true, timeoutMs: 60_000 })
   }
 
+  /**
+   * Names travel over stdin like the values do in `setSecrets` — not because
+   * they are sensitive, but so one script shape covers both and nothing lands in
+   * an argument list.
+   */
+  async unsetSecrets(names: string[], log: LogFn): Promise<void> {
+    if (names.length === 0) return
+    for (const name of names) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+        throw new Error(`invalid variable name: ${name}`)
+      }
+    }
+    const file = `${this.dir()}/.env`
+    log(`Removing ${names.length} variable(s): ${names.join(', ')}`)
+    await this.ssh(`bash -c ${sq(envRemoveScript(file))}`, {
+      input: `${names.join('\n')}\n`,
+      quiet: true,
+      timeoutMs: 60_000
+    })
+  }
+
   async listFunctions(): Promise<RemoteFunctionInfo[]> {
     if (!this.env.functionsContainer) return []
-    const dir = `${this.env.remoteDir}/volumes/functions`
+    const dir = `${this.dir()}/volumes/functions`
     const out = await this.ssh(`ls -1 ${sq(dir)} 2>/dev/null | grep -v '^_' || true`, {
       quiet: true
     })
@@ -360,7 +412,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
 
   async readFunction(name: string): Promise<RemoteFile[]> {
     if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error(`invalid function name: ${name}`)
-    const dir = `${this.env.remoteDir}/volumes/functions/${name}`
+    const dir = `${this.dir()}/volumes/functions/${name}`
     // The separator is random per call — file content must never collide with it
     const token = `__LOCABASE_${randomUUID().replace(/-/g, '')}__`
     const out = await this.ssh(`bash -c ${sq(dumpScript(dir, token))}`, {
@@ -381,7 +433,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
       throw new Error('No edge runtime container is configured — functions cannot be deployed.')
     }
     const localDir = paths.functionsDir(this.project)
-    const remoteDir = `${this.env.remoteDir}/volumes/functions`
+    const remoteDir = `${this.dir()}/volumes/functions`
     const sshCmd = ['ssh', ...this.sshArgs()].join(' ')
 
     for (const name of names) {

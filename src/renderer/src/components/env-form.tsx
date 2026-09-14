@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import type { ManagedEnv, Project, RemoteEnv, SelfHostedEnv } from '@shared/types'
+import type { ManagedEnv, Project, RemoteEnv, SecretMap, SelfHostedEnv } from '@shared/types'
 import { call } from '../lib/ipc'
 import { useAction } from '../lib/use-action'
 import { useT } from '../i18n'
@@ -167,6 +167,7 @@ export function EnvForm({
                 value={env.remoteDir}
                 onChange={(e) => patch<SelfHostedEnv>({ remoteDir: e.target.value.trim() })}
                 className="font-mono"
+                placeholder="/data/coolify/services/abc123"
               />
             </Row>
             <Row
@@ -217,6 +218,11 @@ export function EnvForm({
             </Row>
           </>
         )}
+
+        <SecretMapEditor
+          value={env.secretMap ?? {}}
+          onChange={(secretMap) => patch<RemoteEnv>({ secretMap })}
+        />
       </div>
 
       {error && (
@@ -225,5 +231,79 @@ export function EnvForm({
         </div>
       )}
     </Modal>
+  )
+}
+
+/**
+ * The local→remote rename table.
+ *
+ * Kept as an array while it is being edited rather than as the `Record` it is
+ * stored in: re-keying an object on every keystroke loses focus and reorders the
+ * rows under the cursor. The object is rebuilt on each change, empty and
+ * identity rows dropped — a mapping to the same name is what NOT having a
+ * mapping already means.
+ */
+function SecretMapEditor({
+  value,
+  onChange
+}: {
+  value: SecretMap
+  onChange: (value: SecretMap) => void
+}): ReactNode {
+  const t = useT()
+  const [rows, setRows] = useState<Array<{ local: string; remote: string }>>(() =>
+    Object.entries(value).map(([local, remote]) => ({ local, remote }))
+  )
+
+  const apply = (next: Array<{ local: string; remote: string }>): void => {
+    setRows(next)
+    const out: SecretMap = {}
+    for (const r of next) {
+      const local = r.local.trim()
+      const remote = r.remote.trim()
+      if (local === '' || remote === '' || local === remote) continue
+      out[local] = remote
+    }
+    onChange(out)
+  }
+
+  const edit = (i: number, patch: Partial<{ local: string; remote: string }>): void =>
+    apply(rows.map((r, j) => (i === j ? { ...r, ...patch } : r)))
+
+  return (
+    <div className="mt-2 border-t border-line-soft pt-3">
+      <p className="mb-1 text-note text-text">{t('envForm.secretMap.label')}</p>
+      <p className="mb-2 text-small leading-relaxed text-muted">{t('envForm.secretMap.hint')}</p>
+
+      <div className="flex flex-col gap-1.5">
+        {rows.map((r, i) => (
+          <div key={i} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
+            <Input
+              value={r.local}
+              onChange={(e) => edit(i, { local: e.target.value.trim() })}
+              className="font-mono"
+              placeholder={t('envForm.secretMap.localPlaceholder')}
+            />
+            <span className="text-meta text-faint">→</span>
+            <Input
+              value={r.remote}
+              onChange={(e) => edit(i, { remote: e.target.value.trim() })}
+              className="font-mono"
+              placeholder={t('envForm.secretMap.remotePlaceholder')}
+            />
+            <button
+              onClick={() => apply(rows.filter((_, j) => j !== i))}
+              className="px-1 text-meta text-muted hover:text-danger"
+            >
+              {t('common.delete').toLowerCase()}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <Button className="mt-2" onClick={() => setRows([...rows, { local: '', remote: '' }])}>
+        {t('envForm.secretMap.add')}
+      </Button>
+    </div>
   )
 }

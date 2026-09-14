@@ -4,6 +4,17 @@
 
 export type RemoteKind = 'managed' | 'self-hosted'
 
+/**
+ * Local `.env` key → the name the same secret has on the remote. Only the keys
+ * whose names actually differ belong here; everything else is pushed 1:1.
+ *
+ * It exists because a self-hosted stack rarely uses the CLI's names: a Coolify
+ * Supabase service calls Google's client id `GOOGLE_CLIENT_ID`, while
+ * `config.toml` refers to it as `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID`.
+ * Without the mapping a push writes a key nothing reads.
+ */
+export type SecretMap = Record<string, string>
+
 export interface ManagedEnv {
   id: string
   name: string
@@ -12,6 +23,8 @@ export interface ManagedEnv {
   projectRef: string
   /** The access token lives in safeStorage; only its presence is stored here. */
   hasToken: boolean
+  /** Optional — environments stored before the mapping existed have no field. */
+  secretMap?: SecretMap
 }
 
 export interface SelfHostedEnv {
@@ -25,7 +38,11 @@ export interface SelfHostedEnv {
   sshKeyPath: string
   /** Name of the Postgres container as found by `docker ps` */
   dbContainer: string
-  /** The Coolify service folder — functions are rsynced here */
+  /**
+   * The Coolify service folder — `.env` and `volumes/functions` are read from
+   * and written under it. Required: an empty value used to silently resolve to
+   * the server root, so the app read `/.env` instead of the service's own.
+   */
   remoteDir: string
   /** Edge runtime container; when empty, function deploys are disabled */
   functionsContainer: string
@@ -33,6 +50,8 @@ export interface SelfHostedEnv {
   siteUrl: string
   backupDir: string
   backupRetentionDays: number
+  /** Optional — environments stored before the mapping existed have no field. */
+  secretMap?: SecretMap
 }
 
 export type RemoteEnv = ManagedEnv | SelfHostedEnv
