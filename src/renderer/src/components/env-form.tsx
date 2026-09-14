@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import type { ManagedEnv, Project, RemoteEnv, SecretMap, SelfHostedEnv } from '@shared/types'
+import { isServiceId, servicePaths, serviceIdOf } from '@shared/coolify'
 import { call } from '../lib/ipc'
 import { useAction } from '../lib/use-action'
 import { useT } from '../i18n'
@@ -154,35 +155,7 @@ export function EnvForm({
                 placeholder="~/.ssh/id_ed25519"
               />
             </Row>
-            <Row label={t('envForm.dbContainer.label')} hint={t('envForm.dbContainer.hint')}>
-              <Input
-                value={env.dbContainer}
-                onChange={(e) => patch<SelfHostedEnv>({ dbContainer: e.target.value.trim() })}
-                className="font-mono"
-                placeholder="supabase-db-xxxxxxxx"
-              />
-            </Row>
-            <Row label={t('envForm.remoteDir.label')} hint={t('envForm.remoteDir.hint')}>
-              <Input
-                value={env.remoteDir}
-                onChange={(e) => patch<SelfHostedEnv>({ remoteDir: e.target.value.trim() })}
-                className="font-mono"
-                placeholder="/data/coolify/services/abc123"
-              />
-            </Row>
-            <Row
-              label={t('envForm.functionsContainer.label')}
-              hint={t('envForm.functionsContainer.hint')}
-            >
-              <Input
-                value={env.functionsContainer}
-                onChange={(e) =>
-                  patch<SelfHostedEnv>({ functionsContainer: e.target.value.trim() })
-                }
-                className="font-mono"
-                placeholder="supabase-edge-functions-xxxxxxxx"
-              />
-            </Row>
+            <ServicePathFields env={env} onPatch={(p) => patch<SelfHostedEnv>(p)} />
             <Row label={t('envForm.apiUrl.label')}>
               <Input
                 value={env.apiUrl}
@@ -234,6 +207,110 @@ export function EnvForm({
   )
 }
 
+/** The three fields a service id derives, in the order they are shown. */
+const DERIVED_FIELDS = [
+  {
+    key: 'dbContainer',
+    label: 'envForm.dbContainer.label',
+    hint: 'envForm.dbContainer.hint',
+    placeholder: 'supabase-db-xxxxxxxx'
+  },
+  {
+    key: 'remoteDir',
+    label: 'envForm.remoteDir.label',
+    hint: 'envForm.remoteDir.hint',
+    placeholder: '/data/coolify/services/abc123'
+  },
+  {
+    key: 'functionsContainer',
+    label: 'envForm.functionsContainer.label',
+    hint: 'envForm.functionsContainer.hint',
+    placeholder: 'supabase-edge-functions-xxxxxxxx'
+  }
+] as const
+
+type DerivedKey = (typeof DERIVED_FIELDS)[number]['key']
+
+/**
+ * The service id, and the three paths it derives.
+ *
+ * The paths are read-only text while they follow from the id — three inputs
+ * holding the same id three times is how they end up disagreeing. Each can be
+ * unlocked on its own for a stack that only half matches the layout, and an
+ * environment with no recognisable id starts fully unlocked, because then there
+ * is nothing to derive them from.
+ *
+ * The id itself is not stored: it IS those three fields, and a fourth copy would
+ * be one more thing that can drift. On reopen it is read back out of them.
+ */
+function ServicePathFields({
+  env,
+  onPatch
+}: {
+  env: SelfHostedEnv
+  onPatch: (patch: Partial<SelfHostedEnv>) => void
+}): ReactNode {
+  const t = useT()
+  const [serviceId, setServiceId] = useState(() => serviceIdOf(env))
+  const [unlocked, setUnlocked] = useState<ReadonlySet<DerivedKey>>(new Set())
+
+  const derived = isServiceId(serviceId) ? servicePaths(serviceId) : null
+
+  const changeId = (raw: string): void => {
+    const next = raw.trim()
+    setServiceId(next)
+    if (!isServiceId(next)) return
+    // A field the user took over is left alone — otherwise editing the id would
+    // silently undo the override they just made.
+    const paths = servicePaths(next)
+    const patch: Partial<SelfHostedEnv> = {}
+    for (const f of DERIVED_FIELDS) if (!unlocked.has(f.key)) patch[f.key] = paths[f.key]
+    onPatch(patch)
+  }
+
+  return (
+    <>
+      <Row label={t('envForm.serviceId.label')} hint={t('envForm.serviceId.hint')}>
+        <Input
+          value={serviceId}
+          onChange={(e) => changeId(e.target.value)}
+          className="font-mono"
+          placeholder="m2c95warvc2gnjnscj1znvh8"
+        />
+      </Row>
+
+      {DERIVED_FIELDS.map((f) => {
+        const value = env[f.key]
+        const locked = derived !== null && !unlocked.has(f.key)
+        return (
+          <Row key={f.key} label={t(f.label)} hint={locked ? undefined : t(f.hint)}>
+            {locked ? (
+              <div className="flex items-start gap-2 pt-1">
+                <code className="min-w-0 flex-1 break-all font-mono text-note text-muted">
+                  {value}
+                </code>
+                <button
+                  onClick={() => setUnlocked((prev) => new Set(prev).add(f.key))}
+                  className="shrink-0 text-meta text-muted hover:text-accent"
+                >
+                  {t('common.edit').toLowerCase()}
+                </button>
+              </div>
+            ) : (
+              <Input
+                value={value}
+                onChange={(e) => onPatch({ [f.key]: e.target.value.trim() })}
+                className="font-mono"
+                placeholder={f.placeholder}
+              />
+            )}
+          </Row>
+        )
+      })}
+    </>
+  )
+}
+
 /**
  * The local→remote rename table.
  *
@@ -270,11 +347,11 @@ function SecretMapEditor({
   const edit = (i: number, patch: Partial<{ local: string; remote: string }>): void =>
     apply(rows.map((r, j) => (i === j ? { ...r, ...patch } : r)))
 
+  // The same two-column `Row` every other field uses — a full-width block here
+  // would sit flush against the modal's left edge while the fields above it are
+  // indented, which reads as a different form rather than one more field.
   return (
-    <div className="mt-2 border-t border-line-soft pt-3">
-      <p className="mb-1 text-note text-text">{t('envForm.secretMap.label')}</p>
-      <p className="mb-2 text-small leading-relaxed text-muted">{t('envForm.secretMap.hint')}</p>
-
+    <Row label={t('envForm.secretMap.label')} hint={t('envForm.secretMap.hint')}>
       <div className="flex flex-col gap-1.5">
         {rows.map((r, i) => (
           <div key={i} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
@@ -299,11 +376,12 @@ function SecretMapEditor({
             </button>
           </div>
         ))}
+        <div>
+          <Button onClick={() => setRows([...rows, { local: '', remote: '' }])}>
+            {t('envForm.secretMap.add')}
+          </Button>
+        </div>
       </div>
-
-      <Button className="mt-2" onClick={() => setRows([...rows, { local: '', remote: '' }])}>
-        {t('envForm.secretMap.add')}
-      </Button>
-    </div>
+    </Row>
   )
 }

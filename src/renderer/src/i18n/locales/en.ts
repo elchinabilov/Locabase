@@ -580,6 +580,10 @@ const en = {
     sshHost: { label: 'SSH host', hint: '`root@server` or an alias from ~/.ssh/config' },
     sshPort: { label: 'SSH port' },
     sshKey: { label: 'SSH key', hint: 'Leave empty to use ssh-agent and default keys' },
+    serviceId: {
+      label: 'Service ID',
+      hint: 'The Coolify service id. Typing it fills the container names and the service folder: supabase-db-<id>, supabase-edge-functions-<id>, /data/coolify/services/<id>. On any other layout, fill the fields below by hand.'
+    },
     dbContainer: {
       label: 'Postgres container',
       hint: "on the server: docker ps --format '{{.Names}}' | grep supabase-db"

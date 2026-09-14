@@ -574,6 +574,10 @@ const az = {
     sshHost: { label: 'SSH host', hint: '`root@server` və ya ~/.ssh/config-dakı alias' },
     sshPort: { label: 'SSH port' },
     sshKey: { label: 'SSH açarı', hint: 'Boş buraxsan ssh-agent və default açarlar işlənir' },
+    serviceId: {
+      label: 'Servis ID',
+      hint: 'Coolify servis id-si. Yazan kimi konteyner adları və servis qovluğu avtomatik dolur: supabase-db-<id>, supabase-edge-functions-<id>, /data/coolify/services/<id>. Başqa quruluşdadırsa aşağıdakı sahələri əl ilə doldur.'
+    },
     dbContainer: {
       label: 'Postgres konteyneri',
       hint: "serverdə: docker ps --format '{{.Names}}' | grep supabase-db"
