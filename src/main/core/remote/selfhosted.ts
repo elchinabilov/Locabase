@@ -7,7 +7,13 @@
  */
 import { basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { addServiceEnv, findAuthService, serviceEnv, serviceNames } from '@shared/compose.js'
+import {
+  addServiceEnv,
+  findAuthService,
+  rewriteServiceEnv,
+  serviceEnv,
+  serviceNames
+} from '@shared/compose.js'
 import { parseBytes } from '@shared/services.js'
 import type {
   BackupFormat,
@@ -45,7 +51,7 @@ import {
 import { checkEndpoints } from './index.js'
 import type {
   AuthApplyResult,
-  AuthEnvGaps,
+  AuthEnvPlan,
   LedgerRow,
   LogFn,
   RemoteAdapter,
@@ -449,35 +455,110 @@ export class SelfHostedAdapter implements RemoteAdapter {
   }
 
   /**
-   * Which of `names` the auth container is NOT handed.
-   *
-   * A variable in `.env` is not a variable in the container: compose expands
-   * `${…}` from that file but passes on only what the service's own
-   * `environment:` block lists. A stock Coolify Supabase stack lists nothing
-   * about OAuth, so every `GOTRUE_EXTERNAL_<provider>_*` we write is read by
-   * nobody until the compose file names it too — and the symptom is a provider
-   * that stays disabled no matter how correct the `.env` looks.
+   * The id every container in the stack is named after. Coolify names them
+   * `<service>-<id>`, so the Postgres container's own suffix identifies the whole
+   * stack — the same trick a hand-written deploy script uses.
    */
-  async authEnvGaps(names: string[]): Promise<AuthEnvGaps> {
+  private stackSuffix(): string {
+    const suffix = this.env.dbContainer.slice(this.env.dbContainer.lastIndexOf('-') + 1)
+    if (suffix.length < 4) {
+      throw new Error(
+        `Could not derive the stack suffix from the Postgres container name: ${this.env.dbContainer}`
+      )
+    }
+    return suffix
+  }
+
+  /**
+   * The environment the auth container is actually running with.
+   *
+   * Every other source of this answer is a reconstruction: `.env` does not say
+   * whether a value reaches the process, the compose file's defaults apply only
+   * when a key is absent, and a stack generator may have rewritten either since.
+   * The container knows, so we ask it — and every «the push worked but nothing
+   * changed» report becomes a diff that is simply right.
+   *
+   * `null` when it cannot be read; the caller falls back and says so rather than
+   * reporting a guess as fact.
+   */
+  private async authContainerEnv(service: string): Promise<Map<string, string> | null> {
+    const container = `${service}-${this.stackSuffix()}`
+    const out = await this.ssh(
+      `docker inspect -f '{{json .Config.Env}}' ${sq(container)} 2>/dev/null || true`,
+      { quiet: true, maxOutputLines: 200_000 }
+    )
+    const text = out.trim()
+    if (text === '' || text === 'null') return null
+
+    let entries: unknown
+    try {
+      entries = JSON.parse(text)
+    } catch {
+      return null
+    }
+    if (!Array.isArray(entries)) return null
+
+    const env = new Map<string, string>()
+    for (const entry of entries) {
+      if (typeof entry !== 'string') continue
+      const eq = entry.indexOf('=')
+      if (eq <= 0) continue
+      env.set(entry.slice(0, eq), entry.slice(eq + 1))
+    }
+    return env
+  }
+
+  /**
+   * How `names` reach the auth container, if they do.
+   *
+   * Two separate ways a correct `.env` still changes nothing. The container is
+   * handed only what the service's own `environment:` block lists, so a stock
+   * Coolify stack — which says nothing about OAuth — ignores every
+   * `GOTRUE_EXTERNAL_<provider>_*` we write. And a listed variable may be fed
+   * from a DIFFERENT `.env` key: this stack wires `GOTRUE_URI_ALLOW_LIST` to
+   * `ADDITIONAL_REDIRECT_URLS`, so writing the GoTrue name sets a variable the
+   * compose line then overwrites. Both look like the push having failed.
+   */
+  async authEnvPlan(names: string[]): Promise<AuthEnvPlan> {
+    const blank = { envKey: {}, current: null, literal: [], missing: [] }
     const compose = await this.readCompose()
     if (compose === null) {
-      return { composePath: null, service: null, missing: [], readable: false }
+      return { composePath: null, service: null, ...blank, readable: false }
     }
     const service = findAuthService(compose.text)
     if (service === null) {
-      return { composePath: compose.path, service: null, missing: [], readable: false }
+      return { composePath: compose.path, service: null, ...blank, readable: false }
     }
     const env = serviceEnv(compose.text, service)
     if (!env.found) {
-      return { composePath: compose.path, service, missing: [], readable: false }
+      return { composePath: compose.path, service, ...blank, readable: false }
     }
-    return {
-      composePath: compose.path,
-      service,
-      // `env_file:` hands the whole file over, so nothing can be missing
-      missing: env.envFile ? [] : names.filter((n) => !env.names.has(n)),
-      readable: true
+
+    const running = await this.authContainerEnv(service)
+    const current: Record<string, string> | null = running === null ? null : {}
+    if (running !== null && current !== null) {
+      for (const name of names) {
+        const value = running.get(name)
+        if (value !== undefined) current[name] = value
+      }
     }
+
+    const envKey: Record<string, string> = {}
+    const literal: string[] = []
+    const missing: string[] = []
+    for (const name of names) {
+      if (!env.names.has(name)) {
+        // `env_file:` hands the whole file over, so nothing can be missing and the
+        // key is the name itself.
+        if (env.envFile) envKey[name] = name
+        else missing.push(name)
+        continue
+      }
+      const source = env.sources.get(name) ?? null
+      if (source === null) literal.push(name)
+      else envKey[name] = source
+    }
+    return { composePath: compose.path, service, envKey, current, literal, missing, readable: true }
   }
 
   /**
@@ -510,12 +591,22 @@ export class SelfHostedAdapter implements RemoteAdapter {
       )
     }
 
-    const has = serviceEnv(compose.text, service).names
-    const added = names.filter((n) => !has.has(n))
-    const patched = addServiceEnv(compose.text, service, names)
+    const env = serviceEnv(compose.text, service)
+    const added = names.filter((n) => !env.names.has(n))
+    // A value the compose file writes itself is beyond the reach of `.env`. The
+    // line is re-pointed at `.env` rather than left alone, so the variable joins
+    // the ones this app can actually set — and can be read back and compared.
+    const rewired = names.filter((n) => env.names.has(n) && (env.sources.get(n) ?? null) === null)
+
+    const patched = rewriteServiceEnv(addServiceEnv(compose.text, service, names), service, rewired)
     const composeChanged = patched !== compose.text
     if (composeChanged) {
-      log(`${compose.path}: adding ${added.length} variable(s) to ${service}: ${added.join(', ')}`)
+      if (added.length > 0) {
+        log(`${compose.path}: adding to ${service}: ${added.join(', ')}`)
+      }
+      if (rewired.length > 0) {
+        log(`${compose.path}: re-pointing at .env in ${service}: ${rewired.join(', ')}`)
+      }
       await this.writeRemoteFile(compose.path, patched)
     }
 
@@ -525,7 +616,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
       { timeoutMs: 300_000 }
     )
     log(out.trim() || `${service} is up`)
-    return { composeChanged, service, composePath: compose.path }
+    return { composeChanged, rewired, service, composePath: compose.path }
   }
 
   /** Write a file over ssh, keeping a timestamped copy of what was there. */
@@ -675,12 +766,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
    * same trick a hand-written deploy script uses.
    */
   async listServices(): Promise<RemoteService[]> {
-    const suffix = this.env.dbContainer.slice(this.env.dbContainer.lastIndexOf('-') + 1)
-    if (suffix.length < 4) {
-      throw new Error(
-        `Could not derive the stack suffix from the Postgres container name: ${this.env.dbContainer}`
-      )
-    }
+    const suffix = this.stackSuffix()
 
     const [psOut, statsOut] = await Promise.all([
       this.ssh(
@@ -727,7 +813,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
    * deploy — to disable it for good, remove it from the compose file.
    */
   async setServiceState(container: string, on: boolean, log: LogFn): Promise<void> {
-    const suffix = this.env.dbContainer.slice(this.env.dbContainer.lastIndexOf('-') + 1)
+    const suffix = this.stackSuffix()
     if (!container.endsWith(`-${suffix}`)) {
       throw new Error(`This container does not belong to the stack: ${container}`)
     }
@@ -744,7 +830,10 @@ export class SelfHostedAdapter implements RemoteAdapter {
       ['REST', `${base}/rest/v1/`],
       ['Auth', `${base}/auth/v1/health`]
     ]
-    if (this.env.siteUrl) targets.push(['App', this.env.siteUrl])
+    // Only an http(s) app URL can be reached with a GET. A mobile scheme
+    // (`myapp://login`) is a perfectly valid value for the field and would fail
+    // the check for a reason that has nothing to do with the stack.
+    if (/^https?:\/\//i.test(this.env.siteUrl)) targets.push(['App', this.env.siteUrl])
     return checkEndpoints(targets)
   }
 

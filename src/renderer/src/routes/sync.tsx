@@ -431,6 +431,11 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
                   label={
                     <span className="flex min-w-0 items-center gap-1.5">
                       <code className="truncate font-mono">{a.name}</code>
+                      {a.mapped && (
+                        <span className="truncate font-mono text-micro text-faint">
+                          → {a.envKey}
+                        </span>
+                      )}
                       <span className="truncate font-mono text-micro text-faint">
                         {a.where === 'both' ? a.local : `${a.remote || '—'} → ${a.local}`}
                       </span>

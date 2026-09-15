@@ -41,7 +41,7 @@ import { failedRun } from '../sql/build.js'
 import { checkEndpoints } from './index.js'
 import type {
   AuthApplyResult,
-  AuthEnvGaps,
+  AuthEnvPlan,
   LedgerRow,
   LogFn,
   RemoteAdapter,
@@ -388,8 +388,16 @@ export class ManagedAdapter implements RemoteAdapter {
    * are pushed with `supabase config push`, so there is no compose file to read
    * and nothing here to compare.
    */
-  async authEnvGaps(): Promise<AuthEnvGaps> {
-    return { composePath: null, service: null, missing: [], readable: true }
+  async authEnvPlan(): Promise<AuthEnvPlan> {
+    return {
+      composePath: null,
+      service: null,
+      envKey: {},
+      current: null,
+      literal: [],
+      missing: [],
+      readable: true
+    }
   }
 
   async applyAuthVars(): Promise<AuthApplyResult> {

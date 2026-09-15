@@ -164,7 +164,7 @@ export function EnvForm({
                 placeholder="https://api.next-cv.app"
               />
             </Row>
-            <Row label={t('envForm.siteUrl.label')}>
+            <Row label={t('envForm.siteUrl.label')} hint={t('envForm.siteUrl.hint')}>
               <Input
                 value={env.siteUrl}
                 onChange={(e) => patch<SelfHostedEnv>({ siteUrl: e.target.value.trim() })}

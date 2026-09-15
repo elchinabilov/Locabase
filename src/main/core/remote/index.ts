@@ -27,20 +27,47 @@ export interface LedgerRow {
 
 export type LogFn = (text: string) => void
 
-export interface AuthEnvGaps {
+/**
+ * How the remote's auth container is actually wired, for a given set of GoTrue
+ * variable names.
+ *
+ * Answering this needs the compose file, because `.env` alone does not say
+ * whether a value reaches the process, or even under which key it has to be
+ * written.
+ */
+export interface AuthEnvPlan {
   /** the compose file we read, or null when there is none */
   composePath: string | null
   /** the service running GoTrue, by image */
   service: string | null
-  /** the variables that service is not handed */
+  /** GoTrue name → the `.env` key that feeds it; absent when nothing does */
+  envKey: Record<string, string>
+  /**
+   * What the auth container is running with RIGHT NOW, read from the container
+   * itself. This is the only answer that cannot be wrong: it is past the compose
+   * file's defaults, past whichever `.env` key feeds which variable, and past
+   * whatever a stack generator rewrote on its last deploy.
+   *
+   * `null` when the container could not be read (not running, or no docker
+   * access) — the caller then falls back to `.env` and says so.
+   */
+  current: Record<string, string> | null
+  /**
+   * Names the compose file writes itself. Not a refusal: the deploy rewrites
+   * these lines to read from `.env`, so the value stops being out of reach.
+   */
+  literal: string[]
+  /** names the container is not handed at all */
   missing: string[]
   /** false when the file could not be read well enough to answer */
   readable: boolean
 }
 
 export interface AuthApplyResult {
-  /** true when lines had to be added to the compose file */
+  /** true when the compose file had to be edited at all */
   composeChanged: boolean
+  /** names whose hardcoded compose line was changed to read from `.env` */
+  rewired: string[]
   service: string
   composePath: string
 }
@@ -92,11 +119,12 @@ export interface RemoteAdapter {
   /** Remove secrets by their remote name. */
   unsetSecrets(names: string[], log: LogFn): Promise<void>
   /**
-   * Which auth variables the remote's auth container is not handed. A value in
-   * the stack `.env` only reaches the process when the compose file names it, so
-   * a clean secret push can still leave the provider disabled.
+   * How these auth variables reach the remote's auth container — under which
+   * `.env` key, or not at all. A value in the stack `.env` only reaches the
+   * process when the compose file names it, so a clean secret push can still
+   * leave the provider disabled.
    */
-  authEnvGaps(names: string[]): Promise<AuthEnvGaps>
+  authEnvPlan(names: string[]): Promise<AuthEnvPlan>
   /**
    * Name those variables in the compose file if needed and recreate the auth
    * container, so values just written to `.env` are actually read.

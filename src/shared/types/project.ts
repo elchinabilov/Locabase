@@ -47,6 +47,11 @@ export interface SelfHostedEnv {
   /** Edge runtime container; when empty, function deploys are disabled */
   functionsContainer: string
   apiUrl: string
+  /**
+   * Where a finished sign-in returns to. Not necessarily a web address — a mobile
+   * client's callback is a scheme like `myapp://login`, and GoTrue treats both the
+   * same way. Pushed as `GOTRUE_SITE_URL` and merged into the redirect allow list.
+   */
   siteUrl: string
   backupDir: string
   backupRetentionDays: number

@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { addServiceEnv, findAuthService, serviceEnv, serviceNames } from '../src/shared/compose.js'
+import {
+  addServiceEnv,
+  findAuthService,
+  rewriteServiceEnv,
+  serviceEnv,
+  serviceNames
+} from '../src/shared/compose.js'
 
 /** The compose a Coolify Supabase service really ships with. */
 const COOLIFY = readFileSync(
@@ -140,5 +146,116 @@ describe('serviceNames', () => {
 
   it('is empty when there is no services block at all', () => {
     expect(serviceNames('volumes:\n  data: {}\n')).toEqual([])
+  })
+})
+
+describe('serviceEnv sources', () => {
+  const sources = serviceEnv(COOLIFY, 'supabase-auth').sources
+
+  /**
+   * The trap this exists for: the container variable and the `.env` key are not
+   * the same word. Writing GOTRUE_URI_ALLOW_LIST into `.env` sets a variable the
+   * compose line then overwrites with ADDITIONAL_REDIRECT_URLS, and the push
+   * reports success while nothing changes.
+   */
+  it('follows a variable fed from a differently named .env key', () => {
+    expect(sources.get('GOTRUE_URI_ALLOW_LIST')).toBe('ADDITIONAL_REDIRECT_URLS')
+  })
+
+  it('reads through a `:-default`, including a nested one', () => {
+    expect(sources.get('GOTRUE_SITE_URL')).toBe('GOTRUE_SITE_URL')
+    expect(sources.get('API_EXTERNAL_URL')).toBe('API_EXTERNAL_URL')
+    expect(sources.get('GOTRUE_EXTERNAL_PHONE_ENABLED')).toBe('ENABLE_PHONE_SIGNUP')
+  })
+
+  it('is null for a value the compose file writes itself', () => {
+    expect(sources.get('GOTRUE_API_PORT')).toBeNull()
+    expect(sources.get('GOTRUE_API_HOST')).toBeNull()
+  })
+
+  it('treats a bare `- NAME` as pass-through under its own name', () => {
+    expect(serviceEnv(COOLIFY, 'supabase-kong').sources.get('SERVICE_URL_SUPABASEKONG_8000')).toBe(
+      'SERVICE_URL_SUPABASEKONG_8000'
+    )
+  })
+
+  /**
+   * A reference embedded in a larger value has no single source: setting the
+   * referenced key would not make the container variable what we asked for.
+   */
+  it('is null when the reference is only part of the value', () => {
+    const text =
+      'services:\n  auth:\n    image: supabase/gotrue\n    environment:\n      - ' +
+      "'DB=postgres://u:${PASS}@host/db'\n"
+    expect(serviceEnv(text, 'auth').sources.get('DB')).toBeNull()
+  })
+
+  it('reads sources in the mapping form too', () => {
+    const text =
+      'services:\n  auth:\n    image: supabase/gotrue\n    environment:\n      FOO: ${BAR}\n      LIT: 9\n'
+    const map = serviceEnv(text, 'auth').sources
+    expect(map.get('FOO')).toBe('BAR')
+    expect(map.get('LIT')).toBeNull()
+  })
+})
+
+describe('rewriteServiceEnv', () => {
+  const HARDCODED =
+    'services:\n' +
+    '  supabase-auth:\n' +
+    "    image: 'supabase/gotrue:v2.186.0'\n" +
+    '    environment:\n' +
+    '      - GOTRUE_API_PORT=9999\n' +
+    "      - 'API_EXTERNAL_URL=https://api.example.com'\n" +
+    "      - 'GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}'\n"
+
+  /**
+   * A value the compose file writes itself is beyond the reach of `.env`. Leaving
+   * it alone leaves the user with a variable nothing can change.
+   */
+  it('re-points a hardcoded value at .env under its own name', () => {
+    const out = rewriteServiceEnv(HARDCODED, 'supabase-auth', ['API_EXTERNAL_URL'])
+    expect(out).toContain("      - 'API_EXTERNAL_URL=${API_EXTERNAL_URL}'")
+    expect(serviceEnv(out, 'supabase-auth').sources.get('API_EXTERNAL_URL')).toBe(
+      'API_EXTERNAL_URL'
+    )
+  })
+
+  /**
+   * That key is the stack's own wiring and something else may read it — re-pointing
+   * it at a different name would break whatever that is.
+   */
+  it('leaves a line that already reads from a .env key alone', () => {
+    const out = rewriteServiceEnv(HARDCODED, 'supabase-auth', ['GOTRUE_JWT_SECRET'])
+    expect(out).toBe(HARDCODED)
+  })
+
+  it('touches only the names it was given', () => {
+    const out = rewriteServiceEnv(HARDCODED, 'supabase-auth', ['API_EXTERNAL_URL'])
+    expect(out).toContain('      - GOTRUE_API_PORT=9999')
+    expect(out.split('\n').length).toBe(HARDCODED.split('\n').length)
+  })
+
+  it('keeps the mapping form when the file uses it', () => {
+    const text =
+      'services:\n  auth:\n    image: supabase/gotrue\n    environment:\n      FOO: 9999\n'
+    const out = rewriteServiceEnv(text, 'auth', ['FOO'])
+    expect(out).toContain('      FOO: ${FOO}')
+  })
+
+  it('is a no-op for a name the service does not have', () => {
+    expect(rewriteServiceEnv(HARDCODED, 'supabase-auth', ['NOPE'])).toBe(HARDCODED)
+  })
+
+  it('composes with addServiceEnv — add what is missing, re-point what is stuck', () => {
+    const out = rewriteServiceEnv(
+      addServiceEnv(HARDCODED, 'supabase-auth', ['GOTRUE_EXTERNAL_GOOGLE_ENABLED']),
+      'supabase-auth',
+      ['API_EXTERNAL_URL']
+    )
+    const sources = serviceEnv(out, 'supabase-auth').sources
+    expect(sources.get('GOTRUE_EXTERNAL_GOOGLE_ENABLED')).toBe('GOTRUE_EXTERNAL_GOOGLE_ENABLED')
+    expect(sources.get('API_EXTERNAL_URL')).toBe('API_EXTERNAL_URL')
+    expect(sources.get('GOTRUE_JWT_SECRET')).toBe('SERVICE_PASSWORD_JWT')
   })
 })

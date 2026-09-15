@@ -55,6 +55,21 @@ export interface DesiredVar {
   provider: string
 }
 
+/**
+ * Where this environment lives, as the remote has to be told it.
+ *
+ * `appUrl` is not necessarily a web address: a mobile client's callback is a
+ * scheme like `myapp://login`, and GoTrue treats both the same way.
+ */
+export interface AuthTargets {
+  /** the remote API base — GoTrue's own external address */
+  apiUrl: string
+  /** where a finished sign-in returns to: a https URL, or an app scheme */
+  appUrl: string
+  /** the allow list the remote holds today, so entries added there are not lost */
+  currentAllowList: string
+}
+
 export interface DesiredAuth {
   vars: DesiredVar[]
   /**
@@ -63,6 +78,47 @@ export interface DesiredAuth {
    * server fails in a way that looks like a network problem.
    */
   problems: Array<{ provider: string; field: string }>
+}
+
+/**
+ * Trailing slashes go, except from a bare scheme: `myapp://` trimmed to `myapp:`
+ * is no longer something a redirect can be matched against.
+ */
+function normalizeAppUrl(appUrl: string): string {
+  const trimmed = appUrl.trim()
+  if (/^[a-z][a-z0-9+.-]*:\/\/$/i.test(trimmed)) return trimmed
+  return trimmed.replace(/\/+$/, '')
+}
+
+/**
+ * The redirect allow list: what the remote already holds, plus the app URL.
+ *
+ * A MERGE and not a replacement. This list is the open-redirect surface of the
+ * whole stack, and a self-hosted one legitimately carries entries this app never
+ * hears about — a staging domain, a second mobile scheme, a preview deployment.
+ * Dropping those to push one derived value would be a security change wearing a
+ * config sync's clothes, so existing entries keep their place and order and the
+ * derived ones are appended only when they are not already there.
+ *
+ * Both the bare URL and its glob form go in: GoTrue matches the list as globs and
+ * the callback always carries a path.
+ */
+export function allowList(appUrl: string, current: string): string {
+  const entries = current
+    .split(',')
+    .map((e) => e.trim())
+    .filter((e) => e !== '')
+
+  const base = normalizeAppUrl(appUrl)
+  if (base === '') return entries.join(',')
+
+  const seen = new Set(entries)
+  for (const candidate of [base, base.endsWith('//') ? `${base}**` : `${base}/**`]) {
+    if (seen.has(candidate)) continue
+    entries.push(candidate)
+    seen.add(candidate)
+  }
+  return entries.join(',')
 }
 
 /**
@@ -77,8 +133,9 @@ export interface DesiredAuth {
  * A disabled provider contributes only `…_ENABLED=false`. Writing its empty
  * client id and secret as well would fill the file with keys that mean nothing.
  */
-export function desiredAuthVars(providers: LocalProvider[], apiUrl: string): DesiredAuth {
-  const base = apiUrl.trim().replace(/\/+$/, '')
+export function desiredAuthVars(providers: LocalProvider[], targets: AuthTargets): DesiredAuth {
+  const base = targets.apiUrl.trim().replace(/\/+$/, '')
+  const app = normalizeAppUrl(targets.appUrl)
   const vars: DesiredVar[] = []
   const problems: DesiredAuth['problems'] = []
 
@@ -86,6 +143,20 @@ export function desiredAuthVars(providers: LocalProvider[], apiUrl: string): Des
     // Without this GoTrue builds the callback from the internal Kong address and
     // every provider round trip dies at the redirect, enabled or not.
     vars.push({ name: 'API_EXTERNAL_URL', value: base, secret: false, provider: '' })
+  }
+
+  if (app !== '') {
+    // The two halves of where a finished sign-in lands. GoTrue checks the app's
+    // `redirect_to` against the allow list and, when it is not on it, sends the
+    // user to SITE_URL instead — which on a stock stack is the API's own domain.
+    // That is the whole «signed in, but on the wrong site» symptom.
+    vars.push({ name: 'GOTRUE_SITE_URL', value: app, secret: false, provider: '' })
+    vars.push({
+      name: 'GOTRUE_URI_ALLOW_LIST',
+      value: allowList(app, targets.currentAllowList),
+      secret: false,
+      provider: ''
+    })
   }
 
   for (const p of providers) {
@@ -142,7 +213,16 @@ export function desiredAuthVars(providers: LocalProvider[], apiUrl: string): Des
 export type AuthVarWhere = 'local-only' | 'changed' | 'both'
 
 export interface AuthVarDiff {
+  /** the name GoTrue reads it under, inside the container */
   name: string
+  /**
+   * The `.env` key that feeds it. Usually the same word, but a stack is free to
+   * wire `GOTRUE_URI_ALLOW_LIST` to `ADDITIONAL_REDIRECT_URLS`, and then this is
+   * the name the push has to write.
+   */
+  envKey: string
+  /** true when the two names differ, so the screen can show both */
+  mapped: boolean
   provider: string
   /** the value the local configuration asks for */
   local: string
@@ -158,14 +238,26 @@ export interface AuthVarDiff {
  * `…_ENABLED=false` for a provider the remote has never heard of is dropped:
  * every provider is off by default, so writing twenty `false` lines would turn a
  * clean report into a wall of work that changes nothing.
+ *
+ * `currentOf` answers what the remote HAS, and the caller decides where that
+ * answer comes from — the running container when it can be read, the `.env` file
+ * otherwise. `envKeyOf` is a separate question: not what the value is, but which
+ * key a new one has to be written under.
  */
-export function buildAuthDiff(desired: DesiredVar[], remote: Map<string, string>): AuthVarDiff[] {
+export function buildAuthDiff(
+  desired: DesiredVar[],
+  currentOf: (name: string) => string | undefined,
+  envKeyOf: (name: string) => string = (name) => name
+): AuthVarDiff[] {
   const rows: AuthVarDiff[] = []
   for (const v of desired) {
-    const current = remote.get(v.name)
+    const envKey = envKeyOf(v.name)
+    const current = currentOf(v.name)
     if (current === undefined && v.value === 'false') continue
     rows.push({
       name: v.name,
+      envKey,
+      mapped: envKey !== v.name,
       provider: v.provider,
       local: v.value,
       remote: current ?? '',

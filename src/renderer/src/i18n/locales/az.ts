@@ -598,7 +598,10 @@ const az = {
       hint: 'Boş qalsa funksiya deploy-u söndürülür'
     },
     apiUrl: { label: 'API URL' },
-    siteUrl: { label: 'Site URL' },
+    siteUrl: {
+      label: 'Tətbiq URL-i',
+      hint: 'Girişdən sonra istifadəçinin qayıtdığı ünvan — https://app.example.com, yaxud myapp://login kimi mobil sxem. GOTRUE_SITE_URL kimi göndərilir və redirect allow list-ə əlavə olunur.'
+    },
     backupDir: { label: 'Yedək qovluğu' },
     backupRetention: { label: 'Yedək saxlama (gün)' }
   },

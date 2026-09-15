@@ -11,6 +11,7 @@ import { AUTH_PROVIDERS } from '@shared/providers.js'
 import {
   buildAuthDiff,
   desiredAuthVars,
+  type AuthTargets,
   type AuthVarDiff,
   type DesiredAuth,
   type DesiredVar,
@@ -54,19 +55,19 @@ export function localProviders(projectId: string): LocalProvider[] {
 }
 
 /** The variables the remote must hold for it to behave the way the local stack does. */
-export function desiredFor(projectId: string, apiUrl: string): DesiredAuth {
-  return desiredAuthVars(localProviders(projectId), apiUrl)
+export function desiredFor(projectId: string, targets: AuthTargets): DesiredAuth {
+  return desiredAuthVars(localProviders(projectId), targets)
 }
 
 /** The values for the named variables — for the push. Never logged. */
 export function valuesFor(
   projectId: string,
-  apiUrl: string,
+  targets: AuthTargets,
   names: string[]
 ): Record<string, string> {
   const wanted = new Set(names)
   const kv: Record<string, string> = {}
-  for (const v of desiredFor(projectId, apiUrl).vars) {
+  for (const v of desiredFor(projectId, targets).vars) {
     if (wanted.has(v.name)) kv[v.name] = v.value
   }
   const missing = names.filter((n) => !(n in kv))
@@ -79,8 +80,12 @@ export function valuesFor(
 }
 
 /** The diff rows, with secret values masked for the screen. */
-export function diffRows(desired: DesiredVar[], remote: Map<string, string>): AuthVarDiff[] {
-  return buildAuthDiff(desired, remote).map((row) =>
+export function diffRows(
+  desired: DesiredVar[],
+  currentOf: (name: string) => string | undefined,
+  envKeyOf?: (name: string) => string
+): AuthVarDiff[] {
+  return buildAuthDiff(desired, currentOf, envKeyOf).map((row) =>
     row.secret
       ? { ...row, local: mask(row.local), remote: row.remote === '' ? '' : mask(row.remote) }
       : row

@@ -62,18 +62,39 @@ function serviceLine(lines: string[], service: string): number {
   return childKey(lines, body, service)
 }
 
-/** `- 'FOO=bar'`, `- FOO`, `FOO: bar` → `FOO`. */
-function envItemName(line: string): string | null {
+/**
+ * The `.env` variable a value is read from — but only when the WHOLE value is one
+ * reference: `${FOO}` or `${FOO:-default}`.
+ *
+ * A value with text around the reference (`postgres://user:${PASS}@host`) has no
+ * single source: writing to `PASS` would not set the container variable to what
+ * we asked for, so it is reported as unsettable rather than guessed at.
+ */
+function envItemSource(value: string): string | null {
+  const m = /^\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-.*)?\}$/.exec(value.trim())
+  return m ? m[1]! : null
+}
+
+/** `- 'FOO=${BAR}'`, `- FOO`, `FOO: bar` → the name and, when there is one, its `.env` source. */
+function envItem(line: string): { name: string; source: string | null } | null {
   let text = line.trim()
   if (text.startsWith('-')) {
     text = text.slice(1).trim()
     const quote = text[0]
     if ((quote === '"' || quote === "'") && text.endsWith(quote)) text = text.slice(1, -1)
-    const name = text.split('=')[0]!.trim()
-    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : null
+    const eq = text.indexOf('=')
+    const name = (eq === -1 ? text : text.slice(0, eq)).trim()
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return null
+    // `- FOO` with no `=` is compose's own pass-through: the value comes from the
+    // environment under the same name.
+    return { name, source: eq === -1 ? name : envItemSource(text.slice(eq + 1)) }
   }
-  const m = /^["']?([A-Za-z_][A-Za-z0-9_]*)["']?\s*:/.exec(text)
-  return m ? m[1]! : null
+  const m = /^["']?([A-Za-z_][A-Za-z0-9_]*)["']?\s*:(.*)$/.exec(text)
+  if (m === null) return null
+  let value = m[2]!.trim()
+  const quote = value[0]
+  if ((quote === '"' || quote === "'") && value.endsWith(quote)) value = value.slice(1, -1)
+  return { name: m[1]!, source: envItemSource(value) }
 }
 
 export interface ServiceEnv {
@@ -81,6 +102,15 @@ export interface ServiceEnv {
   found: boolean
   /** the variable names the container is handed */
   names: Set<string>
+  /**
+   * For each of those names, the `.env` key whose value it carries — `null` when
+   * the compose file writes the value itself and `.env` cannot change it.
+   *
+   * The two are not always the same word. The Coolify Supabase stack feeds
+   * `GOTRUE_URI_ALLOW_LIST` from `ADDITIONAL_REDIRECT_URLS`, so writing the
+   * GoTrue name into `.env` sets a variable the compose line then overwrites.
+   */
+  sources: Map<string, string | null>
   /** true when the service pulls a whole file in, so unnamed variables reach it too */
   envFile: boolean
 }
@@ -88,21 +118,26 @@ export interface ServiceEnv {
 export function serviceEnv(text: string, service: string): ServiceEnv {
   const lines = text.split('\n')
   const at = serviceLine(lines, service)
-  if (at === -1) return { found: false, names: new Set(), envFile: false }
+  if (at === -1) {
+    return { found: false, names: new Set(), sources: new Map(), envFile: false }
+  }
 
   const body = blockBody(lines, at)
   const names = new Set<string>()
+  const sources = new Map<string, string | null>()
   const envAt = childKey(lines, body, 'environment')
   if (envAt !== -1) {
     const envBody = blockBody(lines, envAt)
     for (let i = envBody.start; i < envBody.end; i++) {
       const line = lines[i]!
       if (COMMENT_OR_BLANK.test(line)) continue
-      const name = envItemName(line)
-      if (name !== null) names.add(name)
+      const item = envItem(line)
+      if (item === null) continue
+      names.add(item.name)
+      sources.set(item.name, item.source)
     }
   }
-  return { found: true, names, envFile: childKey(lines, body, 'env_file') !== -1 }
+  return { found: true, names, sources, envFile: childKey(lines, body, 'env_file') !== -1 }
 }
 
 /** Every service the file declares, in file order — for a message that has to say what was seen. */
@@ -150,6 +185,46 @@ export function findAuthService(text: string): string | null {
     if (image && /gotrue|supabase\/auth/i.test(image[1]!)) return current
   }
   return fallback
+}
+
+/**
+ * Rewrite `names` so they read from `.env` under their own name, whatever the
+ * file says today — `- 'FOO=9999'` becomes `- 'FOO=${FOO}'`.
+ *
+ * A compose file that writes a value itself puts that value beyond the reach of
+ * `.env`, and a stack generator does this freely. Refusing to touch such a line
+ * leaves the user with a variable nothing can change; rewriting it moves the
+ * value into the file where every other value lives, where it can then be read
+ * back and compared like the rest.
+ *
+ * Lines already reading from some `.env` key are left exactly as they are: that
+ * key is the stack's own wiring, and re-pointing it at a different name would
+ * break whatever else reads it.
+ */
+export function rewriteServiceEnv(text: string, service: string, names: string[]): string {
+  const lines = text.split('\n')
+  const at = serviceLine(lines, service)
+  if (at === -1) throw new Error(`The compose file has no service named ${service}`)
+
+  const wanted = new Set(names)
+  const body = blockBody(lines, at)
+  const envAt = childKey(lines, body, 'environment')
+  if (envAt === -1) return text
+
+  const envBody = blockBody(lines, envAt)
+  let changed = false
+  for (let i = envBody.start; i < envBody.end; i++) {
+    const line = lines[i]!
+    if (COMMENT_OR_BLANK.test(line)) continue
+    const item = envItem(line)
+    if (item === null || item.source !== null || !wanted.has(item.name)) continue
+    const pad = ' '.repeat(indentOf(line))
+    lines[i] = line.trim().startsWith('-')
+      ? `${pad}- '${item.name}=\${${item.name}}'`
+      : `${pad}${item.name}: \${${item.name}}`
+    changed = true
+  }
+  return changed ? lines.join('\n') : text
 }
 
 /**

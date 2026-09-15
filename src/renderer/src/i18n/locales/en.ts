@@ -604,7 +604,10 @@ const en = {
       hint: 'Leave empty to disable function deploys'
     },
     apiUrl: { label: 'API URL' },
-    siteUrl: { label: 'Site URL' },
+    siteUrl: {
+      label: 'App URL',
+      hint: 'Where a finished sign-in returns to — https://app.example.com, or a mobile scheme like myapp://login. Pushed as GOTRUE_SITE_URL and added to the redirect allow list.'
+    },
     backupDir: { label: 'Backup folder' },
     backupRetention: { label: 'Backup retention (days)' }
   },
