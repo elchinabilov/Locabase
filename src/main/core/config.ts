@@ -20,6 +20,22 @@ import { get as getProject, paths } from './projects.js'
 
 const ENV_REF = /^env\(([A-Za-z_][A-Za-z0-9_]*)\)$/
 
+/**
+ * `env(FOO)` → FOO's value from `.env`, a literal → itself, a boolean or number
+ * → its text. `null` means the file does not set the field, or names a variable
+ * the `.env` does not have.
+ *
+ * Unlike `toFieldValue` below, nothing is masked: this is the form the value is
+ * pushed in, so the caller decides what may be shown.
+ */
+export function resolveRef(raw: unknown, env: Map<string, string>): string | null {
+  if (typeof raw === 'boolean' || typeof raw === 'number') return String(raw)
+  if (typeof raw !== 'string') return null
+  const m = ENV_REF.exec(raw)
+  if (m === null) return raw
+  return env.get(m[1]!) ?? null
+}
+
 function pick(obj: unknown, path: string): unknown {
   let cur: unknown = obj
   for (const seg of path.split('.')) {

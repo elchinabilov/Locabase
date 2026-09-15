@@ -1,0 +1,49 @@
+services:
+  supabase-kong:
+    image: 'kong/kong:3.9.1'
+    entrypoint: /home/kong/kong-entrypoint.sh
+    environment:
+      - SERVICE_URL_SUPABASEKONG_8000
+      - 'KONG_PORT_MAPS=443:8000'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_JWT}'
+      - KONG_DATABASE=off
+      - 'SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}'
+    volumes:
+      - type: bind
+        source: ./volumes/api/kong.yml
+        target: /home/kong/temp.yml
+  supabase-db:
+    image: 'supabase/postgres:15.8.1.085'
+    environment:
+      - POSTGRES_HOST=/var/run/postgresql
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_JWT}'
+    volumes:
+      - 'supabase-db-data:/var/lib/postgresql/data'
+  supabase-auth:
+    image: 'supabase/gotrue:v2.186.0'
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--spider'
+        - 'http://127.0.0.1:9999/health'
+      timeout: 5s
+    environment:
+      - GOTRUE_API_HOST=0.0.0.0
+      - GOTRUE_API_PORT=9999
+      - 'API_EXTERNAL_URL=${API_EXTERNAL_URL:-http://supabase-kong:8000}'
+      - GOTRUE_DB_DRIVER=postgres
+      - 'GOTRUE_SITE_URL=${GOTRUE_SITE_URL:-${SERVICE_URL_SUPABASEKONG}}'
+      - 'GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}'
+      - 'GOTRUE_EXTERNAL_EMAIL_ENABLED=${ENABLE_EMAIL_SIGNUP:-true}'
+      - 'GOTRUE_EXTERNAL_PHONE_ENABLED=${ENABLE_PHONE_SIGNUP:-true}'
+      - 'GOTRUE_SMS_AUTOCONFIRM=${ENABLE_PHONE_AUTOCONFIRM:-true}'
+  supabase-meta:
+    image: 'supabase/postgres-meta:v0.95.2'
+    environment:
+      - PG_META_PORT=8080
+      - 'CRYPTO_KEY=${SERVICE_PASSWORD_PGMETACRYPTO}'

@@ -97,6 +97,32 @@ export function envRemoveScript(file: string): string {
 }
 
 /**
+ * A bash script that overwrites one existing file with base64 content arriving on
+ * stdin, keeping a timestamped copy of what was there.
+ *
+ * The content goes over stdin rather than into the script for the same reason
+ * the `.env` values do — and because a compose file is full of `$`, quotes and
+ * newlines that a shell would otherwise be free to interpret.
+ *
+ * `[ -s "$T" ]` is the guard that matters: a truncated transfer would otherwise
+ * replace a working stack configuration with an empty file.
+ */
+export function fileWriteScript(file: string): string {
+  return [
+    'set -e',
+    `TARGET=${sq(file)}`,
+    '[ -f "$TARGET" ]',
+    'T="$(mktemp)"',
+    'trap \'rm -f "$T"\' EXIT',
+    'base64 -d > "$T"',
+    '[ -s "$T" ]',
+    `cp "$TARGET" "$TARGET.bak.$(date +%Y%m%d%H%M%S)"`,
+    'cat "$T" > "$TARGET"',
+    'echo written'
+  ].join('\n')
+}
+
+/**
  * A bash script that streams every file in a folder as a `<token><path>` header
  * plus base64 content. For a large file a `<token>!` marker is sent instead of the
  * content — so the file stays in the listing and isn't reported as "local only".

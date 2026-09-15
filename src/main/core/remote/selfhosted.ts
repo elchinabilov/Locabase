@@ -7,6 +7,7 @@
  */
 import { basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { addServiceEnv, findAuthService, serviceEnv, serviceNames } from '@shared/compose.js'
 import { parseBytes } from '@shared/services.js'
 import type {
   BackupFormat,
@@ -35,13 +36,21 @@ import {
   dumpScript,
   envMergeScript,
   envRemoveScript,
+  fileWriteScript,
   parseHealth,
   retentionDays,
   serviceKeyOf,
   sq
 } from './remote-scripts.js'
 import { checkEndpoints } from './index.js'
-import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
+import type {
+  AuthApplyResult,
+  AuthEnvGaps,
+  LedgerRow,
+  LogFn,
+  RemoteAdapter,
+  RemoteSqlOpts
+} from './index.js'
 
 const LEDGER_TABLE = 'supabase_migrations.schema_migrations'
 
@@ -309,7 +318,13 @@ export class SelfHostedAdapter implements RemoteAdapter {
    */
   async listSecrets(): Promise<RemoteSecret[]> {
     const file = `${this.dir()}/.env`
-    const out = await this.ssh(`base64 < ${sq(file)} 2>/dev/null || true`, { quiet: true })
+    const out = await this.ssh(`base64 < ${sq(file)} 2>/dev/null || true`, {
+      quiet: true,
+      // A Coolify stack `.env` is comfortably past the default 200-line cap once
+      // base64 has wrapped it, and a truncated head decodes to nonsense rather
+      // than to fewer keys.
+      maxOutputLines: 200_000
+    })
     const text = Buffer.from(out.replace(/\s+/g, ''), 'base64').toString('utf8')
     return [...parseMap(text)]
       .map(([name, value]) => ({ name, value, digest: null }))
@@ -402,6 +417,124 @@ export class SelfHostedAdapter implements RemoteAdapter {
     })
 
     await this.assertNames(file, names, 'absent', log)
+  }
+
+  /**
+   * The stack's compose file. `.yml` first, then `.yaml` — Coolify writes the
+   * former, a hand-rolled stack may use either.
+   */
+  private async readCompose(): Promise<{ path: string; text: string } | null> {
+    for (const name of ['docker-compose.yml', 'docker-compose.yaml']) {
+      const path = `${this.dir()}/${name}`
+      // `maxOutputLines` is not decoration here: the default keeps the LAST 200
+      // lines, and base64 wraps at 76 characters, so any compose file over ~11 KB
+      // would arrive with its head cut off. What decodes then is not a short file
+      // but a shifted one — unreadable YAML that looks exactly like a stack with
+      // no auth service in it.
+      const out = await this.ssh(`base64 < ${sq(path)} 2>/dev/null || true`, {
+        quiet: true,
+        maxOutputLines: 200_000
+      })
+      const text = Buffer.from(out.replace(/\s+/g, ''), 'base64').toString('utf8')
+      if (text.trim() === '') continue
+      if (serviceNames(text).length === 0) {
+        throw new Error(
+          `${path} came back unreadable — it has no \`services:\` block after decoding. ` +
+            'The transfer was probably truncated; check that the file is readable over ssh.'
+        )
+      }
+      return { path, text }
+    }
+    return null
+  }
+
+  /**
+   * Which of `names` the auth container is NOT handed.
+   *
+   * A variable in `.env` is not a variable in the container: compose expands
+   * `${…}` from that file but passes on only what the service's own
+   * `environment:` block lists. A stock Coolify Supabase stack lists nothing
+   * about OAuth, so every `GOTRUE_EXTERNAL_<provider>_*` we write is read by
+   * nobody until the compose file names it too — and the symptom is a provider
+   * that stays disabled no matter how correct the `.env` looks.
+   */
+  async authEnvGaps(names: string[]): Promise<AuthEnvGaps> {
+    const compose = await this.readCompose()
+    if (compose === null) {
+      return { composePath: null, service: null, missing: [], readable: false }
+    }
+    const service = findAuthService(compose.text)
+    if (service === null) {
+      return { composePath: compose.path, service: null, missing: [], readable: false }
+    }
+    const env = serviceEnv(compose.text, service)
+    if (!env.found) {
+      return { composePath: compose.path, service, missing: [], readable: false }
+    }
+    return {
+      composePath: compose.path,
+      service,
+      // `env_file:` hands the whole file over, so nothing can be missing
+      missing: env.envFile ? [] : names.filter((n) => !env.names.has(n)),
+      readable: true
+    }
+  }
+
+  /**
+   * Name `names` in the auth service's `environment:` block if they are not
+   * there, then recreate the container.
+   *
+   * The recreate is not optional: a container's environment is fixed when it is
+   * created, so a changed `.env` means nothing to the process already running —
+   * `docker restart` would come back with exactly the old values. `docker compose
+   * up -d` in the service folder is what Coolify itself runs, project name and
+   * all, so the container keeps its name and its place in the stack.
+   *
+   * On Coolify the compose file is regenerated from its database on the next
+   * deploy, which drops the lines added here. That is reported, not worked
+   * around: the durable fix is the same lines pasted into Coolify's own compose
+   * editor, and quietly re-adding them each time would hide that.
+   */
+  async applyAuthVars(names: string[], log: LogFn): Promise<AuthApplyResult> {
+    const compose = await this.readCompose()
+    if (compose === null) {
+      throw new Error(
+        `No docker-compose.yml under ${this.dir()} — the auth service cannot be updated from here.`
+      )
+    }
+    const service = findAuthService(compose.text)
+    if (service === null) {
+      throw new Error(
+        `${compose.path} has no service running GoTrue (supabase/gotrue). ` +
+          `Services found: ${serviceNames(compose.text).join(', ') || 'none'}.`
+      )
+    }
+
+    const has = serviceEnv(compose.text, service).names
+    const added = names.filter((n) => !has.has(n))
+    const patched = addServiceEnv(compose.text, service, names)
+    const composeChanged = patched !== compose.text
+    if (composeChanged) {
+      log(`${compose.path}: adding ${added.length} variable(s) to ${service}: ${added.join(', ')}`)
+      await this.writeRemoteFile(compose.path, patched)
+    }
+
+    log(`docker compose up -d ${service} (recreating so the new values are read)`)
+    const out = await this.ssh(
+      `cd ${sq(this.dir())} && docker compose up -d --no-deps ${sq(service)} 2>&1`,
+      { timeoutMs: 300_000 }
+    )
+    log(out.trim() || `${service} is up`)
+    return { composeChanged, service, composePath: compose.path }
+  }
+
+  /** Write a file over ssh, keeping a timestamped copy of what was there. */
+  private async writeRemoteFile(path: string, text: string): Promise<void> {
+    await this.ssh(`bash -c ${sq(fileWriteScript(path))}`, {
+      input: Buffer.from(text, 'utf8').toString('base64'),
+      quiet: true,
+      timeoutMs: 60_000
+    })
   }
 
   async listFunctions(): Promise<RemoteFunctionInfo[]> {

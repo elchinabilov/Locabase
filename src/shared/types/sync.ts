@@ -2,8 +2,13 @@
  * The Sync screen: the five diff axes and the deploy plan built from them.
  */
 
+import type { AuthVarDiff } from '../gotrue.js'
 import type { MigrationRow } from './migrations.js'
 import type { FunctionInfo } from './functions.js'
+
+// Re-exported so a screen can name the row type without knowing it is derived
+// in `shared/gotrue.ts` rather than declared here.
+export type { AuthVarDiff, AuthVarWhere } from '../gotrue.js'
 
 export interface SyncAxis<T> {
   /** whether this axis has any difference */
@@ -49,7 +54,11 @@ export interface SyncReport {
   schema: SyncAxis<{ sql: string }>
   functions: SyncAxis<FunctionInfo>
   secrets: SyncAxis<SecretDiff>
-  authConfig: SyncAxis<{ path: string; local: string; remote: string }>
+  /**
+   * The `GOTRUE_*` variables derived from local `[auth.external.*]`, against what
+   * the remote `.env` holds. Secret values arrive masked.
+   */
+  authConfig: SyncAxis<AuthVarDiff>
   generatedAt: string
 }
 
@@ -64,5 +73,11 @@ export interface DeployPlan {
   secrets: string[]
   /** remote names to remove; these are remote names already, not local keys */
   secretDeletes: string[]
+  /**
+   * `GOTRUE_*` names to push. Unlike `secrets` these are not local `.env` keys
+   * and the environment's mapping is not applied — they are derived from
+   * `config.toml` and are already spelled the way the remote reads them.
+   */
+  authVars: string[]
   dryRun: boolean
 }

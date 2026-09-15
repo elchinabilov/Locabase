@@ -39,7 +39,14 @@ import { readTree } from '../filetree.js'
 import type { MigrationFile } from '../migrations.js'
 import { failedRun } from '../sql/build.js'
 import { checkEndpoints } from './index.js'
-import type { LedgerRow, LogFn, RemoteAdapter, RemoteSqlOpts } from './index.js'
+import type {
+  AuthApplyResult,
+  AuthEnvGaps,
+  LedgerRow,
+  LogFn,
+  RemoteAdapter,
+  RemoteSqlOpts
+} from './index.js'
 
 const API = 'https://api.supabase.com'
 
@@ -374,6 +381,21 @@ export class ManagedAdapter implements RemoteAdapter {
    */
   async listServices(): Promise<RemoteService[]> {
     return []
+  }
+
+  /**
+   * Auth providers on a managed project are configuration, not environment: they
+   * are pushed with `supabase config push`, so there is no compose file to read
+   * and nothing here to compare.
+   */
+  async authEnvGaps(): Promise<AuthEnvGaps> {
+    return { composePath: null, service: null, missing: [], readable: true }
+  }
+
+  async applyAuthVars(): Promise<AuthApplyResult> {
+    throw new Error(
+      'Auth providers on a managed project are pushed with `supabase config push`, not through the stack environment.'
+    )
   }
 
   async setServiceState(): Promise<void> {

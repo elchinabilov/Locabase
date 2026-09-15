@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mkdirSync } from 'node:fs'
@@ -8,7 +8,8 @@ import {
   decodeDump,
   dumpScript,
   envMergeScript,
-  envRemoveScript
+  envRemoveScript,
+  fileWriteScript
 } from '../src/main/core/remote/remote-scripts.js'
 
 const TOKEN = '__LOCABASE_test__'
@@ -170,6 +171,63 @@ describe('envRemoveScript', () => {
     try {
       runScript(file, 'A\n')
       expect(readFileSync(file, 'utf8')).toBe('AB=2\n')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('fileWriteScript', () => {
+  const write = (file: string, text: string): string =>
+    execFileSync('bash', ['-c', fileWriteScript(file)], { input: b64(text) })
+      .toString()
+      .trim()
+
+  it('replaces the file and keeps a backup of what was there', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'locabase-compose-'))
+    const file = join(dir, 'docker-compose.yml')
+    writeFileSync(file, 'services:\n  a:\n    image: x\n')
+    try {
+      expect(write(file, 'services:\n  a:\n    image: y\n')).toBe('written')
+      expect(readFileSync(file, 'utf8')).toBe('services:\n  a:\n    image: y\n')
+      const backup = readdirSync(dir).find((f) => f.includes('.bak.'))
+      expect(backup).toBeDefined()
+      expect(readFileSync(join(dir, backup!), 'utf8')).toBe('services:\n  a:\n    image: x\n')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('survives the `$`, quotes and newlines a compose file is full of', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'locabase-compose-'))
+    const file = join(dir, 'docker-compose.yml')
+    const body =
+      'services:\n  auth:\n    environment:\n      - \'X=${SERVICE_PASSWORD_JWT}\'\n      - "Y=a b#c"\n'
+    writeFileSync(file, 'old\n')
+    try {
+      write(file, body)
+      expect(readFileSync(file, 'utf8')).toBe(body)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses an empty transfer rather than truncating the stack config', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'locabase-compose-'))
+    const file = join(dir, 'docker-compose.yml')
+    writeFileSync(file, 'services:\n  a:\n    image: x\n')
+    try {
+      expect(() => write(file, '')).toThrow()
+      expect(readFileSync(file, 'utf8')).toBe('services:\n  a:\n    image: x\n')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses to create a file that is not already there', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'locabase-compose-'))
+    try {
+      expect(() => write(join(dir, 'nope.yml'), 'x\n')).toThrow()
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

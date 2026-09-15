@@ -153,6 +153,8 @@ const deployPlan = z.object({
   functions: z.array(z.string().max(512)),
   secrets: z.array(envVarName),
   secretDeletes: z.array(envVarName),
+  /** GOTRUE_* names derived from `config.toml` — not local `.env` keys */
+  authVars: z.array(envVarName),
   dryRun: z.boolean()
 })
 

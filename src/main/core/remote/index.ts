@@ -27,6 +27,24 @@ export interface LedgerRow {
 
 export type LogFn = (text: string) => void
 
+export interface AuthEnvGaps {
+  /** the compose file we read, or null when there is none */
+  composePath: string | null
+  /** the service running GoTrue, by image */
+  service: string | null
+  /** the variables that service is not handed */
+  missing: string[]
+  /** false when the file could not be read well enough to answer */
+  readable: boolean
+}
+
+export interface AuthApplyResult {
+  /** true when lines had to be added to the compose file */
+  composeChanged: boolean
+  service: string
+  composePath: string
+}
+
 export interface RemoteSqlOpts {
   readOnly: boolean
   maxRows: number
@@ -73,6 +91,17 @@ export interface RemoteAdapter {
   setSecrets(kv: Record<string, string>, log: LogFn): Promise<void>
   /** Remove secrets by their remote name. */
   unsetSecrets(names: string[], log: LogFn): Promise<void>
+  /**
+   * Which auth variables the remote's auth container is not handed. A value in
+   * the stack `.env` only reaches the process when the compose file names it, so
+   * a clean secret push can still leave the provider disabled.
+   */
+  authEnvGaps(names: string[]): Promise<AuthEnvGaps>
+  /**
+   * Name those variables in the compose file if needed and recreate the auth
+   * container, so values just written to `.env` are actually read.
+   */
+  applyAuthVars(names: string[], log: LogFn): Promise<AuthApplyResult>
   listFunctions(): Promise<RemoteFunctionInfo[]>
   /**
    * The remote **file contents** of one function — for "View diff". Called on

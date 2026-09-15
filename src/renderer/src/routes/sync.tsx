@@ -138,6 +138,8 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
   const [pickedSecrets, setPickedSecrets] = useState<Set<string>>(new Set())
   /** remote names to remove — a different namespace, so a separate set */
   const [pickedDeletes, setPickedDeletes] = useState<Set<string>>(new Set())
+  /** GOTRUE_* names to push — derived from config.toml, so a third namespace again */
+  const [pickedAuth, setPickedAuth] = useState<Set<string>>(new Set())
   /** the remote-only list is collapsed by default; on a self-hosted stack it is huge */
   const [showRemoteOnly, setShowRemoteOnly] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -170,6 +172,9 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
       )
     )
     setPickedDeletes(new Set())
+    // A provider that is on locally and off on the server is the whole point of
+    // the axis, so everything that differs starts ticked.
+    setPickedAuth(new Set(r.authConfig.items.filter((a) => a.where !== 'both').map((a) => a.name)))
   }, [project.id, env.id, run])
 
   const plan = useMemo(() => {
@@ -177,6 +182,7 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
     if (pickedMigrations.size > 0) steps.push('migrations')
     if (pickedFunctions.size > 0) steps.push('functions')
     if (pickedSecrets.size > 0 || pickedDeletes.size > 0) steps.push('secrets')
+    if (pickedAuth.size > 0) steps.push('auth')
     steps.push('verify')
     return {
       envId: env.id,
@@ -185,15 +191,17 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
       functions: [...pickedFunctions].sort(),
       secrets: [...pickedSecrets].sort(),
       secretDeletes: [...pickedDeletes].sort(),
+      authVars: [...pickedAuth].sort(),
       dryRun: false
     } satisfies DeployPlan
-  }, [env.id, pickedMigrations, pickedFunctions, pickedSecrets, pickedDeletes])
+  }, [env.id, pickedMigrations, pickedFunctions, pickedSecrets, pickedDeletes, pickedAuth])
 
   const nothing =
     pickedMigrations.size === 0 &&
     pickedFunctions.size === 0 &&
     pickedSecrets.size === 0 &&
-    pickedDeletes.size === 0
+    pickedDeletes.size === 0 &&
+    pickedAuth.size === 0
 
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4">
@@ -402,7 +410,37 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
               {!report.secrets.dirty && <Clean text={t('sync.secretsClean')} />}
             </Axis>
 
-            <Axis title={t('sync.authConfig')} dirty={false} error={report.authConfig.error} />
+            <Axis
+              title={t('sync.authConfig')}
+              dirty={report.authConfig.dirty}
+              error={report.authConfig.error}
+              count={pickedAuth.size}
+            >
+              {report.authConfig.items.map((a) => (
+                <Pick
+                  key={a.name}
+                  checked={pickedAuth.has(a.name)}
+                  onChange={(v) =>
+                    setPickedAuth((prev) => {
+                      const next = new Set(prev)
+                      if (v) next.add(a.name)
+                      else next.delete(a.name)
+                      return next
+                    })
+                  }
+                  label={
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <code className="truncate font-mono">{a.name}</code>
+                      <span className="truncate font-mono text-micro text-faint">
+                        {a.where === 'both' ? a.local : `${a.remote || '—'} → ${a.local}`}
+                      </span>
+                    </span>
+                  }
+                  right={<SecretBadge where={a.where} />}
+                />
+              ))}
+              {report.authConfig.items.length === 0 && <Clean text={t('sync.authClean')} />}
+            </Axis>
           </>
         )}
       </div>
