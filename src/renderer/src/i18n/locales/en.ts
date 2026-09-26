@@ -38,7 +38,13 @@ const en = {
       addProject: 'Add project',
       emptyBeforePlus: 'No projects yet.',
       emptyAfterPlus: 'to set up a new project or open a repo with a `supabase/` folder.',
-      version: 'Version'
+      version: 'Version',
+      projectMenu: 'Actions for {name}',
+      remove: 'Remove from Locabase'
+    },
+    removeProject: {
+      title: 'Remove from Locabase',
+      body: '«{name}» will be removed from the list. The folder and its files stay on disk untouched, and a running local stack keeps running — you can open the project again with +.'
     },
     selectProject: {
       title: 'No project selected',

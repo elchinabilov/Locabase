@@ -35,7 +35,13 @@ const az = {
       addProject: 'Layihə əlavə et',
       emptyBeforePlus: 'Hələ layihə yoxdur.',
       emptyAfterPlus: 'ilə yeni layihə qur və ya `supabase/` qovluğu olan repo-nu aç.',
-      version: 'Versiya'
+      version: 'Versiya',
+      projectMenu: '{name} üçün əməliyyatlar',
+      remove: 'Locabase-dən sil'
+    },
+    removeProject: {
+      title: 'Locabase-dən sil',
+      body: '«{name}» siyahıdan çıxarılacaq. Qovluq və faylları diskdə olduğu kimi qalır, işləyən lokal stack dayandırılmır — layihəni + ilə yenidən aça bilərsən.'
     },
     selectProject: {
       title: 'Əvvəlcə layihə seç',

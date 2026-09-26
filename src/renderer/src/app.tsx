@@ -4,9 +4,11 @@ import type { Project } from '@shared/types'
 import { call, useQuery } from './lib/ipc'
 import { pruneUiState, useUiState } from './lib/ui-state'
 import { useStackStatus } from './lib/stack-status'
+import { useAction } from './lib/use-action'
 import { cx, shortPath } from './lib/format'
 import { useT, type TranslationKey } from './i18n'
-import { Badge, Button, Dot, Empty, ErrorNote, SkeletonRows } from './components/ui'
+import { Badge, Button, Dot, Empty, ErrorNote, Modal, SkeletonRows } from './components/ui'
+import { Menu } from './components/menu'
 import { LogDrawer } from './components/log-drawer'
 import { ErrorBoundary } from './components/error-boundary'
 import { Mark, Wordmark } from './components/brand'
@@ -76,6 +78,8 @@ export function App(): ReactNode {
   const [addOpen, setAddOpen] = useState(false)
   /** the folder chosen for «New project»; the modal opens on top of it */
   const [newProjectDir, setNewProjectDir] = useState<string | null>(null)
+  /** the project whose «Remove from Locabase» confirmation is open */
+  const [removing, setRemoving] = useState<Project | null>(null)
 
   const list = projects.data ?? []
   const selected = useMemo(() => list.find((p) => p.id === selectedId) ?? null, [list, selectedId])
@@ -113,6 +117,7 @@ export function App(): ReactNode {
           selectedId={selectedId}
           onSelect={setSelectedId}
           onAdd={() => setAddOpen(true)}
+          onRemove={setRemoving}
           route={route}
           onRoute={setRoute}
           loading={projects.loading}
@@ -154,6 +159,17 @@ export function App(): ReactNode {
             setNewProjectDir(null)
             projects.refresh()
             setSelectedId(project.id)
+          }}
+        />
+      )}
+      {removing && (
+        <RemoveProjectModal
+          project={removing}
+          onClose={() => setRemoving(null)}
+          onDone={() => {
+            setRemoving(null)
+            // The selection falls back to the first project via the effect above.
+            projects.refresh()
           }}
         />
       )}
@@ -244,6 +260,7 @@ function Sidebar({
   selectedId,
   onSelect,
   onAdd,
+  onRemove,
   route,
   onRoute,
   loading,
@@ -253,6 +270,7 @@ function Sidebar({
   selectedId: string | null
   onSelect: (id: string) => void
   onAdd: () => void
+  onRemove: (project: Project) => void
   route: RouteId
   onRoute: (r: RouteId) => void
   loading: boolean
@@ -301,6 +319,7 @@ function Sidebar({
             project={p}
             active={p.id === selectedId}
             onClick={() => onSelect(p.id)}
+            onRemove={() => onRemove(p)}
           />
         ))}
       </div>
@@ -337,32 +356,99 @@ function Sidebar({
 function ProjectItem({
   project,
   active,
-  onClick
+  onClick,
+  onRemove
 }: {
   project: Project
   active: boolean
   onClick: () => void
+  onRemove: () => void
 }): ReactNode {
+  const t = useT()
   const status = useStackStatus(project.id)
   const running = status.data?.running ?? false
   const unhealthy =
     status.data?.services.some((s) => s.state === 'running' && s.health === 'unhealthy') ?? false
 
+  // A div, not a button: the ⋮ menu is a button of its own and can't nest.
   return (
-    <button
-      onClick={onClick}
+    <div
       className={cx(
-        'mb-0.5 flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors',
+        'group mb-0.5 flex w-full items-center rounded-md pr-1 transition-colors',
         active ? 'bg-panel-2' : 'hover:bg-hover'
       )}
     >
-      <Dot tone={unhealthy ? 'warn' : running ? 'ok' : 'muted'} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-ui text-text">{project.name}</span>
-        <span className="block truncate text-badge text-muted">{shortPath(project.path, 1)}</span>
-      </span>
-      {project.environments.length > 0 && <Badge tone="muted">{project.environments.length}</Badge>}
-    </button>
+      <button
+        onClick={onClick}
+        className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-2.5 text-left"
+      >
+        <Dot tone={unhealthy ? 'warn' : running ? 'ok' : 'muted'} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-ui text-text">{project.name}</span>
+          <span className="block truncate text-badge text-muted">{shortPath(project.path, 1)}</span>
+        </span>
+        {project.environments.length > 0 && (
+          <Badge tone="muted">{project.environments.length}</Badge>
+        )}
+      </button>
+      <Menu
+        label={t('app.sidebar.projectMenu', { name: project.name })}
+        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
+        items={[
+          {
+            id: 'remove',
+            label: t('app.sidebar.remove'),
+            tone: 'danger',
+            onSelect: onRemove
+          }
+        ]}
+      />
+    </div>
+  )
+}
+
+/**
+ * Only the registry entry goes: the folder, its migrations and `.env` stay on
+ * disk, and the project can be opened again with «+».
+ */
+function RemoveProjectModal({
+  project,
+  onClose,
+  onDone
+}: {
+  project: Project
+  onClose: () => void
+  onDone: () => void
+}): ReactNode {
+  const t = useT()
+  const { run, busy, error } = useAction()
+  const remove = async (): Promise<void> => {
+    const ok = await run(async () => {
+      await call('projects:remove', { id: project.id })
+      return true
+    })
+    if (ok) onDone()
+  }
+
+  return (
+    <Modal
+      title={t('app.removeProject.title')}
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={() => void remove()} loading={busy}>
+            {t('app.sidebar.remove')}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-ui leading-relaxed">
+        {t('app.removeProject.body', { name: project.name })}
+      </p>
+      <p className="mt-2 font-mono text-small break-all text-muted">{project.path}</p>
+      {error && <ErrorNote>{error}</ErrorNote>}
+    </Modal>
   )
 }
 
