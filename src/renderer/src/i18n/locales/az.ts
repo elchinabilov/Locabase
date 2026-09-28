@@ -166,6 +166,9 @@ const az = {
       subtitle: '{running} / {total} işləyir',
       ramSuffix: ' · {size} RAM',
       logButton: 'log',
+      essentials: 'yalnız vacib olanlar',
+      essentialsHint:
+        'Postgres, API, auth, realtime, edge functions və pooler qalsın — qalanı söndürülsün. Restartdan sonra qüvvəyə minir.',
       noContainers:
         'Konteyner yoxdur — keçidlər `config.toml`-u göstərir, stack qalxanda vəziyyət də gələcək.',
       note: {
@@ -545,6 +548,8 @@ const az = {
     refresh: 'yenilə',
     checkingServer: 'serverə baxılır',
     required: 'məcburi',
+    essentialsHint:
+      'Postgres, Kong, PostgREST, auth, realtime, edge functions və Supavisor-dan başqa hamısını dayandır.',
     stopHint:
       'Burada söndürmək `docker stop`-dur. Coolify növbəti deploy-da konteyneri yenidən qaldıra bilər — davamlı söndürmək üçün servisin compose faylından çıxar.'
   },

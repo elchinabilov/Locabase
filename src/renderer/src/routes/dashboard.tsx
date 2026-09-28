@@ -1,7 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react'
 import { z } from 'zod'
 import type { FieldValue, Project, ServiceStatus, StackStatus } from '@shared/types'
-import { formatBytes, SERVICE_GROUPS } from '@shared/services'
+import { ESSENTIAL_CONFIG_PATHS, formatBytes, SERVICE_GROUPS } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
 import { useStackStatus } from '../lib/stack-status'
 import { useAction } from '../lib/use-action'
@@ -297,6 +297,25 @@ function Services({
   // numerator those currently running. Both in the same unit: rows, not containers.
   const running = rows.filter((r) => r.isRunning).length
 
+  // Only switches OFF what isn't essential — an essential service that is off
+  // (the pooler, say) stays as the user left it.
+  const extras = rows
+    .filter(
+      (r) => r.enabled && r.group.configPath && !ESSENTIAL_CONFIG_PATHS.has(r.group.configPath)
+    )
+    .map((r) => r.group.configPath!)
+
+  const keepEssentials = async (): Promise<void> => {
+    const ok = await run(async () => {
+      // One at a time: every call rewrites `config.toml`.
+      for (const configPath of extras) {
+        await call('stack:setService', { id: projectId, configPath, on: false })
+      }
+      return true
+    }, 'essentials')
+    if (ok) onToggled()
+  }
+
   if (loading) {
     return (
       <Card title={t('dashboard.services.title')} subtitle={t('dashboard.services.checking')}>
@@ -321,6 +340,16 @@ function Services({
       subtitle={
         t('dashboard.services.subtitle', { running, total: rows.length }) +
         (total > 0 ? t('dashboard.services.ramSuffix', { size: formatBytes(total) }) : '')
+      }
+      actions={
+        <Button
+          onClick={() => void keepEssentials()}
+          disabled={extras.length === 0 || (saving !== null && saving !== 'essentials')}
+          loading={saving === 'essentials'}
+          title={t('dashboard.services.essentialsHint')}
+        >
+          {t('dashboard.services.essentials')}
+        </Button>
       }
     >
       {error && (

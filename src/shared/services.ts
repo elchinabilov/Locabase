@@ -63,6 +63,40 @@ export const SERVICE_GROUPS: ServiceGroup[] = (() => {
   return groups
 })()
 
+/**
+ * The "mini Supabase": Postgres, the API gateway + PostgREST, auth, realtime,
+ * edge functions and the pooler. Everything else (Studio, Storage, analytics,
+ * Mailpit…) is dead weight for an app that only talks to the API.
+ */
+export const ESSENTIAL_CONFIG_PATHS = new Set([
+  'api.enabled',
+  'auth.enabled',
+  'realtime.enabled',
+  'edge_runtime.enabled',
+  'db.pooler.enabled'
+])
+
+/**
+ * The same set on a self-hosted (Coolify) stack, by `RemoteService.key`. The
+ * compose file names services differently from the CLI, hence the aliases.
+ */
+const ESSENTIAL_REMOTE_KEYS = new Set([
+  'db',
+  'kong',
+  'rest',
+  'auth',
+  'realtime',
+  'realtime-dev',
+  'edge-functions',
+  'functions',
+  'supavisor',
+  'pooler'
+])
+
+export function isEssentialRemote(key: string): boolean {
+  return ESSENTIAL_REMOTE_KEYS.has(key)
+}
+
 export const SERVICE_BY_KEY = new Map(SERVICES.map((s) => [s.key, s]))
 
 export function labelFor(key: string): string {

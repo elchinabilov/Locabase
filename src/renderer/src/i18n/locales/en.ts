@@ -169,6 +169,9 @@ const en = {
       subtitle: '{running} / {total} running',
       ramSuffix: ' · {size} RAM',
       logButton: 'log',
+      essentials: 'essentials only',
+      essentialsHint:
+        'Keep Postgres, API, auth, realtime, edge functions and the pooler — switch off the rest. Takes effect after a restart.',
       noContainers:
         'No containers — the toggles reflect `config.toml`; status shows up once the stack is up.',
       note: {
@@ -551,6 +554,8 @@ const en = {
     refresh: 'refresh',
     checkingServer: 'checking server',
     required: 'required',
+    essentialsHint:
+      'Stop everything except Postgres, Kong, PostgREST, auth, realtime, edge functions and Supavisor.',
     stopHint:
       'Stopping here is a `docker stop`. Coolify may bring the container back up on the next deploy — remove the service from the compose file to stop it for good.'
   },

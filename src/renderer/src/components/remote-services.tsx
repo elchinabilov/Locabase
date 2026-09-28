@@ -1,6 +1,6 @@
 import { useCallback, type ReactNode } from 'react'
 import type { Project, RemoteEnv } from '@shared/types'
-import { formatBytes } from '@shared/services'
+import { formatBytes, isEssentialRemote } from '@shared/services'
 import { call, useQuery } from '../lib/ipc'
 import { useAction } from '../lib/use-action'
 import { useT } from '../i18n'
@@ -37,6 +37,26 @@ export function RemoteServices({ project, env }: { project: Project; env: Remote
     [project.id, env.id, services, t, run]
   )
 
+  const keepEssentials = useCallback(
+    async (containers: string[]) => {
+      await run(async () => {
+        // One `docker stop` at a time — the SSH session is shared.
+        for (const container of containers) {
+          const res = await call('remote:setService', {
+            id: project.id,
+            envId: env.id,
+            container,
+            on: false
+          })
+          if (!res.ok) throw new Error(res.error ?? t('dashboard.reset.genericError'))
+        }
+        return true
+      }, 'essentials')
+      services.refresh()
+    },
+    [project.id, env.id, services, t, run]
+  )
+
   if (env.kind === 'managed') {
     return (
       <Card title={t('remoteServices.title')}>
@@ -50,6 +70,11 @@ export function RemoteServices({ project, env }: { project: Project; env: Remote
   const items = services.data ?? []
   const total = items.reduce((sum, s) => sum + (s.memory ?? 0), 0)
   const running = items.filter((s) => s.state === 'running').length
+  const extras = items
+    .filter(
+      (s) => s.state === 'running' && s.container !== env.dbContainer && !isEssentialRemote(s.key)
+    )
+    .map((s) => s.container)
 
   return (
     <Card
@@ -61,9 +86,19 @@ export function RemoteServices({ project, env }: { project: Project; env: Remote
           : env.sshHost
       }
       actions={
-        <Button onClick={services.refresh} loading={services.loading}>
-          {t('remoteServices.refresh')}
-        </Button>
+        <div className="flex gap-1.5">
+          <Button
+            onClick={() => void keepEssentials(extras)}
+            disabled={extras.length === 0 || (pending !== null && pending !== 'essentials')}
+            loading={pending === 'essentials'}
+            title={t('remoteServices.essentialsHint')}
+          >
+            {t('dashboard.services.essentials')}
+          </Button>
+          <Button onClick={services.refresh} loading={services.loading}>
+            {t('remoteServices.refresh')}
+          </Button>
+        </div>
       }
     >
       {services.loading && items.length === 0 && (
