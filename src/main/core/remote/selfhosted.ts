@@ -36,7 +36,7 @@ import type { MigrationFile } from '../migrations.js'
 import { readMigration } from '../migrations.js'
 import { parsePsqlCsv, parsePsqlError } from '../sql/csv.js'
 import { quoteLiteral } from '../sql/ident.js'
-import { parseMap } from '../envfile.js'
+import { parseMap, singleLineValue } from '../envfile.js'
 import {
   decodeDump,
   dumpScript,
@@ -342,12 +342,18 @@ export class SelfHostedAdapter implements RemoteAdapter {
    * `ps` output or in shell history.
    */
   async setSecrets(kv: Record<string, string>, log: LogFn): Promise<void> {
-    const entries = Object.entries(kv)
-    if (entries.length === 0) return
-    for (const [k, v] of entries) {
+    const entries: Array<[string, string]> = []
+    for (const [k, v] of Object.entries(kv)) {
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) throw new Error(`invalid variable name: ${k}`)
-      if (v.includes('\n')) throw new Error(`${k}: multi-line values are not supported`)
+      const flat = singleLineValue(v)
+      if (flat === null) {
+        throw new Error(`${k}: multi-line values are only supported when they are JSON`)
+      }
+      // Flattened JSON is single-quoted: taken literally by Docker Compose and by
+      // `parseMap`, so `listSecrets` reads back exactly what was written.
+      entries.push([k, flat === v || flat.includes("'") ? flat : `'${flat}'`])
     }
+    if (entries.length === 0) return
     const file = `${this.dir()}/.env`
     // The path is in the log on purpose: writing to the wrong `.env` is the one
     // failure that otherwise looks exactly like success.

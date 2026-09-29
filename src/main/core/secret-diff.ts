@@ -7,6 +7,7 @@
  */
 import { createHash } from 'node:crypto'
 import type { RemoteSecret, SecretDiff, SecretMap } from '@shared/types/index.js'
+import { singleLineValue } from './envfile.js'
 
 /** The name `localKey` has on the remote. Unmapped keys are pushed 1:1. */
 export function remoteNameOf(map: SecretMap | undefined, localKey: string): string {
@@ -24,7 +25,10 @@ export function remoteNameOf(map: SecretMap | undefined, localKey: string): stri
  * reported as `null` and never as `false`.
  */
 export function valueMatches(remote: RemoteSecret, local: string): boolean | null {
-  if (remote.value !== null) return remote.value === local
+  if (remote.value !== null) {
+    // multi-line JSON is stored flattened on a self-hosted `.env` — see `setSecrets`
+    return remote.value === local || remote.value === singleLineValue(local)
+  }
   if (remote.digest === null || remote.digest === '') return null
   if (remote.digest === local) return true
   if (remote.digest.toLowerCase() === createHash('sha256').update(local).digest('hex')) return true

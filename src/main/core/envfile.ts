@@ -56,6 +56,54 @@ export function parseEntries(text: string): RawEntry[] {
   return entries
 }
 
+/**
+ * A value that can live on one `.env` line, or `null` if it cannot.
+ *
+ * Multi-line JSON (a Google service-account key pasted as-is) is the common
+ * case: re-serialised compactly it means exactly the same to whatever parses
+ * it, and the `\n` inside `private_key` stays an escape, not a line break.
+ *
+ * `unquote` has already turned every `\n` of a double-quoted value into a real
+ * line break — including the ones inside JSON strings, which `JSON.parse`
+ * rejects. `escapeBreaksInStrings` puts those back first.
+ */
+export function singleLineValue(value: string): string | null {
+  if (!value.includes('\n')) return value
+  try {
+    return JSON.stringify(JSON.parse(escapeBreaksInStrings(value)))
+  } catch {
+    return null
+  }
+}
+
+/** Raw CR/LF inside JSON string literals → `\r`/`\n` escapes; outside, untouched. */
+function escapeBreaksInStrings(text: string): string {
+  let out = ''
+  let inString = false
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!
+    if (!inString) {
+      if (c === '"') inString = true
+      out += c
+      continue
+    }
+    if (c === '\\') {
+      const next = text[i + 1]
+      // `\\n` in the file became backslash + line break: that was meant as `\n`
+      if (next === '\n') out += '\\n'
+      else if (next === '\r') out += '\\r'
+      else out += c + (next ?? '')
+      i++
+    } else if (c === '\n') out += '\\n'
+    else if (c === '\r') out += '\\r'
+    else {
+      if (c === '"') inString = false
+      out += c
+    }
+  }
+  return out
+}
+
 /** `.env` text → key/value map; a repeated key keeps its last value. */
 export function parseMap(text: string): Map<string, string> {
   const out = new Map<string, string>()
