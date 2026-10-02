@@ -156,7 +156,8 @@ const handlers: Handlers = {
     for (const key of [
       secrets.keys.managedToken(envId),
       secrets.keys.dbPassword(envId),
-      secrets.keys.sshPassphrase(envId)
+      secrets.keys.sshPassphrase(envId),
+      secrets.keys.coolifyToken(envId)
     ]) {
       secrets.remove(key)
     }
@@ -164,8 +165,14 @@ const handlers: Handlers = {
   },
   'envs:setToken': async ({ id, envId, token }) => {
     const env = projects.getEnv(id, envId)
+    if (env.kind === 'self-hosted') {
+      if (!env.coolify) throw new Error(`«${env.name}» has no Coolify instance to hold a token for`)
+      secrets.set(secrets.keys.coolifyToken(envId), token)
+      projects.upsertEnv(id, { ...env, coolify: { ...env.coolify, hasToken: true } })
+      return
+    }
     secrets.set(secrets.keys.managedToken(envId), token)
-    if (env.kind === 'managed') projects.upsertEnv(id, { ...env, hasToken: true })
+    projects.upsertEnv(id, { ...env, hasToken: true })
   },
   'envs:ping': async ({ id, envId }) =>
     adapterFor(projects.get(id), projects.getEnv(id, envId)).ping(),

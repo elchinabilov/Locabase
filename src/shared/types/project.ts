@@ -27,6 +27,18 @@ export interface ManagedEnv {
   secretMap?: SecretMap
 }
 
+/**
+ * A Coolify instance whose API manages this environment's variables. Coolify
+ * keeps them in its own database and rebuilds the stack's `.env` from there on
+ * every deploy, so without this a pushed secret lasts until the next redeploy.
+ */
+export interface CoolifyLink {
+  /** the instance root, e.g. `https://coolify.example.com` */
+  baseUrl: string
+  /** The API token lives in safeStorage; only its presence is stored here. */
+  hasToken: boolean
+}
+
 export interface SelfHostedEnv {
   id: string
   name: string
@@ -57,6 +69,8 @@ export interface SelfHostedEnv {
   backupRetentionDays: number
   /** Optional — environments stored before the mapping existed have no field. */
   secretMap?: SecretMap
+  /** Set when the stack is a Coolify service managed through its API. */
+  coolify?: CoolifyLink
 }
 
 export type RemoteEnv = ManagedEnv | SelfHostedEnv

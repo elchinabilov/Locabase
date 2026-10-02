@@ -83,7 +83,7 @@ export class SelfHostedAdapter implements RemoteAdapter {
 
   constructor(
     private readonly project: Project,
-    private readonly env: SelfHostedEnv
+    protected readonly env: SelfHostedEnv
   ) {}
 
   private get stream(): string {

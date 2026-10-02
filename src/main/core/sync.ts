@@ -278,7 +278,7 @@ export async function deploy(id: string, plan: DeployPlan, confirm: string): Pro
             'itself; those lines now read from .env like the rest.'
         )
       }
-      if (applied.composeChanged) {
+      if (applied.composeChanged && !applied.durable) {
         log(
           `${applied.composePath} was edited — on Coolify the file is regenerated from its ` +
             'database on the next deploy, so add the same lines in its compose editor to keep them.'

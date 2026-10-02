@@ -63,6 +63,7 @@ export const keys = {
   managedToken: (envId: string): string => `env:${envId}:access_token`,
   dbPassword: (envId: string): string => `env:${envId}:db_password`,
   sshPassphrase: (envId: string): string => `env:${envId}:ssh_passphrase`,
+  coolifyToken: (envId: string): string => `env:${envId}:coolify_token`,
   /** The S3/R2 secret access key of a storage connection. */
   storageSecret: (storageId: string): string => `storage:${storageId}:secret_access_key`
 }

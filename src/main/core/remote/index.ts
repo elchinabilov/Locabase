@@ -17,6 +17,7 @@ import type {
   VerifyReport
 } from '@shared/types/index.js'
 import type { MigrationFile } from '../migrations.js'
+import { CoolifyAdapter } from './coolify.js'
 import { ManagedAdapter } from './managed.js'
 import { SelfHostedAdapter } from './selfhosted.js'
 
@@ -70,6 +71,8 @@ export interface AuthApplyResult {
   rewired: string[]
   service: string
   composePath: string
+  /** true when the change was also saved where the next deploy reads it (Coolify) */
+  durable?: boolean
 }
 
 export interface RemoteSqlOpts {
@@ -185,7 +188,6 @@ export async function checkEndpoints(
 }
 
 export function adapterFor(project: Project, env: RemoteEnv): RemoteAdapter {
-  return env.kind === 'managed'
-    ? new ManagedAdapter(project, env)
-    : new SelfHostedAdapter(project, env)
+  if (env.kind === 'managed') return new ManagedAdapter(project, env)
+  return env.coolify ? new CoolifyAdapter(project, env) : new SelfHostedAdapter(project, env)
 }

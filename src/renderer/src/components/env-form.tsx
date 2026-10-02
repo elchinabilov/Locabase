@@ -46,12 +46,20 @@ export function EnvForm({
   const [token, setToken] = useState('')
   const { run, busy, error } = useAction()
 
+  // Coolify is a self-hosted environment with an API link, not a third kind, so
+  // the picker's value is derived rather than stored.
+  const kindValue = env.kind === 'self-hosted' && env.coolify ? 'coolify' : env.kind
+
   const setKind = (kind: string): void => {
-    setEnv((prev) =>
-      kind === 'managed'
-        ? { ...emptyManaged(), id: prev.id, name: prev.name }
-        : { ...emptySelfHosted(), id: prev.id, name: prev.name }
-    )
+    setEnv((prev) => {
+      if (kind === 'managed') return { ...emptyManaged(), id: prev.id, name: prev.name }
+      // Moving between the two self-hosted flavours keeps the ssh fields typed so far.
+      const base: SelfHostedEnv =
+        prev.kind === 'self-hosted'
+          ? { ...prev, coolify: undefined }
+          : { ...emptySelfHosted(), id: prev.id, name: prev.name }
+      return kind === 'coolify' ? { ...base, coolify: { baseUrl: '', hasToken: false } } : base
+    })
   }
 
   const patch = <T extends RemoteEnv>(p: Partial<T>): void => setEnv((prev) => ({ ...prev, ...p }))
@@ -59,7 +67,7 @@ export function EnvForm({
   const save = async (): Promise<void> => {
     const ok = await run(async () => {
       await call('envs:upsert', { id: project.id, env })
-      if (env.kind === 'managed' && token.trim()) {
+      if ((env.kind === 'managed' || env.coolify) && token.trim()) {
         await call('envs:setToken', { id: project.id, envId: env.id, token: token.trim() })
       }
       return true
@@ -73,7 +81,10 @@ export function EnvForm({
     env.name.trim().length > 0 &&
     (env.kind === 'managed'
       ? /^[a-z0-9]{15,}$/.test(env.projectRef.trim())
-      : env.sshHost.trim().length > 0 && env.dbContainer.trim().length > 0)
+      : env.sshHost.trim().length > 0 &&
+        env.dbContainer.trim().length > 0 &&
+        (!env.coolify ||
+          (/^https?:\/\/[^/\s]+/.test(env.coolify.baseUrl.trim()) && serviceIdOf(env) !== '')))
 
   return (
     <Modal
@@ -95,11 +106,12 @@ export function EnvForm({
         </Row>
         <Row label={t('envForm.kind.label')}>
           <Select
-            value={env.kind}
+            value={kindValue}
             onChange={setKind}
             options={[
               { value: 'managed', label: t('envForm.kind.managed') },
-              { value: 'self-hosted', label: t('envForm.kind.selfHosted') }
+              { value: 'self-hosted', label: t('envForm.kind.selfHosted') },
+              { value: 'coolify', label: t('envForm.kind.coolify') }
             ]}
           />
         </Row>
@@ -156,6 +168,38 @@ export function EnvForm({
               />
             </Row>
             <ServicePathFields env={env} onPatch={(p) => patch<SelfHostedEnv>(p)} />
+            {env.coolify && (
+              <>
+                <Row label={t('envForm.coolifyUrl.label')} hint={t('envForm.coolifyUrl.hint')}>
+                  <Input
+                    value={env.coolify.baseUrl}
+                    onChange={(e) =>
+                      patch<SelfHostedEnv>({
+                        coolify: { ...env.coolify!, baseUrl: e.target.value.trim() }
+                      })
+                    }
+                    className="font-mono"
+                    placeholder="https://coolify.example.com"
+                  />
+                </Row>
+                <Row
+                  label={t('envForm.coolifyToken.label')}
+                  hint={
+                    env.coolify.hasToken
+                      ? t('envForm.coolifyToken.hintSaved')
+                      : t('envForm.coolifyToken.hintNew')
+                  }
+                >
+                  <Input
+                    type="password"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    className="font-mono"
+                    placeholder={env.coolify.hasToken ? '••••••••' : '1|…'}
+                  />
+                </Row>
+              </>
+            )}
             <Row label={t('envForm.apiUrl.label')}>
               <Input
                 value={env.apiUrl}

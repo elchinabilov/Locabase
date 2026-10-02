@@ -103,7 +103,16 @@ const selfHostedEnv = z.object({
   siteUrl: z.string().max(2048),
   backupDir: z.string().max(4096),
   backupRetentionDays: z.number().int().min(0).max(36500),
-  secretMap: secretMap.optional()
+  secretMap: secretMap.optional(),
+  coolify: z
+    .object({
+      baseUrl: z
+        .string()
+        .max(2048)
+        .regex(/^https?:\/\/[^/\s]+/, 'must be an http(s) URL'),
+      hasToken: z.boolean()
+    })
+    .optional()
 })
 
 const remoteEnv = z.discriminatedUnion('kind', [managedEnv, selfHostedEnv])

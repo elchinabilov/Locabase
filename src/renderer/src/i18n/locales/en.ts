@@ -580,7 +580,18 @@ const en = {
     kind: {
       label: 'Kind',
       managed: 'Managed — supabase.com',
-      selfHosted: 'Self-hosted — SSH + Docker'
+      selfHosted: 'Self-hosted — SSH + Docker',
+      coolify: 'Coolify (self-hosted) — SSH + Coolify API'
+    },
+    coolifyUrl: {
+      label: 'Coolify URL',
+      hint: 'The address you open Coolify at. Variables are saved through its API, so they appear under Environment Variables and survive a redeploy.'
+    },
+    coolifyToken: {
+      label: 'Coolify API token',
+      hintSaved: 'Saved. Entering a new value replaces it.',
+      hintNew:
+        'Coolify → Keys & Tokens → API tokens, with the write and read:sensitive abilities (Settings → Advanced → API access must be on). Encrypted in the system keychain.'
     },
     projectRef: { label: 'Project ref' },
     accessToken: {

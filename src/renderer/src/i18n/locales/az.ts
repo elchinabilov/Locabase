@@ -574,7 +574,18 @@ const az = {
     kind: {
       label: 'Növ',
       managed: 'Managed — supabase.com',
-      selfHosted: 'Self-hosted — SSH + Docker'
+      selfHosted: 'Self-hosted — SSH + Docker',
+      coolify: 'Coolify (self-hosted) — SSH + Coolify API'
+    },
+    coolifyUrl: {
+      label: 'Coolify URL',
+      hint: 'Coolify-ı açdığın ünvan. Dəyişənlər onun API-si ilə saxlanılır, ona görə Environment Variables bölməsində görünür və redeploy-dan sonra itmir.'
+    },
+    coolifyToken: {
+      label: 'Coolify API token',
+      hintSaved: 'Saxlanılıb. Yeni dəyər yazsan əvəzlənəcək.',
+      hintNew:
+        'Coolify → Keys & Tokens → API tokens, write və read:sensitive icazələri ilə (Settings → Advanced → API access açıq olmalıdır). Sistem açar anbarında şifrələnir.'
     },
     projectRef: { label: 'Project ref' },
     accessToken: {
