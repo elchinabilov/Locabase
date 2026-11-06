@@ -64,6 +64,8 @@ export const keys = {
   dbPassword: (envId: string): string => `env:${envId}:db_password`,
   sshPassphrase: (envId: string): string => `env:${envId}:ssh_passphrase`,
   coolifyToken: (envId: string): string => `env:${envId}:coolify_token`,
+  /** Cloudflare Access service-token secret in front of a Coolify instance. */
+  coolifyAccessSecret: (envId: string): string => `env:${envId}:coolify_access_secret`,
   /** The S3/R2 secret access key of a storage connection. */
   storageSecret: (storageId: string): string => `storage:${storageId}:secret_access_key`
 }

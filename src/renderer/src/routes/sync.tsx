@@ -161,20 +161,11 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
           .map((f) => f.name)
       )
     )
-    // Pre-selected: what we can prove is out of date. An unchanged key stays
-    // selectable — a managed remote returns no readable value, so "unchanged"
-    // there means "could not be compared".
-    setPickedSecrets(
-      new Set(
-        r.secrets.items
-          .filter((s) => s.where === 'local-only' || s.where === 'changed')
-          .map((s) => s.key)
-      )
-    )
+    // Secrets and auth variables overwrite production values, so nothing is
+    // pre-selected: the user ticks exactly what should be pushed.
+    setPickedSecrets(new Set())
     setPickedDeletes(new Set())
-    // A provider that is on locally and off on the server is the whole point of
-    // the axis, so everything that differs starts ticked.
-    setPickedAuth(new Set(r.authConfig.items.filter((a) => a.where !== 'both').map((a) => a.name)))
+    setPickedAuth(new Set())
   }, [project.id, env.id, run])
 
   const plan = useMemo(() => {
@@ -277,6 +268,13 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
               dirty={report.migrations.dirty}
               error={report.migrations.error}
               count={report.migrations.items.filter((m) => m.state === 'pending-remote').length}
+              select={selectAll(
+                report.migrations.items
+                  .filter((m) => m.state === 'pending-remote')
+                  .map((m) => m.version),
+                pickedMigrations,
+                setPickedMigrations
+              )}
             >
               {report.migrations.items
                 .filter((m) => m.state !== 'synced')
@@ -319,6 +317,11 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
               dirty={report.functions.dirty}
               error={report.functions.error}
               count={pickedFunctions.size}
+              select={selectAll(
+                report.functions.items.filter((f) => f.path !== '').map((f) => f.name),
+                pickedFunctions,
+                setPickedFunctions
+              )}
             >
               {report.functions.items.map((f) => (
                 <Pick
@@ -363,6 +366,11 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
               dirty={report.secrets.dirty}
               error={report.secrets.error}
               count={pickedSecrets.size + pickedDeletes.size}
+              select={selectAll(
+                report.secrets.items.filter((s) => s.where !== 'remote-only').map((s) => s.key),
+                pickedSecrets,
+                setPickedSecrets
+              )}
             >
               {report.secrets.items
                 .filter((s) => s.where !== 'remote-only')
@@ -415,6 +423,11 @@ function EnvPanel({ project, env }: { project: Project; env: RemoteEnv }): React
               dirty={report.authConfig.dirty}
               error={report.authConfig.error}
               count={pickedAuth.size}
+              select={selectAll(
+                report.authConfig.items.map((a) => a.name),
+                pickedAuth,
+                setPickedAuth
+              )}
             >
               {report.authConfig.items.map((a) => (
                 <Pick
@@ -527,23 +540,69 @@ function Health({
   )
 }
 
+type AxisSelect = { total: number; selected: number; onChange: (all: boolean) => void }
+
+/** Header "select / deselect all" state for one group of picks. */
+function selectAll(
+  keys: string[],
+  picked: Set<string>,
+  setPicked: (fn: (prev: Set<string>) => Set<string>) => void
+): AxisSelect {
+  return {
+    total: keys.length,
+    selected: keys.filter((k) => picked.has(k)).length,
+    onChange: (all) =>
+      setPicked((prev) => {
+        const next = new Set(prev)
+        for (const k of keys) {
+          if (all) next.add(k)
+          else next.delete(k)
+        }
+        return next
+      })
+  }
+}
+
 function Axis({
   title,
   dirty,
   error,
   count,
+  select,
   children
 }: {
   title: string
   dirty: boolean
   error: string | null
   count?: number
+  select?: AxisSelect
   children?: ReactNode
 }): ReactNode {
   const t = useT()
+  const all = select !== undefined && select.total > 0 && select.selected === select.total
+  const some = select !== undefined && select.selected > 0 && !all
   return (
     <Card
-      title={title}
+      title={
+        select && select.total > 0 ? (
+          <label className="flex cursor-pointer items-center gap-2.5">
+            <input
+              type="checkbox"
+              checked={all}
+              ref={(el) => {
+                if (el) el.indeterminate = some
+              }}
+              onChange={() => select.onChange(!all)}
+              aria-label={all ? t('sync.deselectAll') : t('sync.selectAll')}
+              title={all ? t('sync.deselectAll') : t('sync.selectAll')}
+              className="accent-accent"
+            />
+            <span className="truncate">{title}</span>
+          </label>
+        ) : (
+          title
+        )
+      }
       actions={
         <>
           {count !== undefined && count > 0 && (

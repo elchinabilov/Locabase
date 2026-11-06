@@ -37,6 +37,13 @@ export interface CoolifyLink {
   baseUrl: string
   /** The API token lives in safeStorage; only its presence is stored here. */
   hasToken: boolean
+  /**
+   * Cloudflare Access service token, for an instance behind Zero Trust. The id is
+   * not secret and is kept here; the secret lives in safeStorage. Both headers are
+   * sent only when the id is set and a secret is saved.
+   */
+  accessClientId?: string
+  hasAccessSecret?: boolean
 }
 
 export interface SelfHostedEnv {

@@ -157,7 +157,8 @@ const handlers: Handlers = {
       secrets.keys.managedToken(envId),
       secrets.keys.dbPassword(envId),
       secrets.keys.sshPassphrase(envId),
-      secrets.keys.coolifyToken(envId)
+      secrets.keys.coolifyToken(envId),
+      secrets.keys.coolifyAccessSecret(envId)
     ]) {
       secrets.remove(key)
     }
@@ -173,6 +174,16 @@ const handlers: Handlers = {
     }
     secrets.set(secrets.keys.managedToken(envId), token)
     projects.upsertEnv(id, { ...env, hasToken: true })
+  },
+  'envs:setAccessSecret': async ({ id, envId, secret }) => {
+    const env = projects.getEnv(id, envId)
+    if (env.kind !== 'self-hosted' || !env.coolify) {
+      throw new Error(`«${env.name}» has no Coolify instance to hold an access secret for`)
+    }
+    const key = secrets.keys.coolifyAccessSecret(envId)
+    if (secret === '') secrets.remove(key)
+    else secrets.set(key, secret)
+    projects.upsertEnv(id, { ...env, coolify: { ...env.coolify, hasAccessSecret: secret !== '' } })
   },
   'envs:ping': async ({ id, envId }) =>
     adapterFor(projects.get(id), projects.getEnv(id, envId)).ping(),

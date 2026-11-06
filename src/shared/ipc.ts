@@ -119,6 +119,8 @@ export interface IpcContract {
   'envs:upsert': { req: { id: string; env: RemoteEnv }; res: Project }
   'envs:remove': { req: { id: string; envId: string }; res: Project }
   'envs:setToken': { req: { id: string; envId: string; token: string }; res: void }
+  /** Cloudflare Access service-token secret of a Coolify link; `''` removes it. */
+  'envs:setAccessSecret': { req: { id: string; envId: string; secret: string }; res: void }
   'envs:ping': { req: { id: string; envId: string }; res: HealthReport }
 
   /* --- sync / deploy --- */
@@ -333,6 +335,7 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'envs:upsert',
   'envs:remove',
   'envs:setToken',
+  'envs:setAccessSecret',
   'envs:ping',
   'sync:report',
   'sync:deploy',

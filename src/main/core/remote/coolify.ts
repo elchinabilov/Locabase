@@ -42,7 +42,15 @@ export class CoolifyAdapter extends SelfHostedAdapter {
           'is unknown — set the service id in the environment settings.'
       )
     }
-    return new CoolifyApi(coolify.baseUrl, token, uuid)
+    const clientId = coolify.accessClientId?.trim() ?? ''
+    const clientSecret = clientId !== '' ? getSecret(keys.coolifyAccessSecret(this.env.id)) : null
+    if (clientId !== '' && !clientSecret) {
+      throw new Error(
+        `«${this.env.name}» has a Cloudflare Access Client ID but no secret — add it in the environment settings.`
+      )
+    }
+    const access = clientId !== '' && clientSecret ? { clientId, clientSecret } : null
+    return new CoolifyApi(coolify.baseUrl, token, uuid, access)
   }
 
   override async ping(): Promise<HealthReport> {

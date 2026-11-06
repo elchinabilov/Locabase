@@ -110,7 +110,9 @@ const selfHostedEnv = z.object({
         .string()
         .max(2048)
         .regex(/^https?:\/\/[^/\s]+/, 'must be an http(s) URL'),
-      hasToken: z.boolean()
+      hasToken: z.boolean(),
+      accessClientId: z.string().max(512).optional(),
+      hasAccessSecret: z.boolean().optional()
     })
     .optional()
 })
@@ -253,6 +255,7 @@ export const IPC_SCHEMAS = {
   'envs:upsert': z.object({ id, env: remoteEnv }),
   'envs:remove': z.object({ id, envId }),
   'envs:setToken': z.object({ id, envId, token: z.string().max(8192) }),
+  'envs:setAccessSecret': z.object({ id, envId, secret: z.string().max(8192) }),
   'envs:ping': z.object({ id, envId }),
 
   /* --- sync / deploy --- */

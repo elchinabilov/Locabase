@@ -587,6 +587,16 @@ const az = {
       hintNew:
         'Coolify → Keys & Tokens → API tokens, write və read:sensitive icazələri ilə (Settings → Advanced → API access açıq olmalıdır). Sistem açar anbarında şifrələnir.'
     },
+    cfAccessClientId: {
+      label: 'Cloudflare Access Client ID',
+      hint: 'İstəyə bağlı — yalnız Coolify URL Cloudflare Zero Trust arxasındadırsa. Zero Trust → Access → Service credentials → Service Tokens, sonra <host>/api/* üçün Service Auth policy. Söndürmək üçün boş burax.'
+    },
+    cfAccessSecret: {
+      label: 'Cloudflare Access Client Secret',
+      hintSaved: 'Saxlanılıb. Yeni dəyər yazsan əvəzlənəcək.',
+      hintNew:
+        'Service token yaradılanda yalnız bir dəfə göstərilir. Sistem açar anbarında şifrələnir.'
+    },
     projectRef: { label: 'Project ref' },
     accessToken: {
       label: 'Access token',
@@ -705,6 +715,8 @@ const az = {
     authConfig: 'Auth provayderləri',
     authClean: 'Bütün provayderlər config.toml ilə eynidir',
     selectedCount: '{count} seçilib',
+    selectAll: 'Hamısını seç',
+    deselectAll: 'Seçimi təmizlə',
     hasDiff: 'fərq var',
     cleanAxis: 'təmiz',
     deployTitle: 'Deploy → {name}',

@@ -593,6 +593,15 @@ const en = {
       hintNew:
         'Coolify → Keys & Tokens → API tokens, with the write and read:sensitive abilities (Settings → Advanced → API access must be on). Encrypted in the system keychain.'
     },
+    cfAccessClientId: {
+      label: 'Cloudflare Access Client ID',
+      hint: 'Optional — only when the Coolify URL is behind Cloudflare Zero Trust. Zero Trust → Access → Service credentials → Service Tokens, then a Service Auth policy for <host>/api/*. Leave empty to turn it off.'
+    },
+    cfAccessSecret: {
+      label: 'Cloudflare Access Client Secret',
+      hintSaved: 'Saved. Entering a new value replaces it.',
+      hintNew: 'Shown once when the service token is created. Encrypted in the system keychain.'
+    },
     projectRef: { label: 'Project ref' },
     accessToken: {
       label: 'Access token',
@@ -712,6 +721,8 @@ const en = {
     authConfig: 'Auth providers',
     authClean: 'Every provider matches config.toml',
     selectedCount: '{count} selected',
+    selectAll: 'Select all',
+    deselectAll: 'Deselect all',
     hasDiff: 'diff found',
     cleanAxis: 'clean',
     deployTitle: 'Deploy → {name}',

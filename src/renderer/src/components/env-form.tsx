@@ -44,6 +44,7 @@ export function EnvForm({
   const t = useT()
   const [env, setEnv] = useState<RemoteEnv>(initial ?? emptyManaged())
   const [token, setToken] = useState('')
+  const [accessSecret, setAccessSecret] = useState('')
   const { run, busy, error } = useAction()
 
   // Coolify is a self-hosted environment with an API link, not a third kind, so
@@ -69,6 +70,19 @@ export function EnvForm({
       await call('envs:upsert', { id: project.id, env })
       if ((env.kind === 'managed' || env.coolify) && token.trim()) {
         await call('envs:setToken', { id: project.id, envId: env.id, token: token.trim() })
+      }
+      if (env.kind === 'self-hosted' && env.coolify) {
+        const clientId = env.coolify.accessClientId?.trim() ?? ''
+        if (clientId === '' && env.coolify.hasAccessSecret) {
+          // Clearing the id switches the service token off; the secret goes with it.
+          await call('envs:setAccessSecret', { id: project.id, envId: env.id, secret: '' })
+        } else if (clientId !== '' && accessSecret.trim()) {
+          await call('envs:setAccessSecret', {
+            id: project.id,
+            envId: env.id,
+            secret: accessSecret.trim()
+          })
+        }
       }
       return true
     })
@@ -196,6 +210,38 @@ export function EnvForm({
                     onChange={(e) => setToken(e.target.value)}
                     className="font-mono"
                     placeholder={env.coolify.hasToken ? '••••••••' : '1|…'}
+                  />
+                </Row>
+                <Row
+                  label={t('envForm.cfAccessClientId.label')}
+                  hint={t('envForm.cfAccessClientId.hint')}
+                >
+                  <Input
+                    value={env.coolify.accessClientId ?? ''}
+                    onChange={(e) =>
+                      patch<SelfHostedEnv>({
+                        coolify: { ...env.coolify!, accessClientId: e.target.value.trim() }
+                      })
+                    }
+                    className="font-mono"
+                    placeholder="xxxxxxxx.access"
+                  />
+                </Row>
+                <Row
+                  label={t('envForm.cfAccessSecret.label')}
+                  hint={
+                    env.coolify.hasAccessSecret
+                      ? t('envForm.cfAccessSecret.hintSaved')
+                      : t('envForm.cfAccessSecret.hintNew')
+                  }
+                >
+                  <Input
+                    type="password"
+                    value={accessSecret}
+                    onChange={(e) => setAccessSecret(e.target.value)}
+                    className="font-mono"
+                    placeholder={env.coolify.hasAccessSecret ? '••••••••' : ''}
+                    disabled={(env.coolify.accessClientId ?? '').trim() === ''}
                   />
                 </Row>
               </>
